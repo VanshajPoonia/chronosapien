@@ -3,7 +3,7 @@
 pub mod color;
 mod writer;
 
-pub use writer::{backspace, clear, init};
+pub use writer::{clear, init};
 
 #[macro_export]
 macro_rules! print {
