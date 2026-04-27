@@ -137,38 +137,10 @@ pub fn init(foreground: Color, background: Color) {
     }
 }
 
-pub fn set_theme(foreground: Color, background: Color) {
-    // SAFETY: Same reasoning as in `init`: no concurrent writers exist yet.
-    unsafe {
-        (*WRITER.0.get()).set_theme(foreground, background);
-    }
-}
-
 pub fn clear() {
     // SAFETY: Same reasoning as in `init`: VGA output is single-threaded here.
     unsafe {
         (*WRITER.0.get()).clear();
-    }
-}
-
-pub fn backspace() {
-    // SAFETY: Same reasoning as in `init`: VGA output is still single-threaded
-    // at this stage, so mutating the global writer remains safe.
-    unsafe {
-        let writer = &mut *WRITER.0.get();
-        if writer.column_position == 0 {
-            return;
-        }
-
-        writer.column_position -= 1;
-        writer.write_cell(
-            BUFFER_HEIGHT - 1,
-            writer.column_position,
-            ScreenChar {
-                ascii_character: b' ',
-                color_code: writer.color_code.value(),
-            },
-        );
     }
 }
 

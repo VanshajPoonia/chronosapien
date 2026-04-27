@@ -3,15 +3,12 @@
 #![no_std]
 #![no_main]
 
-mod keyboard;
 mod panic;
 mod serial;
-mod shell;
 mod theme;
 mod vga_text;
 
 use bootloader::{entry_point, BootInfo};
-use crate::{println, serial_println};
 use theme::Era;
 
 const STARTUP_ERA: Era = Era::Nineties;
@@ -26,14 +23,14 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     vga_text::clear();
 
     serial_println!("Time Capsule OS booting in {} mode", profile.name);
-    serial_println!("{}", profile.boot_text);
-
-    println!("{}", profile.boot_text);
     println!("Welcome to Time Capsule OS");
-    println!();
-    println!("{}", profile.banner);
-    println!("Keyboard polling enabled.");
-    println!("Type 'help' to see available commands.");
+    serial_println!("Welcome to Time Capsule OS");
 
-    shell::run(profile)
+    loop {
+        // SAFETY: The kernel has no scheduler yet, so halting in a loop is a
+        // simple way to stay alive without burning CPU in a tight spin loop.
+        unsafe {
+            core::arch::asm!("hlt");
+        }
+    }
 }

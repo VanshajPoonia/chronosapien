@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! VGA text mode color definitions.
 
 #[repr(u8)]
