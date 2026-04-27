@@ -1,26 +1,30 @@
 # Time Capsule OS Roadmap
 
-This roadmap keeps the project moving in a learning-first order.
+This roadmap keeps the project small, readable, and beginner-friendly.
 
-1. **boot**
-   Reach a reliable QEMU boot into our Rust kernel and understand the boot handoff.
-2. **text output**
-   Print clear status text to the VGA buffer and serial output for debugging.
-3. **keyboard input**
-   Read key presses from the keyboard controller, decode scancodes, and feed a shell input buffer.
-4. **shell**
-   Add a tiny command loop with built-in commands like `help`, `clear`, and `about`.
-5. **era switching**
-   Let the shell switch between era profiles without rebooting the machine.
-6. **interrupts**
-   Set up the IDT and handle hardware/software interrupts safely.
-7. **timer**
-   Configure a periodic timer so the kernel can track time and schedule periodic work.
-8. **memory management**
-   Build paging and frame-allocation concepts into explicit, readable modules.
-9. **allocator**
-   Add a simple heap allocator so dynamic data structures become possible.
-10. **filesystem**
-    Create a tiny readable filesystem layer for storing commands, text, or settings.
-11. **simple GUI later**
-    Explore a small graphical desktop only after the terminal-first kernel is comfortable.
+## Milestone 1: boot to a welcome message
+
+Goal:
+- Build a Rust `no_std` kernel for `x86_64-unknown-none`
+- Boot it in QEMU using the existing `bootloader` crate
+- Print `Welcome to Time Capsule OS`
+
+Status:
+- This is the current baseline for the repo.
+
+## Next milestones
+
+1. **keyboard input**
+   Read key presses from the keyboard controller and print simple feedback.
+2. **tiny shell**
+   Add a small command loop with a fixed buffer and a few built-in commands.
+3. **interrupts and timer**
+   Set up the IDT and a periodic timer so the kernel stops being purely synchronous.
+4. **memory management**
+   Introduce paging concepts, frame allocation, and the first allocator pieces.
+5. **filesystem and persistence**
+   Add a tiny storage layer for settings or simple text data.
+6. **theme switching**
+   Make era selection interactive only after the text terminal is stable.
+7. **graphics later**
+   Explore a simple GUI after the text-first system feels comfortable.
