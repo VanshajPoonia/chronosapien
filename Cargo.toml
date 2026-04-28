@@ -1,0 +1,15 @@
+[package]
+name = "chrono_os"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bootloader = "0.9"
+
+[package.metadata.bootimage]
+build-command = ["build"]
+run-command = [
+    "qemu-system-x86_64",
+    "-drive",
+    "format=raw,file={}",
+]
