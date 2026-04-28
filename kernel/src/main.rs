@@ -11,7 +11,7 @@ mod vga_text;
 use bootloader::{entry_point, BootInfo};
 use theme::Era;
 
-const STARTUP_ERA: Era = Era::Nineties;
+const STARTUP_ERA: Era = Era::Eighties;
 
 entry_point!(kernel_main);
 
@@ -22,8 +22,13 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     vga_text::init(profile.fg, profile.bg);
     vga_text::clear();
 
-    serial_println!("Time Capsule OS booting in {} mode", profile.name);
+    println!("TIME CAPSULE OS");
+    println!("---------------");
+    println!();
+    println!("Era: {}", profile.name);
     println!("Welcome to Time Capsule OS");
+
+    serial_println!("Time Capsule OS booting in {} mode", profile.name);
     serial_println!("Welcome to Time Capsule OS");
 
     loop {

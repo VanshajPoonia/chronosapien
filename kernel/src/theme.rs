@@ -23,7 +23,7 @@ impl Era {
     pub const fn profile(self) -> EraProfile {
         match self {
             Era::Eighties => EraProfile {
-                name: "1980s",
+                name: "1984",
                 fg: Color::LightGreen,
                 bg: Color::Black,
             },
