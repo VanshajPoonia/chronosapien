@@ -22,13 +22,15 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     vga_text::init(profile.fg, profile.bg);
     vga_text::clear();
 
+    let era_name = STARTUP_ERA.name();
+
     println!("TIME CAPSULE OS");
     println!("---------------");
     println!();
-    println!("Era: {}", profile.name);
+    println!("Era: {}", era_name);
     println!("Welcome to Time Capsule OS");
 
-    serial_println!("Time Capsule OS booting in {} mode", profile.name);
+    serial_println!("Time Capsule OS booting in {} mode", era_name);
     serial_println!("Welcome to Time Capsule OS");
 
     loop {
