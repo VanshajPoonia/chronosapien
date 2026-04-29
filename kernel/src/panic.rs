@@ -6,7 +6,7 @@ use core::panic::PanicInfo;
 fn panic(info: &PanicInfo) -> ! {
     // In a `no_std` kernel there is no operating system to unwind into, so the
     // panic path must report the error itself and then stop execution safely.
-    crate::serial_println!("[panic] {}", info);
+    crate::serial_println!("[TCOS] panic: {}", info);
     crate::println!();
     crate::println!("[panic] {}", info);
 

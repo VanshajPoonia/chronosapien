@@ -18,12 +18,16 @@ entry_point!(kernel_main);
 
 fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     serial::init();
+    serial_println!("[TCOS] boot start");
+    serial_println!("[TCOS] serial initialized");
 
     let profile = STARTUP_ERA.profile();
     console::init(profile.fg, profile.bg);
     console::clear();
+    serial_println!("[TCOS] console initialized");
 
     let era_name = STARTUP_ERA.name();
+    serial_println!("[TCOS] active era: {}", era_name);
 
     println!("## TIME CAPSULE OS");
     println!();
@@ -31,8 +35,7 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     println!();
     println!("Welcome to Time Capsule OS");
 
-    serial_println!("Time Capsule OS booting in {} mode", era_name);
-    serial_println!("Welcome to Time Capsule OS");
+    serial_println!("[TCOS] boot complete");
 
     loop {
         // SAFETY: The kernel has no scheduler yet, so halting in a loop is a
