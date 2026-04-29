@@ -3,6 +3,7 @@
 #![no_std]
 #![no_main]
 
+mod console;
 mod panic;
 mod serial;
 mod theme;
@@ -19,15 +20,15 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     serial::init();
 
     let profile = STARTUP_ERA.profile();
-    vga_text::init(profile.fg, profile.bg);
-    vga_text::clear();
+    console::init(profile.fg, profile.bg);
+    console::clear();
 
     let era_name = STARTUP_ERA.name();
 
-    println!("TIME CAPSULE OS");
-    println!("---------------");
+    println!("## TIME CAPSULE OS");
     println!();
     println!("Era: {}", era_name);
+    println!();
     println!("Welcome to Time Capsule OS");
 
     serial_println!("Time Capsule OS booting in {} mode", era_name);
