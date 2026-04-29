@@ -23,6 +23,13 @@ Time Capsule OS is split into **our code** and **borrowed infrastructure** on pu
 
 We keep the early boot plumbing borrowed so you can focus on kernel code first. That keeps Milestone 1 centered on a few core ideas: entrypoints, console output, panic handling, and the basic shape of a bare-metal Rust crate.
 
+## COM1 serial logging
+
+QEMU provides a virtual 16550-compatible serial device at COM1 port `0x3F8`.
+When QEMU runs with `-serial stdio`, bytes written to that port appear in the
+host terminal. Time Capsule OS uses that path for early boot logs and panic
+messages because it still works even when VGA output is hard to inspect.
+
 ## What still hides low-level behavior
 
 - `bootloader` still hides the CPU mode switch, stack setup, paging setup, and the exact boot handoff details.
