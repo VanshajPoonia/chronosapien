@@ -7,7 +7,8 @@ Time Capsule OS is split into **our code** and **borrowed infrastructure** on pu
 - The kernel entrypoint in `kernel/src/main.rs`
 - The panic path in `kernel/src/panic.rs`
 - The serial logger in `kernel/src/serial.rs`
-- The VGA text writer in `kernel/src/vga_text/`
+- The public console layer in `kernel/src/console.rs`
+- The low-level VGA text writer in `kernel/src/vga_text/`
 - The era model in `kernel/src/theme.rs`
 - The startup welcome message
 - The PowerShell helper scripts and documentation
@@ -20,7 +21,7 @@ Time Capsule OS is split into **our code** and **borrowed infrastructure** on pu
 
 ## Why this split is good for learning
 
-We keep the early boot plumbing borrowed so you can focus on kernel code first. That keeps Milestone 1 centered on a few core ideas: entrypoints, text output, panic handling, and the basic shape of a bare-metal Rust crate.
+We keep the early boot plumbing borrowed so you can focus on kernel code first. That keeps Milestone 1 centered on a few core ideas: entrypoints, console output, panic handling, and the basic shape of a bare-metal Rust crate.
 
 ## What still hides low-level behavior
 

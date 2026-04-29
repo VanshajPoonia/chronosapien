@@ -12,10 +12,10 @@ The initial boot flow is intentionally small and readable.
 The VGA banner is:
 
 ```text
-TIME CAPSULE OS
----------------
+## TIME CAPSULE OS
 
 Era: 1984
+
 Welcome to Time Capsule OS
 ```
 
