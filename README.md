@@ -1,6 +1,6 @@
 # Time Capsule OS
 
-Time Capsule OS is a beginner-friendly hobby operating system project in Rust. Milestone 1 keeps things intentionally small: boot a Rust kernel in QEMU and print one welcome message.
+Time Capsule OS is a beginner-friendly hobby operating system project in Rust. Milestone 1 keeps things intentionally small: boot a Rust kernel in QEMU and print a structured startup banner.
 
 ## Folder structure
 
@@ -64,9 +64,10 @@ The kernel currently does four things:
 - boots through the borrowed `bootloader` crate,
 - initializes serial output,
 - initializes VGA text output with a fixed era profile,
-- prints `Welcome to Time Capsule OS` and halts.
+- prints a structured VGA banner with the current era name,
+- halts cleanly after startup.
 
-That small scope is deliberate. It gives us a clean baseline before adding input, interrupts, memory management, or a shell.
+That small scope is deliberate. It gives us a clean baseline before adding more input, interrupts, memory management, or deeper shell behavior.
 
 ## Exact setup commands
 
@@ -121,7 +122,29 @@ qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\booti
 
 ## Boot flow in plain language
 
-QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader` crate performs the early machine setup we are intentionally skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes serial output, configures VGA text output from the selected era profile, prints `Welcome to Time Capsule OS`, and then halts.
+QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader` crate performs the early machine setup we are intentionally skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes serial output, configures VGA text output from the selected era profile, prints the startup banner, and then halts.
+
+The VGA screen shows:
+
+```text
+TIME CAPSULE OS
+---------------
+
+Era: 1984
+Welcome to Time Capsule OS
+```
+
+## VGA text output in simple terms
+
+VGA text mode gives the kernel a small screen buffer at memory address `0xb8000`.
+Each visible character cell uses two bytes:
+
+- one byte stores the ASCII character,
+- one byte stores the foreground and background color.
+
+The writer uses volatile reads and writes because this address belongs to
+hardware, not normal memory. The `vga_text` module keeps that detail in one
+place so the rest of the kernel can use `print!` and `println!`.
 
 ## What to build next
 
