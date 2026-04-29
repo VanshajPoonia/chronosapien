@@ -3,5 +3,5 @@
 pub mod color;
 mod writer;
 
-pub use writer::{clear, init};
+pub use writer::{backspace, clear, init};
 pub use writer::print;

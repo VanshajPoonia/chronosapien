@@ -17,6 +17,10 @@ pub fn clear() {
     vga_text::clear();
 }
 
+pub fn backspace() {
+    vga_text::backspace();
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     vga_text::print(args);

@@ -74,6 +74,21 @@ impl Writer {
         }
     }
 
+    fn backspace(&mut self) {
+        if self.column_position == 0 {
+            return;
+        }
+
+        self.column_position -= 1;
+
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code.value(),
+        };
+
+        self.write_cell(BUFFER_HEIGHT - 1, self.column_position, blank);
+    }
+
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
@@ -141,6 +156,14 @@ pub fn clear() {
     // SAFETY: Same reasoning as in `init`: VGA output is single-threaded here.
     unsafe {
         (*WRITER.0.get()).clear();
+    }
+}
+
+pub fn backspace() {
+    // SAFETY: Same reasoning as in `init`: this is a single polling loop with
+    // no interrupts, so no other code can mutate the VGA writer at once.
+    unsafe {
+        (*WRITER.0.get()).backspace();
     }
 }
 
