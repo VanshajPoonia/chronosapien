@@ -13,6 +13,7 @@ time-capsule-os/
 |-- kernel/
 |   |-- Cargo.toml
 |   `-- src/
+|       |-- console.rs
 |       |-- main.rs
 |       |-- panic.rs
 |       |-- serial.rs
@@ -38,6 +39,7 @@ time-capsule-os/
 - `rust-toolchain.toml` pins the nightly toolchain and required components.
 - `.cargo/config.toml` sets the default build target to `x86_64-unknown-none`.
 - `kernel/Cargo.toml` defines the kernel crate and its dependency on `bootloader`.
+- `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
 - `kernel/src/main.rs` is the kernel entrypoint and first boot flow.
 - `kernel/src/panic.rs` handles panics in a `no_std` environment.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
@@ -59,7 +61,7 @@ That is the only dependency in the kernel. VGA text output and serial output are
 
 ## Current milestone
 
-The kernel currently does four things:
+The kernel currently does five things:
 
 - boots through the borrowed `bootloader` crate,
 - initializes serial output,
@@ -127,10 +129,10 @@ QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader
 The VGA screen shows:
 
 ```text
-TIME CAPSULE OS
----------------
+## TIME CAPSULE OS
 
 Era: 1984
+
 Welcome to Time Capsule OS
 ```
 
@@ -144,13 +146,14 @@ Each visible character cell uses two bytes:
 
 The writer uses volatile reads and writes because this address belongs to
 hardware, not normal memory. The `vga_text` module keeps that detail in one
-place so the rest of the kernel can use `print!` and `println!`.
+place, while `console.rs` gives the rest of the kernel simple `print!` and
+`println!` macros.
 
 ## What to build next
 
-1. Add keyboard input.
-2. Add a tiny shell.
-3. Set up interrupts and a timer.
+1. Add a static read-only prompt such as `> _`.
+2. Add real keyboard input later.
+3. Set up interrupts and a timer after keyboard planning is clear.
 4. Add memory-management pieces once the text-only boot path feels comfortable.
 
 ## What is ours and what is borrowed
