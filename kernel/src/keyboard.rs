@@ -62,7 +62,8 @@ pub fn read_key() -> Option<KeyEvent> {
 fn decode_scancode(scancode: u8, shift_pressed: bool) -> Option<u8> {
     // These are the common set-1 scancodes produced by a standard PC keyboard
     // in QEMU's default PS/2-compatible path. We only decode the subset needed
-    // for a tiny shell so the table stays readable.
+    // for text input so the table stays readable. Each match arm maps one raw
+    // keyboard scancode to the ASCII byte the console should display.
     let byte = match (scancode, shift_pressed) {
         (0x02, false) => b'1',
         (0x03, false) => b'2',
