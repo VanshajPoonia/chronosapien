@@ -20,25 +20,34 @@ pub struct EraProfile {
 }
 
 impl Era {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Era::Eighties => "1984",
+            Era::Nineties => "1990s",
+            Era::TwoThousands => "2000s",
+            Era::Future => "future",
+        }
+    }
+
     pub const fn profile(self) -> EraProfile {
         match self {
             Era::Eighties => EraProfile {
-                name: "1984",
+                name: self.name(),
                 fg: Color::LightGreen,
                 bg: Color::Black,
             },
             Era::Nineties => EraProfile {
-                name: "1990s",
+                name: self.name(),
                 fg: Color::LightCyan,
                 bg: Color::Blue,
             },
             Era::TwoThousands => EraProfile {
-                name: "2000s",
+                name: self.name(),
                 fg: Color::Black,
                 bg: Color::LightGray,
             },
             Era::Future => EraProfile {
-                name: "future",
+                name: self.name(),
                 fg: Color::LightMagenta,
                 bg: Color::Black,
             },
