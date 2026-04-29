@@ -14,6 +14,7 @@ time-capsule-os/
 |   |-- Cargo.toml
 |   `-- src/
 |       |-- console.rs
+|       |-- keyboard.rs
 |       |-- main.rs
 |       |-- panic.rs
 |       |-- serial.rs
@@ -40,6 +41,7 @@ time-capsule-os/
 - `.cargo/config.toml` sets the default build target to `x86_64-unknown-none`.
 - `kernel/Cargo.toml` defines the kernel crate and its dependency on `bootloader`.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
+- `kernel/src/keyboard.rs` polls the PS/2 keyboard and turns scancodes into simple key events.
 - `kernel/src/main.rs` is the kernel entrypoint and first boot flow.
 - `kernel/src/panic.rs` handles panics in a `no_std` environment.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
@@ -61,16 +63,17 @@ That is the only dependency in the kernel. VGA text output and serial output are
 
 ## Current milestone
 
-The kernel currently does five things:
+The kernel currently does seven things:
 
 - boots through the borrowed `bootloader` crate,
 - initializes COM1 serial logging,
 - initializes VGA text output with a fixed era profile,
-- prints a structured VGA banner with the current era name,
+- prints a compact VGA banner with the current era name,
+- polls the PS/2 keyboard and echoes typed characters,
 - logs the boot sequence to the QEMU terminal,
-- halts cleanly after startup.
+- waits in a tiny input loop without interrupts or a heap.
 
-That small scope is deliberate. It gives us a clean baseline before adding more input, interrupts, memory management, or deeper shell behavior.
+That small scope is deliberate. It gives us a clean baseline before adding shell commands, interrupts, memory management, or deeper terminal behavior.
 
 ## Exact setup commands
 
@@ -130,11 +133,9 @@ QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader
 The VGA screen shows:
 
 ```text
-## TIME CAPSULE OS
-
+TIME CAPSULE OS
 Era: 1984
-
-Welcome to Time Capsule OS
+TCOS/84> _
 ```
 
 With `-serial stdio`, the QEMU terminal shows:
@@ -145,6 +146,15 @@ With `-serial stdio`, the QEMU terminal shows:
 [TCOS] console initialized
 [TCOS] active era: 1984
 [TCOS] boot complete
+```
+
+Keyboard debugging adds lines like:
+
+```text
+[TCOS] key: a
+[TCOS] key: backspace
+[TCOS] key: enter
+[TCOS] line submitted: hello
 ```
 
 ## VGA text output in simple terms
@@ -171,12 +181,23 @@ This repo uses small inline `in` and `out` assembly helpers instead of adding a
 port I/O crate. That keeps the dependency list short and makes the hardware
 access visible while the serial code is still tiny.
 
+## PS/2 keyboard input in simple terms
+
+The PS/2 controller exposes two important I/O ports in QEMU's PC-compatible
+machine:
+
+- `0x64` is the status port. The kernel checks it to see whether a keyboard byte is ready.
+- `0x60` is the data port. The kernel reads one scancode from it after the status port says data is waiting.
+
+The keyboard module uses a small scancode lookup table for common set-1 keys.
+It turns those scancodes into ASCII bytes, backspace, or enter events. The input
+buffer is a fixed-size array on the stack, so this milestone still uses no heap.
+
 ## What to build next
 
-1. Add a static read-only prompt such as `> _`.
-2. Add real keyboard input later.
-3. Set up interrupts and a timer after keyboard planning is clear.
-4. Add memory-management pieces once the text-only boot path feels comfortable.
+1. Add a tiny command dispatcher for `help`, `clear`, and `about`.
+2. Set up interrupts and a timer after the polling path is easy to understand.
+3. Add memory-management pieces once the text-only boot path feels comfortable.
 
 ## What is ours and what is borrowed
 
