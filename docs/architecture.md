@@ -8,6 +8,7 @@ Time Capsule OS is split into **our code** and **borrowed infrastructure** on pu
 - The panic path in `kernel/src/panic.rs`
 - The serial logger in `kernel/src/serial.rs`
 - The public console layer in `kernel/src/console.rs`
+- The polling keyboard reader in `kernel/src/keyboard.rs`
 - The low-level VGA text writer in `kernel/src/vga_text/`
 - The era model in `kernel/src/theme.rs`
 - The startup welcome message
