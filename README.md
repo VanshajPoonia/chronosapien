@@ -64,9 +64,10 @@ That is the only dependency in the kernel. VGA text output and serial output are
 The kernel currently does five things:
 
 - boots through the borrowed `bootloader` crate,
-- initializes serial output,
+- initializes COM1 serial logging,
 - initializes VGA text output with a fixed era profile,
 - prints a structured VGA banner with the current era name,
+- logs the boot sequence to the QEMU terminal,
 - halts cleanly after startup.
 
 That small scope is deliberate. It gives us a clean baseline before adding more input, interrupts, memory management, or deeper shell behavior.
@@ -124,7 +125,7 @@ qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\booti
 
 ## Boot flow in plain language
 
-QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader` crate performs the early machine setup we are intentionally skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes serial output, configures VGA text output from the selected era profile, prints the startup banner, and then halts.
+QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader` crate performs the early machine setup we are intentionally skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes COM1 serial output, configures VGA text output from the selected era profile, prints the startup banner, logs the boot sequence, and then halts.
 
 The VGA screen shows:
 
@@ -134,6 +135,16 @@ The VGA screen shows:
 Era: 1984
 
 Welcome to Time Capsule OS
+```
+
+With `-serial stdio`, the QEMU terminal shows:
+
+```text
+[TCOS] boot start
+[TCOS] serial initialized
+[TCOS] console initialized
+[TCOS] active era: 1984
+[TCOS] boot complete
 ```
 
 ## VGA text output in simple terms
@@ -148,6 +159,17 @@ The writer uses volatile reads and writes because this address belongs to
 hardware, not normal memory. The `vga_text` module keeps that detail in one
 place, while `console.rs` gives the rest of the kernel simple `print!` and
 `println!` macros.
+
+## COM1 serial output in simple terms
+
+QEMU exposes a virtual 16550 UART at the classic COM1 I/O port address `0x3F8`.
+The kernel configures that serial port once during startup. After that, writing
+bytes to the COM1 data port sends text to the host terminal when QEMU is run
+with `-serial stdio`.
+
+This repo uses small inline `in` and `out` assembly helpers instead of adding a
+port I/O crate. That keeps the dependency list short and makes the hardware
+access visible while the serial code is still tiny.
 
 ## What to build next
 
