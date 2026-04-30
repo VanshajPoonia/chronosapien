@@ -39,6 +39,16 @@ pub fn run(prompt: &str) -> ! {
                 show_cursor(&mut cursor_visible);
                 idle_ticks = 0;
             }
+            Some(KeyEvent::Enter) => {
+                hide_cursor(&mut cursor_visible);
+                println!();
+
+                execute_command(buffer.as_str());
+                buffer.clear();
+                print_prompt(prompt);
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
+            }
             Some(_) => {
                 idle_ticks = 0;
             }
@@ -100,6 +110,14 @@ impl CommandBuffer {
         // SAFETY: The keyboard decoder only returns printable ASCII bytes, and
         // ASCII is always valid UTF-8.
         unsafe { core::str::from_utf8_unchecked(&self.bytes[..self.len]) }
+    }
+}
+
+fn execute_command(command: &str) {
+    let command = command.trim();
+
+    if !command.is_empty() {
+        serial_println!("[CHRONO] cmd: {}", command);
     }
 }
 
