@@ -1,41 +1,87 @@
 //! Tiny line-based shell for the first interactive milestone.
 
+use crate::console;
 use crate::keyboard::{self, KeyEvent};
-use crate::theme::EraProfile;
-use crate::vga_text;
-use crate::{print, println, serial_print, serial_println};
+use crate::theme::Era;
+use crate::{print, println, serial_println};
 
-const COMMAND_BUFFER_CAPACITY: usize = 64;
+const COMMAND_BUFFER_CAPACITY: usize = 80;
+const CURSOR_BLINK_TICKS: usize = 80_000;
+const RESET_COMMAND_PORT: u16 = 0x64;
+const CPU_RESET_COMMAND: u8 = 0xFE;
 
-pub fn run(profile: EraProfile) -> ! {
+pub fn run(startup_era: Era) -> ! {
+    let mut state = ShellState::new(startup_era);
     let mut buffer = CommandBuffer::new();
+    let mut cursor_visible = true;
+    let mut idle_ticks = 0;
 
-    print_prompt(profile);
+    print_prompt(&state);
+    draw_cursor();
 
     loop {
         match keyboard::read_key() {
             Some(KeyEvent::Char(byte)) => {
+                hide_cursor(&mut cursor_visible);
+
                 if buffer.push(byte) {
                     print!("{}", byte as char);
-                    serial_print!("{}", byte as char);
+                } else {
+                    serial_println!("[CHRONO] input buffer full");
                 }
+
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
             }
             Some(KeyEvent::Backspace) => {
+                hide_cursor(&mut cursor_visible);
+
                 if buffer.pop().is_some() {
-                    vga_text::backspace();
-                    serial_print!("\u{8} \u{8}");
+                    console::backspace();
                 }
+
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
             }
             Some(KeyEvent::Enter) => {
+                hide_cursor(&mut cursor_visible);
                 println!();
-                serial_println!();
 
-                execute_command(buffer.as_str(), profile);
+                execute_command(buffer.as_str(), &mut state);
                 buffer.clear();
-                print_prompt(profile);
+                print_prompt(&state);
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
             }
-            None => cpu_relax(),
+            None => {
+                idle_ticks += 1;
+
+                if idle_ticks >= CURSOR_BLINK_TICKS {
+                    toggle_cursor(&mut cursor_visible);
+                    idle_ticks = 0;
+                }
+
+                cpu_relax();
+            }
         }
+    }
+}
+
+struct ShellState {
+    active_era: Era,
+}
+
+impl ShellState {
+    const fn new(active_era: Era) -> Self {
+        Self { active_era }
+    }
+
+    fn active_era(&self) -> Era {
+        self.active_era
+    }
+
+    fn switch_era(&mut self, era: Era) {
+        self.active_era = era;
     }
 }
 
@@ -82,55 +128,122 @@ impl CommandBuffer {
     }
 }
 
-fn execute_command(command: &str, profile: EraProfile) {
+fn execute_command(command: &str, state: &mut ShellState) {
+    let command = command.trim();
+
+    if !command.is_empty() {
+        serial_println!("[CHRONO] command: {}", command);
+    }
+
     match command {
         "" => {}
         "help" => print_help(),
-        "clear" => clear_screen(profile),
-        "about" => print_about(profile),
-        _ => {
-            println!("Unknown command: {}", command);
-            println!("Try 'help'.");
-            serial_println!("Unknown command: {}", command);
-            serial_println!("Try 'help'.");
+        "clear" => console::clear(),
+        "about" => print_about(state),
+        "reboot" => reboot(),
+        command if command == "era" || command.starts_with("era ") => {
+            run_era_command(command, state)
         }
+        _ => println!("Unknown command: {}", command),
     }
 }
 
-fn print_prompt(profile: EraProfile) {
+fn run_era_command(command: &str, state: &mut ShellState) {
+    let mut parts = command.split_ascii_whitespace();
+    let _command_name = parts.next();
+
+    let Some(year) = parts.next() else {
+        print_era_usage();
+        return;
+    };
+
+    if parts.next().is_some() {
+        print_era_usage();
+        return;
+    }
+
+    match Era::from_year(year) {
+        Some(era) => switch_era(state, era),
+        None => print_era_usage(),
+    }
+}
+
+fn switch_era(state: &mut ShellState, era: Era) {
+    let profile = era.profile();
+
+    println!("Switching to {} mode...", profile.name);
+
+    // Era is plain mutable shell state rather than `static mut`: the kernel is
+    // currently one polling loop, so Rust's normal `&mut ShellState` borrow is
+    // enough. Future interrupt-visible era state should use a documented
+    // synchronization primitive instead of raw global mutation.
+    state.switch_era(era);
+    console::init(profile.fg, profile.bg);
+    serial_println!("[CHRONO] era switched to {}", profile.name);
+}
+
+fn print_era_usage() {
+    println!("Usage: era 1984|1995|2007|2040");
+}
+
+fn print_prompt(state: &ShellState) {
+    let profile = state.active_era().profile();
+
     print!("{} ", profile.prompt);
-    serial_print!("{} ", profile.prompt);
+}
+
+fn draw_cursor() {
+    print!("_");
+}
+
+fn erase_cursor() {
+    console::backspace();
+}
+
+fn show_cursor(cursor_visible: &mut bool) {
+    if !*cursor_visible {
+        draw_cursor();
+        *cursor_visible = true;
+    }
+}
+
+fn hide_cursor(cursor_visible: &mut bool) {
+    if *cursor_visible {
+        erase_cursor();
+        *cursor_visible = false;
+    }
+}
+
+fn toggle_cursor(cursor_visible: &mut bool) {
+    if *cursor_visible {
+        erase_cursor();
+        *cursor_visible = false;
+    } else {
+        draw_cursor();
+        *cursor_visible = true;
+    }
 }
 
 fn print_help() {
-    println!("Available commands:");
-    println!("  help  - show the command list");
-    println!("  clear - clear the screen");
-    println!("  about - show information about Time Capsule OS");
-
-    serial_println!("Available commands:");
-    serial_println!("  help  - show the command list");
-    serial_println!("  clear - clear the screen");
-    serial_println!("  about - show information about Time Capsule OS");
+    println!("Commands: help, clear, about, reboot, era");
 }
 
-fn clear_screen(profile: EraProfile) {
-    vga_text::clear();
-    println!("Welcome to Time Capsule OS");
-    println!("{}", profile.banner);
-    println!("Current era: {}", profile.name);
+fn print_about(state: &ShellState) {
+    let profile = state.active_era().profile();
 
-    serial_println!("Screen cleared.");
+    println!("Time Capsule OS | Era: {} | v0.1", profile.name);
 }
 
-fn print_about(profile: EraProfile) {
-    println!("Time Capsule OS is a learning-first Rust hobby kernel.");
-    println!("Current era profile: {}", profile.name);
-    println!("Future shell expansion will add era switching.");
+fn reboot() -> ! {
+    serial_println!("[CHRONO] reboot requested");
 
-    serial_println!("Time Capsule OS is a learning-first Rust hobby kernel.");
-    serial_println!("Current era profile: {}", profile.name);
-    serial_println!("Future shell expansion will add era switching.");
+    // SAFETY: Port 0x64 is the PS/2 controller command port on the
+    // PC-compatible machine QEMU emulates. Command 0xFE requests a CPU reset.
+    unsafe {
+        outb(RESET_COMMAND_PORT, CPU_RESET_COMMAND);
+    }
+
+    halt_forever()
 }
 
 fn cpu_relax() {
@@ -139,4 +252,25 @@ fn cpu_relax() {
     unsafe {
         core::arch::asm!("pause", options(nomem, nostack, preserves_flags));
     }
+}
+
+fn halt_forever() -> ! {
+    loop {
+        // SAFETY: `hlt` stops the CPU until the next external interrupt. This
+        // fallback is only reached if the reboot command does not reset.
+        unsafe {
+            core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+        }
+    }
+}
+
+unsafe fn outb(port: u16, value: u8) {
+    // SAFETY: The caller must ensure `port` belongs to the intended hardware
+    // device and `value` is a valid command for that port.
+    core::arch::asm!(
+        "out dx, al",
+        in("dx") port,
+        in("al") value,
+        options(nomem, nostack, preserves_flags)
+    );
 }

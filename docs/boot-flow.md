@@ -14,17 +14,17 @@ The VGA banner is:
 ```text
 TIME CAPSULE OS
 Era: 1984
-TCOS/84> _
+CHRONO/84> _
 ```
 
 The QEMU terminal shows:
 
 ```text
-[TCOS] boot start
-[TCOS] serial initialized
-[TCOS] console initialized
-[TCOS] active era: 1984
-[TCOS] boot complete
+[CHRONO] boot start
+[CHRONO] serial initialized
+[CHRONO] console initialized
+[CHRONO] active era: 1984
+[CHRONO] boot complete
 ```
 
 After that, typed keys are echoed on the VGA screen and logged to serial. Enter
