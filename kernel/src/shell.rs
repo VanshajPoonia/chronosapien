@@ -9,7 +9,7 @@ const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
 const PROMPT: &str = "TCOS/84>";
 
-pub fn run(profile: EraProfile) -> ! {
+pub fn run(_profile: EraProfile) -> ! {
     let mut buffer = CommandBuffer::new();
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
@@ -46,7 +46,7 @@ pub fn run(profile: EraProfile) -> ! {
                 println!();
                 serial_println!();
 
-                execute_command(buffer.as_str(), profile);
+                execute_command(buffer.as_str());
                 buffer.clear();
                 print_prompt();
                 show_cursor(&mut cursor_visible);
@@ -109,18 +109,15 @@ impl CommandBuffer {
     }
 }
 
-fn execute_command(command: &str, profile: EraProfile) {
+fn execute_command(command: &str) {
+    let command = command.trim();
+
     match command {
         "" => {}
         "help" => print_help(),
-        "clear" => clear_screen(profile),
-        "about" => print_about(profile),
-        _ => {
-            println!("Unknown command: {}", command);
-            println!("Try 'help'.");
-            serial_println!("Unknown command: {}", command);
-            serial_println!("Try 'help'.");
-        }
+        "clear" => console::clear(),
+        "about" => print_about(),
+        _ => println!("Unknown command: {}", command),
     }
 }
 
@@ -161,34 +158,11 @@ fn toggle_cursor(cursor_visible: &mut bool) {
 }
 
 fn print_help() {
-    println!("Available commands:");
-    println!("  help  - show the command list");
-    println!("  clear - clear the screen");
-    println!("  about - show information about Time Capsule OS");
-
-    serial_println!("Available commands:");
-    serial_println!("  help  - show the command list");
-    serial_println!("  clear - clear the screen");
-    serial_println!("  about - show information about Time Capsule OS");
+    println!("Commands: help, clear, about, reboot");
 }
 
-fn clear_screen(profile: EraProfile) {
-    vga_text::clear();
-    println!("Welcome to Time Capsule OS");
-    println!("{}", profile.banner);
-    println!("Current era: {}", profile.name);
-
-    serial_println!("Screen cleared.");
-}
-
-fn print_about(profile: EraProfile) {
-    println!("Time Capsule OS is a learning-first Rust hobby kernel.");
-    println!("Current era profile: {}", profile.name);
-    println!("Future shell expansion will add era switching.");
-
-    serial_println!("Time Capsule OS is a learning-first Rust hobby kernel.");
-    serial_println!("Current era profile: {}", profile.name);
-    serial_println!("Future shell expansion will add era switching.");
+fn print_about() {
+    println!("Time Capsule OS | Era: 1984 | v0.1");
 }
 
 fn cpu_relax() {
