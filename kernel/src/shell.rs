@@ -29,6 +29,16 @@ pub fn run(prompt: &str) -> ! {
                 show_cursor(&mut cursor_visible);
                 idle_ticks = 0;
             }
+            Some(KeyEvent::Backspace) => {
+                hide_cursor(&mut cursor_visible);
+
+                if buffer.pop().is_some() {
+                    console::backspace();
+                }
+
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
+            }
             Some(_) => {
                 idle_ticks = 0;
             }
