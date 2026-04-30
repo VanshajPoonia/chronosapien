@@ -11,7 +11,7 @@ const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 
 pub fn run(startup_era: Era) -> ! {
-    let state = ShellState::new(startup_era);
+    let mut state = ShellState::new(startup_era);
     let mut buffer = CommandBuffer::new();
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
@@ -47,7 +47,7 @@ pub fn run(startup_era: Era) -> ! {
                 hide_cursor(&mut cursor_visible);
                 println!();
 
-                execute_command(buffer.as_str(), &state);
+                execute_command(buffer.as_str(), &mut state);
                 buffer.clear();
                 print_prompt(&state);
                 show_cursor(&mut cursor_visible);
@@ -78,6 +78,10 @@ impl ShellState {
 
     fn active_era(&self) -> Era {
         self.active_era
+    }
+
+    fn switch_era(&mut self, era: Era) {
+        self.active_era = era;
     }
 }
 
@@ -124,7 +128,7 @@ impl CommandBuffer {
     }
 }
 
-fn execute_command(command: &str, state: &ShellState) {
+fn execute_command(command: &str, state: &mut ShellState) {
     let command = command.trim();
 
     if !command.is_empty() {
@@ -137,12 +141,14 @@ fn execute_command(command: &str, state: &ShellState) {
         "clear" => console::clear(),
         "about" => print_about(state),
         "reboot" => reboot(),
-        command if command == "era" || command.starts_with("era ") => run_era_command(command),
+        command if command == "era" || command.starts_with("era ") => {
+            run_era_command(command, state)
+        }
         _ => println!("Unknown command: {}", command),
     }
 }
 
-fn run_era_command(command: &str) {
+fn run_era_command(command: &str, state: &mut ShellState) {
     let mut parts = command.split_ascii_whitespace();
     let _command_name = parts.next();
 
@@ -157,9 +163,23 @@ fn run_era_command(command: &str) {
     }
 
     match Era::from_year(year) {
-        Some(era) => println!("Switching to {} mode...", era.profile().name),
+        Some(era) => switch_era(state, era),
         None => print_era_usage(),
     }
+}
+
+fn switch_era(state: &mut ShellState, era: Era) {
+    let profile = era.profile();
+
+    println!("Switching to {} mode...", profile.name);
+
+    // Era is plain mutable shell state rather than `static mut`: the kernel is
+    // currently one polling loop, so Rust's normal `&mut ShellState` borrow is
+    // enough. Future interrupt-visible era state should use a documented
+    // synchronization primitive instead of raw global mutation.
+    state.switch_era(era);
+    console::init(profile.fg, profile.bg);
+    serial_println!("[TCOS] era switched to {}", profile.name);
 }
 
 fn print_era_usage() {
