@@ -31,6 +31,16 @@ impl Era {
         }
     }
 
+    pub fn from_year(year: &str) -> Option<Self> {
+        match year {
+            "1984" => Some(Era::Eighties),
+            "1995" => Some(Era::Nineties),
+            "2007" => Some(Era::TwoThousands),
+            "2040" => Some(Era::Future),
+            _ => None,
+        }
+    }
+
     pub const fn profile(self) -> EraProfile {
         match self {
             Era::Eighties => EraProfile {
