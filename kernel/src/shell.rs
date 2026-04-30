@@ -8,6 +8,8 @@ use crate::{print, println, serial_println};
 const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
 const PROMPT: &str = "TCOS/84>";
+const RESET_COMMAND_PORT: u16 = 0x64;
+const CPU_RESET_COMMAND: u8 = 0xFE;
 
 pub fn run(_profile: EraProfile) -> ! {
     let mut buffer = CommandBuffer::new();
@@ -120,6 +122,7 @@ fn execute_command(command: &str) {
         "help" => print_help(),
         "clear" => console::clear(),
         "about" => print_about(),
+        "reboot" => reboot(),
         _ => println!("Unknown command: {}", command),
     }
 }
@@ -168,10 +171,43 @@ fn print_about() {
     println!("Time Capsule OS | Era: 1984 | v0.1");
 }
 
+fn reboot() -> ! {
+    serial_println!("[TCOS] reboot requested");
+
+    // SAFETY: Port 0x64 is the PS/2 controller command port on the
+    // PC-compatible machine QEMU emulates. Command 0xFE requests a CPU reset.
+    unsafe {
+        outb(RESET_COMMAND_PORT, CPU_RESET_COMMAND);
+    }
+
+    halt_forever()
+}
+
 fn cpu_relax() {
     // SAFETY: `pause` is a CPU hint for tight polling loops. We use it here
     // because keyboard input is polled without interrupts in this milestone.
     unsafe {
         core::arch::asm!("pause", options(nomem, nostack, preserves_flags));
     }
+}
+
+fn halt_forever() -> ! {
+    loop {
+        // SAFETY: `hlt` stops the CPU until the next external interrupt. This
+        // fallback is only reached if the reboot command does not reset.
+        unsafe {
+            core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+        }
+    }
+}
+
+unsafe fn outb(port: u16, value: u8) {
+    // SAFETY: The caller must ensure `port` belongs to the intended hardware
+    // device and `value` is a valid command for that port.
+    core::arch::asm!(
+        "out dx, al",
+        in("dx") port,
+        in("al") value,
+        options(nomem, nostack, preserves_flags)
+    );
 }
