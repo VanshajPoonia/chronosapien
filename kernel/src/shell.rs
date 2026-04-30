@@ -2,6 +2,7 @@
 
 use crate::console;
 use crate::keyboard::{self, KeyEvent};
+use crate::theme::{self, Era};
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
@@ -9,12 +10,12 @@ const CURSOR_BLINK_TICKS: usize = 80_000;
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 
-pub fn run(prompt: &str) -> ! {
+pub fn run() -> ! {
     let mut buffer = CommandBuffer::new();
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
 
-    print_prompt(prompt);
+    print_prompt();
     draw_cursor();
 
     loop {
@@ -50,7 +51,7 @@ pub fn run(prompt: &str) -> ! {
 
                 execute_command(buffer.as_str());
                 buffer.clear();
-                print_prompt(prompt);
+                print_prompt();
                 show_cursor(&mut cursor_visible);
                 idle_ticks = 0;
             }
@@ -71,8 +72,10 @@ pub fn run(prompt: &str) -> ! {
     }
 }
 
-fn print_prompt(prompt: &str) {
-    print!("{} ", prompt);
+fn print_prompt() {
+    let profile = theme::active_profile();
+
+    print!("{} ", profile.vga_prompt);
 }
 
 struct CommandBuffer {
@@ -131,16 +134,51 @@ fn execute_command(command: &str) {
         "clear" => console::clear(),
         "about" => print_about(),
         "reboot" => reboot(),
+        command if command == "era" || command.starts_with("era ") => run_era_command(command),
         _ => println!("unknown command: {}", command),
     }
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot");
+    println!("Commands: help, clear, about, reboot, era");
 }
 
 fn print_about() {
-    println!("ChronoOS | Era: 1984 | v0.1");
+    let profile = theme::active_profile();
+
+    println!("ChronoOS | Era: {} | v0.1", profile.name);
+}
+
+fn run_era_command(command: &str) {
+    let mut parts = command.split_ascii_whitespace();
+    let _command_name = parts.next();
+
+    let Some(year) = parts.next() else {
+        print_era_usage();
+        return;
+    };
+
+    if parts.next().is_some() {
+        print_era_usage();
+        return;
+    }
+
+    match Era::from_year(year) {
+        Some(era) => switch_era(era),
+        None => print_era_usage(),
+    }
+}
+
+fn switch_era(era: Era) {
+    let profile = era.profile();
+
+    println!("Switching to {} mode...", profile.name);
+    theme::set_active_era(era);
+    serial_println!("[CHRONO] era: {}", profile.name);
+}
+
+fn print_era_usage() {
+    println!("Usage: era 1984|1995|2007|2040");
 }
 
 fn reboot() -> ! {

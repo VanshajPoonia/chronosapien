@@ -30,6 +30,7 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
 
     let era_name = STARTUP_ERA.name();
     serial_println!("[CHRONO] active era: {}", era_name);
+    theme::set_active_era(STARTUP_ERA);
     keyboard::init();
 
     println!("{}", profile.boot_welcome);
@@ -37,5 +38,5 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
 
     serial_println!("[CHRONO] boot complete");
 
-    shell::run(profile.prompt)
+    shell::run()
 }
