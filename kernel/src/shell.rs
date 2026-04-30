@@ -180,7 +180,7 @@ fn toggle_cursor(cursor_visible: &mut bool) {
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot");
+    println!("Commands: help, clear, about, reboot, era");
 }
 
 fn print_about(state: &ShellState) {
