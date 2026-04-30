@@ -1,5 +1,6 @@
 //! Tiny line-based shell for the first interactive milestone.
 
+use crate::console;
 use crate::{print, println};
 
 const CURSOR_BLINK_TICKS: usize = 80_000;
@@ -19,6 +20,34 @@ fn print_prompt(prompt: &str) {
 
 fn draw_cursor() {
     print!("_");
+}
+
+fn erase_cursor() {
+    console::backspace();
+}
+
+fn show_cursor(cursor_visible: &mut bool) {
+    if !*cursor_visible {
+        draw_cursor();
+        *cursor_visible = true;
+    }
+}
+
+fn hide_cursor(cursor_visible: &mut bool) {
+    if *cursor_visible {
+        erase_cursor();
+        *cursor_visible = false;
+    }
+}
+
+fn toggle_cursor(cursor_visible: &mut bool) {
+    if *cursor_visible {
+        erase_cursor();
+        *cursor_visible = false;
+    } else {
+        draw_cursor();
+        *cursor_visible = true;
+    }
 }
 
 fn cpu_relax() {
