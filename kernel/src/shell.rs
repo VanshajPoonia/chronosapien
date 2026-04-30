@@ -18,6 +18,9 @@ pub fn run(prompt: &str) -> ! {
     draw_cursor();
 
     loop {
+        // The shell polls one key at a time. Printable keys edit the fixed
+        // buffer and VGA line; Enter turns that buffer into a command, runs it,
+        // clears the buffer, and redraws the prompt.
         match keyboard::read_key() {
             Some(KeyEvent::Char(byte)) => {
                 hide_cursor(&mut cursor_visible);
