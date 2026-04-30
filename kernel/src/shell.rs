@@ -7,7 +7,6 @@ use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
-const PROMPT: &str = "TCOS/84>";
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 
@@ -17,7 +16,7 @@ pub fn run(startup_era: Era) -> ! {
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
 
-    print_prompt();
+    print_prompt(&state);
     draw_cursor();
 
     loop {
@@ -50,7 +49,7 @@ pub fn run(startup_era: Era) -> ! {
 
                 execute_command(buffer.as_str());
                 buffer.clear();
-                print_prompt();
+                print_prompt(&state);
                 show_cursor(&mut cursor_visible);
                 idle_ticks = 0;
             }
@@ -142,8 +141,10 @@ fn execute_command(command: &str) {
     }
 }
 
-fn print_prompt() {
-    print!("{} ", PROMPT);
+fn print_prompt(state: &ShellState) {
+    let profile = state.active_era().profile();
+
+    print!("{} ", profile.prompt);
 }
 
 fn draw_cursor() {
