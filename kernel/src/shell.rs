@@ -44,7 +44,6 @@ pub fn run(_profile: EraProfile) -> ! {
             Some(KeyEvent::Enter) => {
                 hide_cursor(&mut cursor_visible);
                 println!();
-                serial_println!();
 
                 execute_command(buffer.as_str());
                 buffer.clear();
@@ -111,6 +110,10 @@ impl CommandBuffer {
 
 fn execute_command(command: &str) {
     let command = command.trim();
+
+    if !command.is_empty() {
+        serial_println!("[TCOS] command: {}", command);
+    }
 
     match command {
         "" => {}
