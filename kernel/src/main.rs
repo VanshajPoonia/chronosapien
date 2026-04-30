@@ -2,8 +2,11 @@
 
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 mod console;
+mod gdt;
+mod interrupts;
 mod keyboard;
 mod panic;
 mod serial;
@@ -27,6 +30,10 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     console::init(profile.fg, profile.bg);
     console::clear();
     serial_println!("[CHRONO] console initialized");
+
+    gdt::init();
+    interrupts::init();
+    interrupts::trigger_test_breakpoint();
 
     let era_name = STARTUP_ERA.name();
     serial_println!("[CHRONO] active era: {}", era_name);

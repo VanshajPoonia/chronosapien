@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 bootloader = "0.9.29"
+x86_64 = { version = "0.14", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
