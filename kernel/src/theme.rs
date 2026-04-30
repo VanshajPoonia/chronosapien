@@ -15,6 +15,7 @@ pub enum Era {
 #[derive(Clone, Copy, Debug)]
 pub struct EraProfile {
     pub name: &'static str,
+    pub prompt: &'static str,
     pub fg: Color,
     pub bg: Color,
 }
@@ -33,21 +34,25 @@ impl Era {
         match self {
             Era::Eighties => EraProfile {
                 name: self.name(),
+                prompt: "TCOS/84>",
                 fg: Color::LightGreen,
                 bg: Color::Black,
             },
             Era::Nineties => EraProfile {
                 name: self.name(),
+                prompt: "C:\\TCOS>",
                 fg: Color::LightCyan,
                 bg: Color::Blue,
             },
             Era::TwoThousands => EraProfile {
                 name: self.name(),
+                prompt: "tcos@millennium:~$",
                 fg: Color::Black,
                 bg: Color::LightGray,
             },
             Era::Future => EraProfile {
                 name: self.name(),
+                prompt: ">",
                 fg: Color::LightMagenta,
                 bg: Color::Black,
             },
