@@ -1,39 +1,67 @@
 //! Tiny line-based shell for the first interactive milestone.
 
+use crate::console;
 use crate::keyboard::{self, KeyEvent};
 use crate::theme::EraProfile;
-use crate::vga_text;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
+const CURSOR_BLINK_TICKS: usize = 80_000;
 const PROMPT: &str = "TCOS/84>";
 
 pub fn run(profile: EraProfile) -> ! {
     let mut buffer = CommandBuffer::new();
+    let mut cursor_visible = true;
+    let mut idle_ticks = 0;
 
     print_prompt();
+    draw_cursor();
 
     loop {
         match keyboard::read_key() {
             Some(KeyEvent::Char(byte)) => {
+                hide_cursor(&mut cursor_visible);
+
                 if buffer.push(byte) {
                     print!("{}", byte as char);
+                } else {
+                    serial_println!("[TCOS] input buffer full");
                 }
+
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
             }
             Some(KeyEvent::Backspace) => {
+                hide_cursor(&mut cursor_visible);
+
                 if buffer.pop().is_some() {
-                    vga_text::backspace();
+                    console::backspace();
                 }
+
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
             }
             Some(KeyEvent::Enter) => {
+                hide_cursor(&mut cursor_visible);
                 println!();
                 serial_println!();
 
                 execute_command(buffer.as_str(), profile);
                 buffer.clear();
                 print_prompt();
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
             }
-            None => cpu_relax(),
+            None => {
+                idle_ticks += 1;
+
+                if idle_ticks >= CURSOR_BLINK_TICKS {
+                    toggle_cursor(&mut cursor_visible);
+                    idle_ticks = 0;
+                }
+
+                cpu_relax();
+            }
         }
     }
 }
@@ -98,6 +126,38 @@ fn execute_command(command: &str, profile: EraProfile) {
 
 fn print_prompt() {
     print!("{} ", PROMPT);
+}
+
+fn draw_cursor() {
+    print!("_");
+}
+
+fn erase_cursor() {
+    console::backspace();
+}
+
+fn show_cursor(cursor_visible: &mut bool) {
+    if !*cursor_visible {
+        draw_cursor();
+        *cursor_visible = true;
+    }
+}
+
+fn hide_cursor(cursor_visible: &mut bool) {
+    if *cursor_visible {
+        erase_cursor();
+        *cursor_visible = false;
+    }
+}
+
+fn toggle_cursor(cursor_visible: &mut bool) {
+    if *cursor_visible {
+        erase_cursor();
+        *cursor_visible = false;
+    } else {
+        draw_cursor();
+        *cursor_visible = true;
+    }
 }
 
 fn print_help() {
