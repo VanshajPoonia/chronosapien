@@ -45,21 +45,21 @@ impl Era {
         match self {
             Era::Eighties => EraProfile {
                 name: self.name(),
-                prompt: "TCOS/84>",
+                prompt: "CHRONO/84>",
                 boot_welcome: "TIME CAPSULE OS",
                 fg: Color::LightGreen,
                 bg: Color::Black,
             },
             Era::Nineties => EraProfile {
                 name: self.name(),
-                prompt: "C:\\TCOS>",
+                prompt: "C:\\CHRONO>",
                 boot_welcome: "Time Capsule OS 95",
                 fg: Color::LightCyan,
                 bg: Color::Blue,
             },
             Era::TwoThousands => EraProfile {
                 name: self.name(),
-                prompt: "tcos@millennium:~$",
+                prompt: "chrono@millennium:~$",
                 boot_welcome: "Time Capsule OS Millennium",
                 fg: Color::Black,
                 bg: Color::LightGray,
