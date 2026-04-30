@@ -1,17 +1,35 @@
 //! Tiny line-based shell for the first interactive milestone.
 
 use crate::console;
+use crate::keyboard;
 use crate::{print, println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
 
 pub fn run(prompt: &str) -> ! {
+    let mut cursor_visible = true;
+    let mut idle_ticks = 0;
+
     print_prompt(prompt);
     draw_cursor();
 
     loop {
-        cpu_relax();
+        match keyboard::read_key() {
+            Some(_) => {
+                idle_ticks = 0;
+            }
+            None => {
+                idle_ticks += 1;
+
+                if idle_ticks >= CURSOR_BLINK_TICKS {
+                    toggle_cursor(&mut cursor_visible);
+                    idle_ticks = 0;
+                }
+
+                cpu_relax();
+            }
+        }
     }
 }
 
