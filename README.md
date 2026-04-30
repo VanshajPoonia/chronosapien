@@ -128,7 +128,7 @@ qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\booti
 
 ## Boot flow in plain language
 
-QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader` crate performs the early machine setup we are intentionally skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes COM1 serial output, configures VGA text output from the selected era profile, prints the startup banner, logs the boot sequence, and then halts.
+QEMU emulates an x86_64 machine and boots a disk image. The borrowed `bootloader` crate performs the early machine setup we are intentionally skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes COM1 serial output, configures VGA text output from the selected era profile, prints the startup banner, logs the boot sequence, and enters a polling keyboard input loop.
 
 The VGA screen shows:
 
@@ -145,16 +145,15 @@ With `-serial stdio`, the QEMU terminal shows:
 [CHRONO] serial initialized
 [CHRONO] console initialized
 [CHRONO] active era: 1984
+[CHRONO] keyboard initialized
 [CHRONO] boot complete
 ```
 
 Keyboard debugging adds lines like:
 
 ```text
-[CHRONO] key: a
-[CHRONO] key: backspace
-[CHRONO] key: enter
-[CHRONO] line submitted: hello
+[CHRONO] key: H
+[CHRONO] key: I
 ```
 
 ## VGA text output in simple terms
@@ -195,7 +194,7 @@ buffer is a fixed-size array on the stack, so this milestone still uses no heap.
 
 ## What to build next
 
-1. Add a tiny command dispatcher for `help`, `clear`, and `about`.
+1. Add a tiny shell command dispatcher for `help`, `clear`, and `about`.
 2. Set up interrupts and a timer after the polling path is easy to understand.
 3. Add memory-management pieces once the text-only boot path feels comfortable.
 
