@@ -123,8 +123,9 @@ fn execute_command(command: &str) {
     match command {
         "" => {}
         "help" => print_help(),
+        "clear" => console::clear(),
         "about" => print_about(),
-        _ => {}
+        _ => println!("unknown command: {}", command),
     }
 }
 
