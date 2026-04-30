@@ -3,27 +3,26 @@
 use crate::keyboard::{self, KeyEvent};
 use crate::theme::EraProfile;
 use crate::vga_text;
-use crate::{print, println, serial_print, serial_println};
+use crate::{print, println, serial_println};
 
-const COMMAND_BUFFER_CAPACITY: usize = 64;
+const COMMAND_BUFFER_CAPACITY: usize = 80;
+const PROMPT: &str = "TCOS/84>";
 
 pub fn run(profile: EraProfile) -> ! {
     let mut buffer = CommandBuffer::new();
 
-    print_prompt(profile);
+    print_prompt();
 
     loop {
         match keyboard::read_key() {
             Some(KeyEvent::Char(byte)) => {
                 if buffer.push(byte) {
                     print!("{}", byte as char);
-                    serial_print!("{}", byte as char);
                 }
             }
             Some(KeyEvent::Backspace) => {
                 if buffer.pop().is_some() {
                     vga_text::backspace();
-                    serial_print!("\u{8} \u{8}");
                 }
             }
             Some(KeyEvent::Enter) => {
@@ -32,7 +31,7 @@ pub fn run(profile: EraProfile) -> ! {
 
                 execute_command(buffer.as_str(), profile);
                 buffer.clear();
-                print_prompt(profile);
+                print_prompt();
             }
             None => cpu_relax(),
         }
@@ -97,9 +96,8 @@ fn execute_command(command: &str, profile: EraProfile) {
     }
 }
 
-fn print_prompt(profile: EraProfile) {
-    print!("{} ", profile.prompt);
-    serial_print!("{} ", profile.prompt);
+fn print_prompt() {
+    print!("{} ", PROMPT);
 }
 
 fn print_help() {
