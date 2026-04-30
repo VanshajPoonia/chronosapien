@@ -27,7 +27,7 @@ pub fn run(startup_era: Era) -> ! {
                 if buffer.push(byte) {
                     print!("{}", byte as char);
                 } else {
-                    serial_println!("[TCOS] input buffer full");
+                    serial_println!("[CHRONO] input buffer full");
                 }
 
                 show_cursor(&mut cursor_visible);
@@ -132,7 +132,7 @@ fn execute_command(command: &str, state: &mut ShellState) {
     let command = command.trim();
 
     if !command.is_empty() {
-        serial_println!("[TCOS] command: {}", command);
+        serial_println!("[CHRONO] command: {}", command);
     }
 
     match command {
@@ -179,7 +179,7 @@ fn switch_era(state: &mut ShellState, era: Era) {
     // synchronization primitive instead of raw global mutation.
     state.switch_era(era);
     console::init(profile.fg, profile.bg);
-    serial_println!("[TCOS] era switched to {}", profile.name);
+    serial_println!("[CHRONO] era switched to {}", profile.name);
 }
 
 fn print_era_usage() {
@@ -235,7 +235,7 @@ fn print_about(state: &ShellState) {
 }
 
 fn reboot() -> ! {
-    serial_println!("[TCOS] reboot requested");
+    serial_println!("[CHRONO] reboot requested");
 
     // SAFETY: Port 0x64 is the PS/2 controller command port on the
     // PC-compatible machine QEMU emulates. Command 0xFE requests a CPU reset.
