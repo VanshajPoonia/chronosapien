@@ -119,6 +119,21 @@ fn execute_command(command: &str) {
     if !command.is_empty() {
         serial_println!("[CHRONO] cmd: {}", command);
     }
+
+    match command {
+        "" => {}
+        "help" => print_help(),
+        "about" => print_about(),
+        _ => {}
+    }
+}
+
+fn print_help() {
+    println!("Commands: help, clear, about, reboot");
+}
+
+fn print_about() {
+    println!("ChronoOS | Era: 1984 | v0.1");
 }
 
 fn draw_cursor() {
