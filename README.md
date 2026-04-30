@@ -135,26 +135,26 @@ The VGA screen shows:
 ```text
 TIME CAPSULE OS
 Era: 1984
-TCOS/84> _
+CHRONO/84> _
 ```
 
 With `-serial stdio`, the QEMU terminal shows:
 
 ```text
-[TCOS] boot start
-[TCOS] serial initialized
-[TCOS] console initialized
-[TCOS] active era: 1984
-[TCOS] boot complete
+[CHRONO] boot start
+[CHRONO] serial initialized
+[CHRONO] console initialized
+[CHRONO] active era: 1984
+[CHRONO] boot complete
 ```
 
 Keyboard debugging adds lines like:
 
 ```text
-[TCOS] key: a
-[TCOS] key: backspace
-[TCOS] key: enter
-[TCOS] line submitted: hello
+[CHRONO] key: a
+[CHRONO] key: backspace
+[CHRONO] key: enter
+[CHRONO] line submitted: hello
 ```
 
 ## VGA text output in simple terms
