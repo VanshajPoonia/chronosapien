@@ -36,5 +36,5 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
 
     serial_println!("[TCOS] boot complete");
 
-    shell::run(profile)
+    shell::run(STARTUP_ERA)
 }

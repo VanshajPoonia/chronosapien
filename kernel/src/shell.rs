@@ -2,7 +2,7 @@
 
 use crate::console;
 use crate::keyboard::{self, KeyEvent};
-use crate::theme::EraProfile;
+use crate::theme::Era;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
@@ -11,7 +11,8 @@ const PROMPT: &str = "TCOS/84>";
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 
-pub fn run(_profile: EraProfile) -> ! {
+pub fn run(startup_era: Era) -> ! {
+    let state = ShellState::new(startup_era);
     let mut buffer = CommandBuffer::new();
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
@@ -64,6 +65,20 @@ pub fn run(_profile: EraProfile) -> ! {
                 cpu_relax();
             }
         }
+    }
+}
+
+struct ShellState {
+    active_era: Era,
+}
+
+impl ShellState {
+    const fn new(active_era: Era) -> Self {
+        Self { active_era }
+    }
+
+    fn active_era(&self) -> Era {
+        self.active_era
     }
 }
 
