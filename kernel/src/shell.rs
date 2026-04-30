@@ -2,7 +2,7 @@
 
 use crate::console;
 use crate::keyboard::{self, KeyEvent};
-use crate::{print, println};
+use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
@@ -22,6 +22,8 @@ pub fn run(prompt: &str) -> ! {
 
                 if buffer.push(byte) {
                     print!("{}", byte as char);
+                } else {
+                    serial_println!("[CHRONO] input buffer full");
                 }
 
                 show_cursor(&mut cursor_visible);
