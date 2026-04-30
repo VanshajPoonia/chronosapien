@@ -1,4 +1,9 @@
-//! Tiny PS/2 keyboard polling for the first shell milestone.
+//! Tiny PS/2 keyboard polling for the first input milestone.
+//!
+//! QEMU exposes the keyboard through the classic PC PS/2 controller. Port
+//! `0x64` is the controller status port; bit 0 tells us whether a byte is
+//! waiting. Port `0x60` is the data port; after bit 0 is set, one read from
+//! `0x60` returns the next raw keyboard scancode.
 
 use core::cell::UnsafeCell;
 
@@ -25,6 +30,10 @@ unsafe impl Sync for GlobalKeyboard {}
 static KEYBOARD_STATE: GlobalKeyboard = GlobalKeyboard(UnsafeCell::new(KeyboardState {
     shift_pressed: false,
 }));
+
+pub fn init() {
+    crate::serial_println!("[CHRONO] keyboard initialized");
+}
 
 pub fn read_key() -> Option<KeyEvent> {
     // SAFETY: Port `0x64` is the PS/2 controller status port on the standard
@@ -61,9 +70,10 @@ pub fn read_key() -> Option<KeyEvent> {
 
 fn decode_scancode(scancode: u8, shift_pressed: bool) -> Option<u8> {
     // These are the common set-1 scancodes produced by a standard PC keyboard
-    // in QEMU's default PS/2-compatible path. We only decode the subset needed
-    // for text input so the table stays readable. Each match arm maps one raw
-    // keyboard scancode to the ASCII byte the console should display.
+    // in QEMU's default PS/2-compatible path. `0x1C` is handled as Enter,
+    // `0x0E` as Backspace, Shift make/release scancodes update modifier state,
+    // and release scancodes (`0x80..=0xFF`) are ignored. Every lookup below is
+    // one explicit `(make scancode, shift pressed?) -> ASCII byte` mapping.
     let byte = match (scancode, shift_pressed) {
         (0x02, false) => b'1',
         (0x03, false) => b'2',

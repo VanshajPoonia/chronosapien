@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-//! Era-specific presentation data for boot and shell output.
+//! Era-specific presentation data for boot and keyboard prompt output.
 
 use crate::vga_text::color::Color;
 

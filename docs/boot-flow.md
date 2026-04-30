@@ -24,6 +24,7 @@ The QEMU terminal shows:
 [CHRONO] serial initialized
 [CHRONO] console initialized
 [CHRONO] active era: 1984
+[CHRONO] keyboard initialized
 [CHRONO] boot complete
 ```
 

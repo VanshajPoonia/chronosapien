@@ -15,8 +15,8 @@ Status:
 
 ## Next milestones
 
-1. **tiny shell**
-   Add a small command loop with a fixed buffer and a few built-in commands.
+1. **tiny shell commands**
+   Add a small command dispatcher with a fixed buffer and built-ins like `help`, `clear`, and `about`.
 2. **interrupts and timer**
    Set up the IDT and a periodic timer so the kernel stops being purely synchronous.
 3. **memory management**
