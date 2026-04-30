@@ -3,6 +3,7 @@
 use crate::console;
 use crate::{print, println};
 
+const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
 
 pub fn run(prompt: &str) -> ! {
@@ -16,6 +17,49 @@ pub fn run(prompt: &str) -> ! {
 
 fn print_prompt(prompt: &str) {
     print!("{} ", prompt);
+}
+
+struct CommandBuffer {
+    bytes: [u8; COMMAND_BUFFER_CAPACITY],
+    len: usize,
+}
+
+impl CommandBuffer {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; COMMAND_BUFFER_CAPACITY],
+            len: 0,
+        }
+    }
+
+    fn push(&mut self, byte: u8) -> bool {
+        if self.len >= self.bytes.len() {
+            return false;
+        }
+
+        self.bytes[self.len] = byte;
+        self.len += 1;
+        true
+    }
+
+    fn pop(&mut self) -> Option<u8> {
+        if self.len == 0 {
+            return None;
+        }
+
+        self.len -= 1;
+        Some(self.bytes[self.len])
+    }
+
+    fn clear(&mut self) {
+        self.len = 0;
+    }
+
+    fn as_str(&self) -> &str {
+        // SAFETY: The keyboard decoder only returns printable ASCII bytes, and
+        // ASCII is always valid UTF-8.
+        unsafe { core::str::from_utf8_unchecked(&self.bytes[..self.len]) }
+    }
 }
 
 fn draw_cursor() {
