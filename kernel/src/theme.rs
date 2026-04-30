@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-//! Era-specific presentation data for the first boot experience.
+//! Era-specific presentation data for boot and shell output.
 
 use crate::vga_text::color::Color;
 
@@ -23,9 +23,9 @@ impl Era {
     pub const fn name(self) -> &'static str {
         match self {
             Era::Eighties => "1984",
-            Era::Nineties => "1990s",
-            Era::TwoThousands => "2000s",
-            Era::Future => "future",
+            Era::Nineties => "1995",
+            Era::TwoThousands => "2007",
+            Era::Future => "2040",
         }
     }
 
