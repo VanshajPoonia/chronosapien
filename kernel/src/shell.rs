@@ -47,7 +47,7 @@ pub fn run(startup_era: Era) -> ! {
                 hide_cursor(&mut cursor_visible);
                 println!();
 
-                execute_command(buffer.as_str());
+                execute_command(buffer.as_str(), &state);
                 buffer.clear();
                 print_prompt(&state);
                 show_cursor(&mut cursor_visible);
@@ -124,7 +124,7 @@ impl CommandBuffer {
     }
 }
 
-fn execute_command(command: &str) {
+fn execute_command(command: &str, state: &ShellState) {
     let command = command.trim();
 
     if !command.is_empty() {
@@ -135,7 +135,7 @@ fn execute_command(command: &str) {
         "" => {}
         "help" => print_help(),
         "clear" => console::clear(),
-        "about" => print_about(),
+        "about" => print_about(state),
         "reboot" => reboot(),
         _ => println!("Unknown command: {}", command),
     }
@@ -183,8 +183,10 @@ fn print_help() {
     println!("Commands: help, clear, about, reboot");
 }
 
-fn print_about() {
-    println!("Time Capsule OS | Era: 1984 | v0.1");
+fn print_about(state: &ShellState) {
+    let profile = state.active_era().profile();
+
+    println!("Time Capsule OS | Era: {} | v0.1", profile.name);
 }
 
 fn reboot() -> ! {
