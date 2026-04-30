@@ -137,8 +137,33 @@ fn execute_command(command: &str, state: &ShellState) {
         "clear" => console::clear(),
         "about" => print_about(state),
         "reboot" => reboot(),
+        command if command == "era" || command.starts_with("era ") => run_era_command(command),
         _ => println!("Unknown command: {}", command),
     }
+}
+
+fn run_era_command(command: &str) {
+    let mut parts = command.split_ascii_whitespace();
+    let _command_name = parts.next();
+
+    let Some(year) = parts.next() else {
+        print_era_usage();
+        return;
+    };
+
+    if parts.next().is_some() {
+        print_era_usage();
+        return;
+    }
+
+    match Era::from_year(year) {
+        Some(era) => println!("Switching to {} mode...", era.profile().name),
+        None => print_era_usage(),
+    }
+}
+
+fn print_era_usage() {
+    println!("Usage: era 1984|1995|2007|2040");
 }
 
 fn print_prompt(state: &ShellState) {
