@@ -31,8 +31,8 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     let era_name = STARTUP_ERA.name();
     serial_println!("[TCOS] active era: {}", era_name);
 
-    println!("TIME CAPSULE OS");
-    println!("Era: {}", era_name);
+    println!("{}", profile.boot_welcome);
+    println!("Era: {}", profile.name);
 
     serial_println!("[TCOS] boot complete");
 

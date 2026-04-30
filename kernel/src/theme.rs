@@ -16,6 +16,7 @@ pub enum Era {
 pub struct EraProfile {
     pub name: &'static str,
     pub prompt: &'static str,
+    pub boot_welcome: &'static str,
     pub fg: Color,
     pub bg: Color,
 }
@@ -35,24 +36,28 @@ impl Era {
             Era::Eighties => EraProfile {
                 name: self.name(),
                 prompt: "TCOS/84>",
+                boot_welcome: "TIME CAPSULE OS",
                 fg: Color::LightGreen,
                 bg: Color::Black,
             },
             Era::Nineties => EraProfile {
                 name: self.name(),
                 prompt: "C:\\TCOS>",
+                boot_welcome: "Time Capsule OS 95",
                 fg: Color::LightCyan,
                 bg: Color::Blue,
             },
             Era::TwoThousands => EraProfile {
                 name: self.name(),
                 prompt: "tcos@millennium:~$",
+                boot_welcome: "Time Capsule OS Millennium",
                 fg: Color::Black,
                 bg: Color::LightGray,
             },
             Era::Future => EraProfile {
                 name: self.name(),
                 prompt: ">",
+                boot_welcome: "Time Capsule OS 2040",
                 fg: Color::LightMagenta,
                 bg: Color::Black,
             },
