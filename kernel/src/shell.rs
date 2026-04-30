@@ -1,13 +1,14 @@
 //! Tiny line-based shell for the first interactive milestone.
 
 use crate::console;
-use crate::keyboard;
+use crate::keyboard::{self, KeyEvent};
 use crate::{print, println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
 const CURSOR_BLINK_TICKS: usize = 80_000;
 
 pub fn run(prompt: &str) -> ! {
+    let mut buffer = CommandBuffer::new();
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
 
@@ -16,6 +17,16 @@ pub fn run(prompt: &str) -> ! {
 
     loop {
         match keyboard::read_key() {
+            Some(KeyEvent::Char(byte)) => {
+                hide_cursor(&mut cursor_visible);
+
+                if buffer.push(byte) {
+                    print!("{}", byte as char);
+                }
+
+                show_cursor(&mut cursor_visible);
+                idle_ticks = 0;
+            }
             Some(_) => {
                 idle_ticks = 0;
             }
