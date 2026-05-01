@@ -7,6 +7,7 @@
 
 extern crate alloc;
 
+mod apps;
 mod console;
 mod gdt;
 mod interrupts;
