@@ -14,6 +14,7 @@ pub fn run(args: &str) {
     let uptime = crate::timer::uptime_seconds();
     let used_kb = memory.heap_used_bytes / 1024;
 
+    // The same facts get era-specific formatting, not different data.
     match era {
         Era::Eighties => {
             crate::println!("== CHRONO SYSINFO 1984 ==");
