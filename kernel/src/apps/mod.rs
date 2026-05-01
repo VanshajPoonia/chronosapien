@@ -5,6 +5,7 @@ mod notes;
 mod sysinfo;
 
 pub fn run(command: &str) -> bool {
+    // Return true only when the shell command belongs to a built-in app.
     if command == "notes" || command.starts_with("notes ") {
         crate::serial_println!("[CHRONO] app: notes launched");
         notes::run(command.strip_prefix("notes").unwrap_or("").trim_start());
