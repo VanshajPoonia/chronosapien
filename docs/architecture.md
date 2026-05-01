@@ -59,6 +59,18 @@ clock. The PIT runs from a fixed input frequency of 1,193,182 Hz. Programming
 channel 0 with a divisor turns that input clock into periodic IRQ0 interrupts;
 for the current 100 Hz timer, the divisor is `1_193_182 / 100`.
 
+Hardware IRQs arrive through the legacy 8259 Programmable Interrupt Controller
+(PIC). By default, the PIC's IRQ vectors overlap the CPU exception vectors,
+which occupy IDT entries 0 through 31. ChronoOS remaps the master PIC to start
+at vector 32 and the slave PIC to start at vector 40, so IRQ0 becomes IDT vector
+32 instead of colliding with an exception.
+
+The timer path is intentionally small: PIT channel 0 fires IRQ0, the remapped
+PIC forwards that as vector 32, the IDT dispatches the timer handler, the
+handler increments an atomic tick counter, and then it sends an end-of-interrupt
+command back to the PIC. The handler does not print per tick, because serial
+and VGA output are not interrupt-safe yet.
+
 ## What still hides low-level behavior
 
 - `bootloader` still hides the CPU mode switch, stack setup, paging setup, and the exact boot handoff details.
