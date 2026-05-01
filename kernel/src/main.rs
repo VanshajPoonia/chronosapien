@@ -24,6 +24,8 @@ const STARTUP_ERA: Era = Era::Eighties;
 entry_point!(kernel_main);
 
 fn kernel_main(_boot_info: &'static BootInfo) -> ! {
+    x86_64::instructions::interrupts::disable();
+
     serial::init();
     serial_println!("[CHRONO] boot start");
     serial_println!("[CHRONO] serial initialized");
