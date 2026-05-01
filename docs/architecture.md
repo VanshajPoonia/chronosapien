@@ -52,6 +52,13 @@ fault and reset the machine. ChronoOS assigns double faults a separate TSS
 Interrupt Stack Table entry so the handler has a clean stack to report the
 failure.
 
+## PIT timer and PIC remapping
+
+ChronoOS uses the legacy Programmable Interval Timer (PIT) for a simple uptime
+clock. The PIT runs from a fixed input frequency of 1,193,182 Hz. Programming
+channel 0 with a divisor turns that input clock into periodic IRQ0 interrupts;
+for the current 100 Hz timer, the divisor is `1_193_182 / 100`.
+
 ## What still hides low-level behavior
 
 - `bootloader` still hides the CPU mode switch, stack setup, paging setup, and the exact boot handoff details.
