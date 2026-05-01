@@ -71,6 +71,24 @@ handler increments an atomic tick counter, and then it sends an end-of-interrupt
 command back to the PIC. The handler does not print per tick, because serial
 and VGA output are not interrupt-safe yet.
 
+## Basic memory management
+
+ChronoOS reads the bootloader's memory map to learn which physical RAM ranges
+exist and which ranges are safe for the kernel to use. A physical frame is a
+fixed-size chunk of physical RAM; this kernel starts with 4KiB frames because
+that is the default granularity used by x86_64 page tables.
+
+The kernel's physical frames and the first heap are identity mapped, meaning a
+virtual address such as `0x200000` points to physical address `0x200000`.
+Identity mapping is the safest starting point here because the addresses
+printed by the kernel match the hardware addresses being used, which keeps
+early debugging straightforward.
+
+The heap uses a bump allocator. A bump allocator keeps one pointer to the next
+free byte and moves it forward for each allocation. That makes it tiny and
+predictable, but freeing memory is a no-op, so used heap space never comes back
+until the kernel grows a more complete allocator.
+
 ## What still hides low-level behavior
 
 - `bootloader` still hides the CPU mode switch, stack setup, paging setup, and the exact boot handoff details.
