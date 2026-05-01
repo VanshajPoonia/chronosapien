@@ -9,9 +9,11 @@ mod gdt;
 mod interrupts;
 mod keyboard;
 mod panic;
+mod pic;
 mod serial;
 mod shell;
 mod theme;
+mod timer;
 mod vga_text;
 
 use bootloader::{entry_point, BootInfo};
