@@ -1,5 +1,6 @@
 //! Tiny line-based shell for the first interactive milestone.
 
+use crate::apps;
 use crate::console;
 use crate::keyboard::{self, KeyEvent};
 use crate::memory;
