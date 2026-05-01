@@ -141,6 +141,7 @@ fn execute_command(command: &str) {
         "clock" => print_clock(),
         "mem" => print_memory(),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
+        command if apps::run(command) => {}
         _ => println!("unknown command: {}", command),
     }
 }
