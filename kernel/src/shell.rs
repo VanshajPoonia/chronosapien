@@ -147,7 +147,7 @@ fn execute_command(command: &str) {
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem");
+    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem, notes, calc, sysinfo");
 }
 
 fn print_about() {
