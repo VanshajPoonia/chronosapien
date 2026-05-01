@@ -2,6 +2,7 @@
 
 use crate::console;
 use crate::keyboard::{self, KeyEvent};
+use crate::memory;
 use crate::theme::{self, Era};
 use crate::timer;
 use crate::{print, println, serial_println};
@@ -137,13 +138,14 @@ fn execute_command(command: &str) {
         "reboot" => reboot(),
         "uptime" => print_uptime(),
         "clock" => print_clock(),
+        "mem" => print_memory(),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         _ => println!("unknown command: {}", command),
     }
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era, uptime, clock");
+    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem");
 }
 
 fn print_about() {
@@ -158,6 +160,18 @@ fn print_uptime() {
 
 fn print_clock() {
     println!("Ticks: {}", timer::ticks());
+}
+
+fn print_memory() {
+    let stats = memory::stats();
+
+    println!("Total memory: {} MB", stats.total_memory_bytes / 1024 / 1024);
+    println!(
+        "Heap: {} MB at {:#x}",
+        stats.heap_size_bytes / 1024 / 1024,
+        stats.heap_start
+    );
+    println!("Used: {} KB", stats.heap_used_bytes / 1024);
 }
 
 fn run_era_command(command: &str) {

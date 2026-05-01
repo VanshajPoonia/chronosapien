@@ -3,11 +3,15 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![feature(alloc_error_handler)]
+
+extern crate alloc;
 
 mod console;
 mod gdt;
 mod interrupts;
 mod keyboard;
+mod memory;
 mod panic;
 mod pic;
 mod serial;
@@ -23,7 +27,7 @@ const STARTUP_ERA: Era = Era::Eighties;
 
 entry_point!(kernel_main);
 
-fn kernel_main(_boot_info: &'static BootInfo) -> ! {
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
     x86_64::instructions::interrupts::disable();
 
     serial::init();
@@ -38,6 +42,7 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     gdt::init();
     interrupts::init();
     interrupts::trigger_test_breakpoint();
+    memory::init(boot_info);
     pic::init();
     timer::init();
     x86_64::instructions::interrupts::enable();
