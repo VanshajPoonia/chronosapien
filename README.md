@@ -1,6 +1,6 @@
-# ChronoOS
+# Chronosapian
 
-ChronoOS is a beginner-friendly hobby operating system project in Rust. It boots
+Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
 a `no_std` x86_64 kernel in QEMU, prints to VGA text mode, logs to serial, runs
 a tiny era-themed shell, handles CPU exceptions and timer interrupts, and now
 has early memory management plus a few built-in apps.
@@ -171,7 +171,7 @@ timer, prints the startup banner, and enters the shell.
 The VGA screen shows:
 
 ```text
-TIME CAPSULE OS
+CHRONOSAPIAN
 Era: 1984
 CHRONO/84> _
 ```
@@ -206,7 +206,7 @@ Built-ins:
 
 - `help` lists available commands.
 - `clear` clears the VGA text screen.
-- `about` prints the current ChronoOS version line.
+- `about` prints the current Chronosapian version line.
 - `reboot` asks the PS/2 controller to reset the machine.
 - `era 1984|1995|2007|2040` switches the active era style.
 - `uptime` prints elapsed seconds from the PIT tick counter.
@@ -261,7 +261,7 @@ use the heap.
 
 The GDT gives the CPU valid segment descriptors and a Task State Segment for the
 double-fault stack. The IDT tells the CPU which Rust handler to call for
-exceptions and interrupts. ChronoOS currently handles breakpoints, page faults,
+exceptions and interrupts. Chronosapian currently handles breakpoints, page faults,
 double faults, and timer IRQs.
 
 The PIT is programmed to fire IRQ0 about 100 times per second. The legacy PIC is
@@ -271,7 +271,7 @@ sends an end-of-interrupt command back to the PIC.
 
 ## Memory management in simple terms
 
-The bootloader gives ChronoOS a memory map. The kernel uses it to count total
+The bootloader gives Chronosapian a memory map. The kernel uses it to count total
 memory and pick usable 4KiB physical frames. Early pages are identity mapped,
 which means a virtual address points to the same physical address. That is the
 safest starting point because printed addresses match the hardware addresses
