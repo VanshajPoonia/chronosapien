@@ -38,6 +38,9 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     gdt::init();
     interrupts::init();
     interrupts::trigger_test_breakpoint();
+    pic::init();
+    timer::init();
+    x86_64::instructions::interrupts::enable();
 
     let era_name = STARTUP_ERA.name();
     serial_println!("[CHRONO] active era: {}", era_name);
