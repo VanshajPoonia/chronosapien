@@ -12,6 +12,7 @@ static NOTE: NoteSlot = NoteSlot(UnsafeCell::new(None));
 pub fn run(args: &str) {
     let args = args.trim();
 
+    // Notes are intentionally one-line and heap-only for this milestone.
     if args.is_empty() {
         crate::println!("Usage: notes <text> | notes read");
         return;
