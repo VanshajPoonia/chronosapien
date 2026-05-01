@@ -3,6 +3,7 @@
 use crate::console;
 use crate::keyboard::{self, KeyEvent};
 use crate::theme::{self, Era};
+use crate::timer;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
@@ -134,19 +135,29 @@ fn execute_command(command: &str) {
         "clear" => console::clear(),
         "about" => print_about(),
         "reboot" => reboot(),
+        "uptime" => print_uptime(),
+        "clock" => print_clock(),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         _ => println!("unknown command: {}", command),
     }
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era");
+    println!("Commands: help, clear, about, reboot, era, uptime, clock");
 }
 
 fn print_about() {
     let profile = theme::active_profile();
 
     println!("ChronoOS | Era: {} | v0.1", profile.name);
+}
+
+fn print_uptime() {
+    println!("Uptime: {} seconds", timer::uptime_seconds());
+}
+
+fn print_clock() {
+    println!("Ticks: {}", timer::ticks());
 }
 
 fn run_era_command(command: &str) {
