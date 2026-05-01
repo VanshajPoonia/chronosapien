@@ -3,6 +3,7 @@
 pub fn run(args: &str) {
     let mut parts = args.split_ascii_whitespace();
 
+    // Keep parsing deliberately tiny: one binary integer operation.
     let Some(left) = parts.next().and_then(parse_i64) else {
         print_usage();
         return;
