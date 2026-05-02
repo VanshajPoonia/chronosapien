@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "Building Time Capsule OS boot image..."
-cargo bootimage -p kernel
+Write-Host "Building Chronosapian BIOS image..."
+$hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
+cargo build -p chronosapien --target $hostTarget
