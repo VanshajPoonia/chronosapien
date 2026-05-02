@@ -3,7 +3,7 @@
 Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
 a `no_std` x86_64 kernel in QEMU, prints to VGA text mode, logs to serial, runs
 a tiny era-themed shell, handles CPU exceptions and timer interrupts, and now
-has early memory management plus a few built-in apps.
+has early memory management, an in-memory filesystem, and a few built-in apps.
 
 ## Folder structure
 
@@ -22,6 +22,7 @@ chronosapien/
 |       |   |-- notes.rs
 |       |   `-- sysinfo.rs
 |       |-- console.rs
+|       |-- fs.rs
 |       |-- gdt.rs
 |       |-- interrupts.rs
 |       |-- keyboard.rs
@@ -56,6 +57,7 @@ chronosapien/
 - `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader` and `x86_64`.
 - `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
+- `kernel/src/fs.rs` stores a tiny heap-backed in-memory file list.
 - `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
 - `kernel/src/keyboard.rs` polls the PS/2 keyboard and turns scancodes into simple key events.
@@ -98,6 +100,7 @@ The kernel currently:
 - handles breakpoint, page fault, and double fault exceptions,
 - remaps the PIC and runs a 100Hz PIT timer interrupt,
 - initializes a 1MiB bump heap from the bootloader memory map,
+- keeps a tiny in-memory filesystem for shell files and notes,
 - prints a compact VGA banner with the current era name,
 - polls the PS/2 keyboard and runs a small command shell,
 - supports era switching,
@@ -198,6 +201,8 @@ Shell commands and apps add serial lines like:
 ```text
 [CHRONO] cmd: sysinfo
 [CHRONO] app: sysinfo launched
+[CHRONO] cmd: write hello.txt Hi there
+[CHRONO] fs: write hello.txt
 ```
 
 ## Shell Commands
@@ -212,11 +217,15 @@ Built-ins:
 - `uptime` prints elapsed seconds from the PIT tick counter.
 - `clock` prints raw PIT ticks.
 - `mem` prints total memory, heap location, and used heap space.
+- `ls` lists in-memory files.
+- `cat <name>` prints a file's contents.
+- `write <name> <content>` creates or overwrites a heap-backed file.
+- `rm <name>` deletes an in-memory file.
 
 Tiny apps:
 
-- `notes <text>` stores one short heap-backed note.
-- `notes read` prints the stored note.
+- `notes <text>` stores one short note as `note.txt` in the in-memory filesystem.
+- `notes read` prints `note.txt`.
 - `calc <int> +|-|*|/ <int>` evaluates one integer operation.
 - `sysinfo` prints era-styled OS, era, uptime, and memory usage.
 
@@ -282,11 +291,23 @@ allocation moves a pointer forward, and freeing is a no-op. This is tiny and
 predictable, but replacing notes or allocating more objects consumes heap space
 until reboot.
 
+## In-memory filesystem in simple terms
+
+Chronosapian now has a tiny volatile filesystem. It does not talk to a disk yet:
+files live only in heap memory and disappear on reboot.
+
+The filesystem stores a heap-allocated `Vec<File>`, where each `File` contains a
+name `String` and a content `String`. That data structure preserves insertion
+order for `ls`, is easy to inspect while learning, and keeps the implementation
+small. Looking up, overwriting, or removing a file uses a linear search through
+the vector. That is acceptable for this milestone because the expected file
+count is tiny. Filenames are single shell tokens and can be up to 32 bytes long.
+
 ## What to build next
 
 1. Add interrupt-driven keyboard input instead of polling.
 2. Replace the bump heap with an allocator that can reuse freed memory.
-3. Add a small filesystem or persistent note storage.
+3. Add persistent disk-backed storage.
 4. Add more app-like shell programs after the kernel basics stay stable.
 
 ## What is ours and what is borrowed
@@ -298,6 +319,7 @@ Ours:
 - GDT, IDT, PIC, and PIT setup
 - Exception and timer handlers
 - Basic memory management and bump allocation
+- In-memory filesystem
 - Theme and era model
 - Shell commands and tiny built-in apps
 - Scripts and docs

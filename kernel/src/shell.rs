@@ -2,6 +2,7 @@
 
 use crate::apps;
 use crate::console;
+use crate::fs::{self, FsError};
 use crate::keyboard::{self, KeyEvent};
 use crate::memory;
 use crate::theme::{self, Era};
@@ -140,6 +141,10 @@ fn execute_command(command: &str) {
         "uptime" => print_uptime(),
         "clock" => print_clock(),
         "mem" => print_memory(),
+        "ls" => list_files(),
+        command if command == "cat" || command.starts_with("cat ") => cat_file(command),
+        command if command == "write" || command.starts_with("write ") => write_file(command),
+        command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         command if apps::run(command) => {}
         _ => println!("unknown command: {}", command),
@@ -147,7 +152,9 @@ fn execute_command(command: &str) {
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem, notes, calc, sysinfo");
+    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem");
+    println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
+    println!("Apps: notes, calc, sysinfo");
 }
 
 fn print_about() {
@@ -174,6 +181,75 @@ fn print_memory() {
         stats.heap_start
     );
     println!("Used: {} KB", stats.heap_used_bytes / 1024);
+}
+
+fn list_files() {
+    if !fs::list(|name| println!("{}", name)) {
+        println!("(no files)");
+    }
+}
+
+fn cat_file(command: &str) {
+    let name = command.strip_prefix("cat").unwrap_or("").trim();
+
+    if name.is_empty() {
+        println!("Usage: cat <name>");
+        return;
+    }
+
+    match fs::read(name) {
+        Ok(content) => println!("{}", content),
+        Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn write_file(command: &str) {
+    let rest = command.strip_prefix("write").unwrap_or("").trim_start();
+    let Some((name, content)) = split_once_ascii_whitespace(rest) else {
+        println!("Usage: write <name> <content>");
+        return;
+    };
+
+    if content.is_empty() {
+        println!("Usage: write <name> <content>");
+        return;
+    }
+
+    match fs::write(name, content) {
+        Ok(()) => {}
+        Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn remove_file(command: &str) {
+    let name = command.strip_prefix("rm").unwrap_or("").trim();
+
+    if name.is_empty() {
+        println!("Usage: rm <name>");
+        return;
+    }
+
+    match fs::remove(name) {
+        Ok(()) => {}
+        Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn split_once_ascii_whitespace(input: &str) -> Option<(&str, &str)> {
+    let split_at = input
+        .bytes()
+        .position(|byte| byte.is_ascii_whitespace())?;
+    let (head, tail) = input.split_at(split_at);
+
+    Some((head, tail.trim_start()))
+}
+
+fn print_fs_error(name: &str, error: FsError) {
+    match error {
+        FsError::NotFound => println!("file not found: {}", name),
+        FsError::EmptyName | FsError::InvalidName => println!("invalid filename"),
+        FsError::NameTooLong => println!("filename too long"),
+    }
 }
 
 fn run_era_command(command: &str) {

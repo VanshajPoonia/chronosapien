@@ -1,13 +1,6 @@
-//! Heap-only single-note app.
+//! Heap-only note app backed by the in-memory filesystem.
 
-use alloc::string::String;
-use core::cell::UnsafeCell;
-
-struct NoteSlot(UnsafeCell<Option<String>>);
-
-unsafe impl Sync for NoteSlot {}
-
-static NOTE: NoteSlot = NoteSlot(UnsafeCell::new(None));
+const NOTE_FILE: &str = "note.txt";
 
 pub fn run(args: &str) {
     let args = args.trim();
@@ -27,19 +20,15 @@ pub fn run(args: &str) {
 }
 
 fn read_note() {
-    // SAFETY: Notes are accessed only from the single shell command loop.
-    let note = unsafe { &*NOTE.0.get() };
-
-    match note {
-        Some(text) => crate::println!("{}", text),
-        None => crate::println!("No note stored."),
+    match crate::fs::read(NOTE_FILE) {
+        Ok(text) => crate::println!("{}", text),
+        Err(_) => crate::println!("No note stored."),
     }
 }
 
 fn store_note(text: &str) {
-    // SAFETY: Notes are accessed only from the single shell command loop.
-    let note = unsafe { &mut *NOTE.0.get() };
-
-    *note = Some(String::from(text));
-    crate::println!("Note stored.");
+    match crate::fs::write(NOTE_FILE, text) {
+        Ok(()) => crate::println!("Note stored."),
+        Err(_) => crate::println!("Could not store note."),
+    }
 }
