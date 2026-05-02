@@ -1,4 +1,4 @@
-# Time Capsule OS Roadmap
+# Chronosapian Roadmap
 
 This roadmap keeps the project small, readable, and beginner-friendly.
 
@@ -7,7 +7,7 @@ This roadmap keeps the project small, readable, and beginner-friendly.
 Goal:
 - Build a Rust `no_std` kernel for `x86_64-unknown-none`
 - Boot it in QEMU using the existing `bootloader` crate
-- Print a structured Time Capsule OS banner through the console layer
+- Print a structured Chronosapian banner through the console layer
 - Poll the PS/2 keyboard and echo typed characters without interrupts
 
 Status:
@@ -22,8 +22,8 @@ Status:
 3. **memory management**
    Introduce paging concepts, frame allocation, and the first allocator pieces.
 4. **filesystem and persistence**
-   Add a tiny storage layer for settings or simple text data.
+   Grow the current in-memory file list into persistent storage.
 5. **theme switching**
    Make era selection interactive only after the text terminal is stable.
-6. **graphics later**
-   Explore a simple GUI after the text-first system feels comfortable.
+6. **graphics shell**
+   Grow the current framebuffer console into richer graphical surfaces.
