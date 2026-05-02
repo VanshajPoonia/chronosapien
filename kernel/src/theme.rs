@@ -4,7 +4,7 @@
 
 use core::cell::UnsafeCell;
 
-use crate::vga_text::color::Color;
+use crate::framebuffer::Color;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Era {
@@ -18,10 +18,12 @@ pub enum Era {
 pub struct EraProfile {
     pub name: &'static str,
     pub prompt: &'static str,
-    pub vga_prompt: &'static str,
+    pub screen_prompt: &'static str,
     pub boot_welcome: &'static str,
     pub fg: Color,
     pub bg: Color,
+    pub top_bar_fg: Color,
+    pub top_bar_bg: Color,
 }
 
 struct GlobalEra(UnsafeCell<Era>);
@@ -31,10 +33,9 @@ unsafe impl Sync for GlobalEra {}
 static ACTIVE_ERA: GlobalEra = GlobalEra(UnsafeCell::new(Era::Eighties));
 
 pub fn active_era() -> Era {
-    // SAFETY: ChronoOS is currently single-core, polling-based, and does not
-    // enable interrupts. Access to this global era slot is therefore
-    // serialized by the one shell loop. Future interrupt or SMP support should
-    // replace this with a real synchronization primitive.
+    // SAFETY: Chronosapian is currently single-core, and era changes happen
+    // only from the shell loop. Future SMP or interrupt-driven UI changes
+    // should replace this with a real synchronization primitive.
     unsafe { *ACTIVE_ERA.0.get() }
 }
 
@@ -75,34 +76,42 @@ impl Era {
             Era::Eighties => EraProfile {
                 name: self.name(),
                 prompt: "CHRONO/84>",
-                vga_prompt: "CHRONO/84>",
-                boot_welcome: "TIME CAPSULE OS",
-                fg: Color::LightGreen,
-                bg: Color::Black,
+                screen_prompt: "CHRONO/84>",
+                boot_welcome: "CHRONOSAPIAN",
+                fg: Color::GREEN,
+                bg: Color::BLACK,
+                top_bar_fg: Color::GREEN,
+                top_bar_bg: Color::DARKER,
             },
             Era::Nineties => EraProfile {
                 name: self.name(),
                 prompt: "C:\\CHRONO>",
-                vga_prompt: "C:\\CHRONO>",
-                boot_welcome: "Time Capsule OS 95",
-                fg: Color::LightCyan,
-                bg: Color::Blue,
+                screen_prompt: "C:\\CHRONO>",
+                boot_welcome: "Chronosapian 95",
+                fg: Color::BLACK,
+                bg: Color::GRAY,
+                top_bar_fg: Color::WHITE,
+                top_bar_bg: Color::BLUE,
             },
             Era::TwoThousands => EraProfile {
                 name: self.name(),
                 prompt: "chrono@millennium:~$",
-                vga_prompt: "chrono@millennium:~$",
-                boot_welcome: "Time Capsule OS Millennium",
-                fg: Color::Black,
-                bg: Color::LightGray,
+                screen_prompt: "chrono@millennium:~$",
+                boot_welcome: "Chronosapian Millennium",
+                fg: Color::BLACK,
+                bg: Color::LIGHT_GRAY,
+                top_bar_fg: Color::BLACK,
+                top_bar_bg: Color::WHITE,
             },
             Era::Future => EraProfile {
                 name: self.name(),
                 prompt: "›",
-                vga_prompt: ">",
-                boot_welcome: "Time Capsule OS 2040",
-                fg: Color::LightMagenta,
-                bg: Color::Black,
+                screen_prompt: ">",
+                boot_welcome: "Chronosapian 2040",
+                fg: Color::WHITE,
+                bg: Color::DARK,
+                top_bar_fg: Color::WHITE,
+                top_bar_bg: Color::BLACK,
             },
         }
     }
