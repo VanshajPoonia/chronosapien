@@ -9,6 +9,7 @@ extern crate alloc;
 
 mod apps;
 mod console;
+mod fs;
 mod gdt;
 mod interrupts;
 mod keyboard;
