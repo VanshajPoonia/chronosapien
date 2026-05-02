@@ -18,14 +18,15 @@ pub fn run() -> ! {
     let mut buffer = CommandBuffer::new();
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
+    let mut top_bar_second = timer::uptime_seconds();
 
     print_prompt();
     draw_cursor();
 
     loop {
         // The shell polls one key at a time. Printable keys edit the fixed
-        // buffer and VGA line; Enter turns that buffer into a command, runs it,
-        // clears the buffer, and redraws the prompt.
+        // buffer and framebuffer line; Enter turns that buffer into a command,
+        // runs it, clears the buffer, and redraws the prompt.
         match keyboard::read_key() {
             Some(KeyEvent::Char(byte)) => {
                 hide_cursor(&mut cursor_visible);
@@ -70,6 +71,12 @@ pub fn run() -> ! {
                     idle_ticks = 0;
                 }
 
+                let uptime = timer::uptime_seconds();
+                if uptime != top_bar_second {
+                    top_bar_second = uptime;
+                    console::refresh_top_bar();
+                }
+
                 cpu_relax();
             }
         }
@@ -79,7 +86,7 @@ pub fn run() -> ! {
 fn print_prompt() {
     let profile = theme::active_profile();
 
-    print!("{} ", profile.vga_prompt);
+    print!("{} ", profile.screen_prompt);
 }
 
 struct CommandBuffer {
@@ -160,7 +167,7 @@ fn print_help() {
 fn print_about() {
     let profile = theme::active_profile();
 
-    println!("ChronoOS | Era: {} | v0.1", profile.name);
+    println!("Chronosapian | Era: {} | v0.1", profile.name);
 }
 
 fn print_uptime() {
@@ -275,8 +282,9 @@ fn run_era_command(command: &str) {
 fn switch_era(era: Era) {
     let profile = era.profile();
 
-    println!("Switching to {} mode...", profile.name);
     theme::set_active_era(era);
+    console::set_theme(profile);
+    println!("Switched to {} mode.", profile.name);
     serial_println!("[CHRONO] era: {}", profile.name);
 }
 
