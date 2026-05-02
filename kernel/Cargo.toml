@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bootloader = { version = "0.9.29", features = ["map_physical_memory"] }
+bootloader_api = "0.11.15"
 x86_64 = { version = "0.14", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
