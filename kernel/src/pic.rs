@@ -1,6 +1,6 @@
 //! Legacy 8259 Programmable Interrupt Controller setup.
 //!
-//! The first 32 IDT vectors belong to CPU exceptions, so ChronoOS remaps the
+//! The first 32 IDT vectors belong to CPU exceptions, so Chronosapian remaps the
 //! master PIC to vector 32 and the slave PIC to vector 40 before enabling IRQs.
 
 pub const MASTER_PIC_OFFSET: u8 = 32;
