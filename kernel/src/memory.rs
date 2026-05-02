@@ -1,12 +1,12 @@
 //! First-pass physical memory, paging, and heap setup.
 //!
 //! Physical memory is managed in 4KiB frames because that is the default page
-//! size used by x86_64 page tables. ChronoOS starts with identity-mapped heap
+//! size used by x86_64 page tables. Chronosapian starts with identity-mapped heap
 //! pages so the virtual address equals the physical address, which keeps early
 //! memory behavior easy to inspect while the kernel is still small.
 
 use alloc::alloc::{alloc, Layout};
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
 use core::alloc::{GlobalAlloc, Layout as CoreLayout};
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -34,10 +34,10 @@ pub struct MemoryStats {
     pub heap_used_bytes: u64,
 }
 
-pub fn init(boot_info: &'static bootloader::BootInfo) {
-    TOTAL_MEMORY_BYTES.store(total_memory_bytes(&boot_info.memory_map), Ordering::Relaxed);
+pub fn init(boot_info: &'static bootloader_api::BootInfo) {
+    TOTAL_MEMORY_BYTES.store(total_memory_bytes(&boot_info.memory_regions), Ordering::Relaxed);
 
-    if !heap_range_is_usable(&boot_info.memory_map) {
+    if !heap_range_is_usable(&boot_info.memory_regions) {
         crate::serial_println!(
             "[CHRONO] mem: heap range {:#x}..{:#x} is not usable",
             HEAP_START,
@@ -46,11 +46,15 @@ pub fn init(boot_info: &'static bootloader::BootInfo) {
         panic!("heap range is not usable");
     }
 
-    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let Some(physical_memory_offset) = boot_info.physical_memory_offset.into_option() else {
+        crate::serial_println!("[CHRONO] mem: physical memory offset missing");
+        panic!("physical memory mapping missing");
+    };
+    let physical_memory_offset = VirtAddr::new(physical_memory_offset);
     let mut mapper = unsafe { init_offset_page_table(physical_memory_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::new(&boot_info.memory_map) };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::new(&boot_info.memory_regions) };
 
-    identity_map_kernel(&boot_info.memory_map, &mut mapper, &mut frame_allocator);
+    identity_map_kernel(boot_info, &mut mapper, &mut frame_allocator);
     map_heap(&mut mapper, &mut frame_allocator);
     ALLOCATOR.init(HEAP_START as usize, HEAP_SIZE as usize);
     leak_boot_allocation();
@@ -70,20 +74,20 @@ pub fn stats() -> MemoryStats {
     }
 }
 
-fn total_memory_bytes(memory_map: &MemoryMap) -> u64 {
-    memory_map
+fn total_memory_bytes(memory_regions: &MemoryRegions) -> u64 {
+    memory_regions
         .iter()
-        .map(|region| region.range.end_addr() - region.range.start_addr())
+        .map(|region| region.end - region.start)
         .sum()
 }
 
-fn heap_range_is_usable(memory_map: &MemoryMap) -> bool {
+fn heap_range_is_usable(memory_regions: &MemoryRegions) -> bool {
     let heap_end = HEAP_START + HEAP_SIZE;
 
-    memory_map.iter().any(|region| {
-        region.region_type == MemoryRegionType::Usable
-            && region.range.start_addr() <= HEAP_START
-            && region.range.end_addr() >= heap_end
+    memory_regions.iter().any(|region| {
+        region.kind == MemoryRegionKind::Usable
+            && region.start <= HEAP_START
+            && region.end >= heap_end
     })
 }
 
@@ -102,22 +106,25 @@ fn map_heap(mapper: &mut OffsetPageTable, frame_allocator: &mut BootInfoFrameAll
 }
 
 fn identity_map_kernel(
-    memory_map: &MemoryMap,
+    boot_info: &bootloader_api::BootInfo,
     mapper: &mut OffsetPageTable,
     frame_allocator: &mut BootInfoFrameAllocator,
 ) {
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let kernel_start = boot_info.kernel_addr;
+    let kernel_end = boot_info.kernel_addr + boot_info.kernel_len;
 
-    for region in memory_map
-        .iter()
-        .filter(|region| region.region_type == MemoryRegionType::Kernel)
-    {
-        for frame_number in region.range.start_frame_number..region.range.end_frame_number {
-            let frame: PhysFrame<Size4KiB> =
-                PhysFrame::containing_address(PhysAddr::new(frame_number * PAGE_SIZE));
+    if kernel_end <= kernel_start {
+        return;
+    }
 
-            identity_map_frame(mapper, frame_allocator, frame, flags);
-        }
+    let start_frame: PhysFrame<Size4KiB> =
+        PhysFrame::containing_address(PhysAddr::new(kernel_start));
+    let end_frame: PhysFrame<Size4KiB> =
+        PhysFrame::containing_address(PhysAddr::new(kernel_end - 1));
+
+    for frame in PhysFrame::range_inclusive(start_frame, end_frame) {
+        identity_map_frame(mapper, frame_allocator, frame, flags);
     }
 }
 
@@ -160,25 +167,33 @@ fn leak_boot_allocation() {
 }
 
 pub struct BootInfoFrameAllocator {
-    memory_map: &'static MemoryMap,
+    memory_regions: &'static MemoryRegions,
     next: usize,
 }
 
 impl BootInfoFrameAllocator {
-    pub unsafe fn new(memory_map: &'static MemoryMap) -> Self {
+    pub unsafe fn new(memory_regions: &'static MemoryRegions) -> Self {
         Self {
-            memory_map,
+            memory_regions,
             next: 0,
         }
     }
 
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame<Size4KiB>> + '_ {
-        self.memory_map
+        self.memory_regions
             .iter()
-            .filter(|region| region.region_type == MemoryRegionType::Usable)
-            .flat_map(|region| region.range.start_frame_number..region.range.end_frame_number)
-            .map(|frame_number| {
-                PhysFrame::containing_address(PhysAddr::new(frame_number * PAGE_SIZE))
+            .filter(|region| region.kind == MemoryRegionKind::Usable)
+            .filter(|region| align_up_u64(region.start, PAGE_SIZE) < region.end)
+            .flat_map(|region| {
+                let start_frame: PhysFrame<Size4KiB> =
+                    PhysFrame::containing_address(PhysAddr::new(align_up_u64(
+                        region.start,
+                        PAGE_SIZE,
+                    )));
+                let end_frame: PhysFrame<Size4KiB> =
+                    PhysFrame::containing_address(PhysAddr::new(region.end - 1));
+
+                PhysFrame::range_inclusive(start_frame, end_frame)
             })
             .filter(|frame| !frame_is_heap_frame(*frame))
     }
@@ -263,6 +278,12 @@ unsafe impl GlobalAlloc for BumpAllocator {
 }
 
 fn align_up(address: usize, alignment: usize) -> usize {
+    let mask = alignment - 1;
+
+    (address + mask) & !mask
+}
+
+fn align_up_u64(address: u64, alignment: u64) -> u64 {
     let mask = alignment - 1;
 
     (address + mask) & !mask
