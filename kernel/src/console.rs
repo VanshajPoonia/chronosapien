@@ -1,29 +1,38 @@
 //! Beginner-friendly text output layer for the kernel.
 //!
 //! The console module is the public place for screen printing. The low-level
-//! VGA details stay in `vga_text`, so the rest of the kernel can use familiar
-//! `print!` and `println!` macros.
+//! framebuffer details stay in `framebuffer`, so the rest of the kernel can use
+//! familiar `print!` and `println!` macros.
 
+use bootloader_api::info::FrameBuffer;
 use core::fmt;
 
-use crate::vga_text;
-use crate::vga_text::color::Color;
+use crate::framebuffer;
+use crate::theme::EraProfile;
 
-pub fn init(foreground: Color, background: Color) {
-    vga_text::init(foreground, background);
+pub fn init(framebuffer: &mut FrameBuffer, profile: EraProfile) {
+    framebuffer::init(framebuffer, profile);
 }
 
 pub fn clear() {
-    vga_text::clear();
+    framebuffer::clear();
 }
 
 pub fn backspace() {
-    vga_text::backspace();
+    framebuffer::backspace();
+}
+
+pub fn set_theme(profile: EraProfile) {
+    framebuffer::set_theme(profile);
+}
+
+pub fn refresh_top_bar() {
+    framebuffer::refresh_top_bar();
 }
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    vga_text::print(args);
+    framebuffer::print(args);
 }
 
 #[macro_export]
