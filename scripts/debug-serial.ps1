@@ -1,10 +1,10 @@
 $ErrorActionPreference = "Stop"
 
-$image = "target\x86_64-unknown-none\debug\bootimage-kernel.bin"
+$image = "target\x86_64-unknown-none\debug\chronosapien-bios.img"
 
 if (-not (Test-Path $image)) {
-    Write-Host "Boot image not found. Building it first..."
-    cargo bootimage -p kernel
+    Write-Host "BIOS image not found. Building it first..."
+    .\scripts\build.ps1
 }
 
 qemu-system-x86_64 `

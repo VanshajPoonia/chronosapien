@@ -1,16 +1,20 @@
 # Chronosapian
 
 Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
-a `no_std` x86_64 kernel in QEMU, prints to VGA text mode, logs to serial, runs
-a tiny era-themed shell, handles CPU exceptions and timer interrupts, and now
-has early memory management, an in-memory filesystem, and a few built-in apps.
+a `no_std` x86_64 kernel in QEMU, renders a framebuffer graphics console, logs
+to serial, runs a tiny era-themed shell, handles CPU exceptions and timer
+interrupts, and now has early memory management, an in-memory filesystem, and a
+few built-in apps.
 
 ## Folder structure
 
 ```text
 chronosapien/
 |-- Cargo.toml
+|-- build.rs
 |-- rust-toolchain.toml
+|-- src/
+|   `-- main.rs
 |-- .cargo/
 |   `-- config.toml
 |-- kernel/
@@ -22,6 +26,9 @@ chronosapien/
 |       |   |-- notes.rs
 |       |   `-- sysinfo.rs
 |       |-- console.rs
+|       |-- framebuffer/
+|       |   |-- font.rs
+|       |   `-- mod.rs
 |       |-- fs.rs
 |       |-- gdt.rs
 |       |-- interrupts.rs
@@ -33,11 +40,7 @@ chronosapien/
 |       |-- serial.rs
 |       |-- shell.rs
 |       |-- theme.rs
-|       |-- timer.rs
-|       `-- vga_text/
-|           |-- color.rs
-|           |-- mod.rs
-|           `-- writer.rs
+|       `-- timer.rs
 |-- scripts/
 |   |-- build.ps1
 |   |-- debug-serial.ps1
@@ -52,11 +55,14 @@ chronosapien/
 ## What each file is for
 
 - `Cargo.toml` sets up the Rust workspace.
+- `build.rs` uses the bootloader 0.11 BIOS image builder to create the bootable image.
+- `src/main.rs` is a small host-side helper that reports the generated image path.
 - `rust-toolchain.toml` pins the nightly toolchain and required components.
-- `.cargo/config.toml` sets the default build target to `x86_64-unknown-none`.
-- `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader` and `x86_64`.
+- `.cargo/config.toml` sets the default kernel target and enables nightly artifact dependencies.
+- `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader_api` and `x86_64`.
 - `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
+- `kernel/src/framebuffer/` draws text and the top bar into the bootloader framebuffer.
 - `kernel/src/fs.rs` stores a tiny heap-backed in-memory file list.
 - `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
@@ -67,9 +73,8 @@ chronosapien/
 - `kernel/src/pic.rs` remaps the legacy PIC so hardware IRQs start at IDT vector 32.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
-- `kernel/src/theme.rs` defines simple era profiles for startup colors.
+- `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
-- `kernel/src/vga_text/` contains the minimal VGA text writer used for screen output.
 - `scripts/build.ps1` builds the bootable disk image.
 - `scripts/run.ps1` runs the image in QEMU.
 - `scripts/debug-serial.ps1` runs QEMU with display disabled and serial output enabled.
@@ -80,14 +85,16 @@ chronosapien/
 ## Dependencies
 
 - `bootloader`
-  Borrowed early boot infrastructure. It loads the kernel, provides the memory
-  map, and can map physical memory so the kernel can inspect active page tables.
+  Host-side disk image builder. It wraps the kernel ELF in a bootable BIOS image.
+- `bootloader_api`
+  The kernel-facing boot API. It provides the memory map, physical-memory
+  offset, and framebuffer metadata.
 - `x86_64`
   A `no_std` helper crate for descriptor tables, interrupt stack frames,
   control registers, and page-table types.
 
-VGA text output, serial output, keyboard polling, PIC/PIT setup, the bump heap,
-and the tiny apps are implemented directly in this repo.
+Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, the
+bump heap, and the tiny apps are implemented directly in this repo.
 
 ## Current State
 
@@ -95,13 +102,13 @@ The kernel currently:
 
 - boots through the borrowed `bootloader` crate,
 - initializes COM1 serial logging,
-- initializes VGA text output with a fixed era profile,
+- initializes a framebuffer graphics console with an era-colored top bar,
 - loads a GDT and IDT,
 - handles breakpoint, page fault, and double fault exceptions,
 - remaps the PIC and runs a 100Hz PIT timer interrupt,
 - initializes a 1MiB bump heap from the bootloader memory map,
 - keeps a tiny in-memory filesystem for shell files and notes,
-- prints a compact VGA banner with the current era name,
+- prints a compact boot banner below the top bar,
 - polls the PS/2 keyboard and runs a small command shell,
 - supports era switching,
 - includes built-in `notes`, `calc`, and `sysinfo` apps,
@@ -120,12 +127,6 @@ winget install Rustlang.Rustup
 rustup toolchain install nightly
 rustup component add rust-src llvm-tools-preview --toolchain nightly
 rustup target add x86_64-unknown-none --toolchain nightly
-```
-
-Install the boot image helper:
-
-```powershell
-cargo install bootimage
 ```
 
 Install QEMU:
@@ -155,25 +156,34 @@ Serial-only debug run:
 .\scripts\debug-serial.ps1
 ```
 
+Graphics mode still requires the bootloader to provide a framebuffer. If a host
+QEMU setup refuses to create one with `-display none`, use `.\scripts\run.ps1`
+for graphical testing and keep serial output enabled there.
+
 Optional direct commands:
 
 ```powershell
-cargo bootimage -p kernel
-qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\bootimage-kernel.bin -serial stdio
+$hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
+cargo build -p chronosapien --target $hostTarget
+qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img -serial stdio
 ```
 
 ## Boot Flow in Plain Language
 
 QEMU emulates an x86_64 machine and boots a disk image. The borrowed
 `bootloader` crate performs the early machine setup we are intentionally
-skipping for now, then jumps into our Rust kernel entrypoint. Our code starts in
-`kernel/src/main.rs`, initializes serial and VGA output, loads descriptor
-tables, triggers one test breakpoint exception, initializes memory, starts the
-timer, prints the startup banner, and enters the shell.
+skipping for now, sets up a 1024x768 framebuffer, then jumps into our Rust
+kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes serial
+and framebuffer output, loads descriptor tables, triggers one test breakpoint
+exception, initializes memory, starts the timer, prints the startup banner, and
+enters the shell.
 
-The VGA screen shows:
+The graphical console shows a top bar plus shell output:
 
 ```text
+Chronosapian | Era: 1984 | Uptime: 0s
+
+EXCEPTION: BREAKPOINT
 CHRONOSAPIAN
 Era: 1984
 CHRONO/84> _
@@ -184,6 +194,7 @@ With `-serial stdio`, the QEMU terminal shows:
 ```text
 [CHRONO] boot start
 [CHRONO] serial initialized
+[CHRONO] fb: 1024x768 initialized
 [CHRONO] console initialized
 [CHRONO] GDT loaded
 [CHRONO] IDT loaded
@@ -210,7 +221,7 @@ Shell commands and apps add serial lines like:
 Built-ins:
 
 - `help` lists available commands.
-- `clear` clears the VGA text screen.
+- `clear` clears the framebuffer shell region and redraws the top bar.
 - `about` prints the current Chronosapian version line.
 - `reboot` asks the PS/2 controller to reset the machine.
 - `era 1984|1995|2007|2040` switches the active era style.
@@ -229,18 +240,29 @@ Tiny apps:
 - `calc <int> +|-|*|/ <int>` evaluates one integer operation.
 - `sysinfo` prints era-styled OS, era, uptime, and memory usage.
 
-## VGA text output in simple terms
+## Framebuffer graphics in simple terms
 
-VGA text mode gives the kernel a small screen buffer at memory address `0xb8000`.
-Each visible character cell uses two bytes:
+The bootloader asks the firmware for a linear framebuffer and passes its address
+and layout to Chronosapian. The kernel does not implement VESA or a GPU driver;
+it receives ready-to-write pixel memory from the bootloader.
 
-- one byte stores the ASCII character,
-- one byte stores the foreground and background color.
+The framebuffer is a flat byte array. To draw pixel `(x, y)`, the renderer uses:
 
-The writer uses volatile reads and writes because this address belongs to
-hardware, not normal memory. The `vga_text` module keeps that detail in one
-place, while `console.rs` gives the rest of the kernel simple `print!` and
-`println!` macros.
+```text
+offset = (y * stride + x) * bytes_per_pixel
+```
+
+`stride` is the number of pixels between the start of one scanline and the next.
+It can be wider than the visible screen because some framebuffers add padding at
+the end of each row. RGB and BGR formats store the same color channels in a
+different byte order, so the renderer writes either red-green-blue or
+blue-green-red depending on the bootloader metadata.
+
+Text is drawn with a tiny 8x8 bitmap font. Each glyph is stored as eight bytes:
+one byte per row. A set bit draws a foreground pixel; a cleared bit draws a
+background pixel. The console keeps a small text cell buffer for the shell
+region so it can scroll below the persistent top bar. Mouse support is not part
+of this milestone.
 
 ## COM1 serial output in simple terms
 
@@ -315,7 +337,7 @@ count is tiny. Filenames are single shell tokens and can be up to 32 bytes long.
 Ours:
 - Kernel entry and startup flow
 - Panic handling
-- VGA text output
+- Framebuffer text output and bitmap font rendering
 - GDT, IDT, PIC, and PIT setup
 - Exception and timer handlers
 - Basic memory management and bump allocation
