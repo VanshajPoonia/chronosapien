@@ -46,6 +46,16 @@ const PACKET_Y_OVERFLOW: u8 = 1 << 7;
 const WAIT_LIMIT: usize = 100_000;
 
 #[derive(Clone, Copy)]
+pub struct MouseEvent {
+    pub x: usize,
+    pub y: usize,
+    pub left_down: bool,
+    pub left_pressed: bool,
+    pub left_released: bool,
+    pub moved: bool,
+}
+
+#[derive(Clone, Copy)]
 struct MouseState {
     x: i32,
     y: i32,
@@ -54,6 +64,7 @@ struct MouseState {
     packet: [u8; 3],
     packet_index: usize,
     left_button_down: bool,
+    pending_event: Option<MouseEvent>,
     initialized: bool,
 }
 
@@ -67,6 +78,7 @@ impl MouseState {
             packet: [0; 3],
             packet_index: 0,
             left_button_down: false,
+            pending_event: None,
             initialized: false,
         }
     }
@@ -99,6 +111,7 @@ pub fn init() {
     state.packet = [0; 3];
     state.packet_index = 0;
     state.left_button_down = false;
+    state.pending_event = None;
     state.initialized = false;
 
     drain_output_buffer();
