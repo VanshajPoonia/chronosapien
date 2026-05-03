@@ -151,6 +151,18 @@ pub fn handle_interrupt() {
     push_packet_byte(state, byte);
 }
 
+pub fn take_event() -> Option<MouseEvent> {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Mouse events are produced by IRQ12 and consumed by the shell
+        // loop. Interrupts are disabled here to make taking the slot atomic.
+        let state = unsafe { &mut *MOUSE.0.get() };
+        let event = state.pending_event;
+        state.pending_event = None;
+
+        event
+    })
+}
+
 fn initialize_controller_and_device() -> bool {
     if !send_controller_command(ENABLE_SECOND_PORT) {
         return false;
