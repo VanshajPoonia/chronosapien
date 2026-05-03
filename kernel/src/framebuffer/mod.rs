@@ -198,6 +198,23 @@ impl Writer {
         }
     }
 
+    fn redraw_console_base(&mut self) {
+        if !self.initialized {
+            return;
+        }
+
+        self.fill_rect(0, 0, self.info.width, self.info.height, self.background);
+
+        for row in 0..self.rows {
+            for col in 0..self.columns {
+                let cell = self.cells[self.cell_index(row, col)];
+                self.draw_cell(row, col, cell);
+            }
+        }
+
+        self.draw_top_bar();
+    }
+
     fn write_byte(&mut self, byte: u8) {
         if !self.initialized || self.columns == 0 || self.rows == 0 {
             return;
@@ -637,6 +654,15 @@ pub fn refresh_top_bar() {
         // SAFETY: Same interrupt-exclusion model as `clear`.
         unsafe {
             (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| writer.refresh_top_bar());
+        }
+    });
+}
+
+pub fn redraw_console_base() {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| writer.redraw_console_base());
         }
     });
 }
