@@ -211,17 +211,52 @@ fn handle_packet(state: &mut MouseState) {
     let max_x = state.screen_width.saturating_sub(1) as i32;
     let max_y = state.screen_height.saturating_sub(1) as i32;
 
+    let previous_x = state.x;
+    let previous_y = state.y;
+
     state.x = clamp(state.x + dx, 0, max_x);
     state.y = clamp(state.y - dy, 0, max_y);
 
     framebuffer::set_mouse_cursor_position(state.x as usize, state.y as usize);
 
     let left_button_down = flags & PACKET_LEFT_BUTTON != 0;
+    let left_pressed = left_button_down && !state.left_button_down;
+    let left_released = !left_button_down && state.left_button_down;
+    let moved = state.x != previous_x || state.y != previous_y;
+
     if left_button_down && !state.left_button_down {
         crate::serial_println!("[CHRONO] mouse: click at {},{}", state.x, state.y);
     }
 
+    if moved || left_pressed || left_released {
+        publish_event(
+            state,
+            MouseEvent {
+                x: state.x as usize,
+                y: state.y as usize,
+                left_down: left_button_down,
+                left_pressed,
+                left_released,
+                moved,
+            },
+        );
+    }
+
     state.left_button_down = left_button_down;
+}
+
+fn publish_event(state: &mut MouseState, event: MouseEvent) {
+    state.pending_event = Some(match state.pending_event {
+        Some(previous) => MouseEvent {
+            x: event.x,
+            y: event.y,
+            left_down: event.left_down,
+            left_pressed: previous.left_pressed || event.left_pressed,
+            left_released: previous.left_released || event.left_released,
+            moved: previous.moved || event.moved,
+        },
+        None => event,
+    });
 }
 
 fn clamp(value: i32, min: i32, max: i32) -> i32 {
