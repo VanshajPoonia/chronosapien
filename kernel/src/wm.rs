@@ -80,6 +80,52 @@ impl WindowManager {
             drag: None,
         }
     }
+
+    fn open(&mut self, kind: WindowKind, content: ContentBuffer) -> bool {
+        if self.count >= MAX_WINDOWS {
+            return false;
+        }
+
+        let (screen_width, screen_height) = framebuffer::screen_size().unwrap_or((640, 480));
+        let index = self.count;
+        let width = 360.min(screen_width.saturating_sub(32)).max(160);
+        let height = match kind {
+            WindowKind::Notes => 152,
+            WindowKind::Sysinfo => 176,
+        }
+        .min(screen_height.saturating_sub(framebuffer::TOP_BAR_RESERVED_HEIGHT + 16))
+        .max(80);
+        let x = clamp_usize(32 + index * 28, 0, screen_width.saturating_sub(width));
+        let y = clamp_usize(
+            framebuffer::TOP_BAR_RESERVED_HEIGHT + 24 + index * 24,
+            framebuffer::TOP_BAR_RESERVED_HEIGHT,
+            screen_height.saturating_sub(height),
+        );
+
+        self.windows[index] = Window {
+            x,
+            y,
+            width,
+            height,
+            title: kind.title(),
+            content: content.bytes,
+            content_len: content.len,
+            kind,
+        };
+        self.count += 1;
+        self.redraw();
+
+        crate::serial_println!("[CHRONO] wm: open {}", kind.log_name());
+        true
+    }
+
+    fn redraw(&self) {
+        framebuffer::redraw_console_base();
+
+        for index in 0..self.count {
+            draw_window(self.windows[index]);
+        }
+    }
 }
 
 struct GlobalWindowManager(UnsafeCell<WindowManager>);
@@ -88,3 +134,21 @@ unsafe impl Sync for GlobalWindowManager {}
 
 static WINDOW_MANAGER: GlobalWindowManager =
     GlobalWindowManager(UnsafeCell::new(WindowManager::new()));
+
+fn with_manager<R>(action: impl FnOnce(&mut WindowManager) -> R) -> R {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: The shell loop is the only WM mutator. Interrupts are kept
+        // disabled so mouse-event consumption cannot interleave with redraws.
+        unsafe { action(&mut *WINDOW_MANAGER.0.get()) }
+    })
+}
+
+fn clamp_usize(value: usize, min: usize, max: usize) -> usize {
+    if value < min {
+        min
+    } else if value > max {
+        max
+    } else {
+        value
+    }
+}
