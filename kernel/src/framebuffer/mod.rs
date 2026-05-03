@@ -711,6 +711,39 @@ pub fn screen_size() -> Option<(usize, usize)> {
     })
 }
 
+pub fn fill_rect(x: usize, y: usize, width: usize, height: usize, color: Color) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.fill_rect(x, y, width, height, color);
+            });
+        }
+    });
+}
+
+pub fn stroke_rect(x: usize, y: usize, width: usize, height: usize, color: Color) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.stroke_rect(x, y, width, height, color);
+            });
+        }
+    });
+}
+
+pub fn draw_text_at(x: usize, y: usize, text: &str, fg: Color, bg: Color) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.draw_text_at(x, y, text, fg, bg);
+            });
+        }
+    });
+}
+
 pub fn set_mouse_cursor_position(x: usize, y: usize) {
     x86_64::instructions::interrupts::without_interrupts(|| {
         // SAFETY: The IRQ12 mouse handler is the only caller expected to move
