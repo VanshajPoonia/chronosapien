@@ -119,6 +119,69 @@ impl WindowManager {
         true
     }
 
+    fn handle_mouse_event(&mut self, event: MouseEvent) {
+        if event.left_pressed {
+            self.handle_left_press(event.x, event.y);
+        } else if event.left_down && event.moved {
+            self.handle_drag(event.x, event.y);
+        }
+
+        if event.left_released {
+            self.drag = None;
+        }
+    }
+
+    fn handle_left_press(&mut self, x: usize, y: usize) {
+        let Some(index) = self.hit_test(x, y) else {
+            self.drag = None;
+            return;
+        };
+
+        if self.in_close_button(index, x, y) {
+            self.close(index);
+            return;
+        }
+
+        if self.in_title_bar(index, x, y) {
+            let front_index = self.bring_to_front(index);
+            let window = self.windows[front_index];
+            self.drag = Some(DragState {
+                window_index: front_index,
+                offset_x: x.saturating_sub(window.x),
+                offset_y: y.saturating_sub(window.y),
+            });
+            self.redraw();
+            return;
+        }
+
+        self.bring_to_front(index);
+        self.redraw();
+    }
+
+    fn handle_drag(&mut self, x: usize, y: usize) {
+        let Some(drag) = self.drag else {
+            return;
+        };
+
+        if drag.window_index >= self.count {
+            self.drag = None;
+            return;
+        }
+
+        let (screen_width, screen_height) = framebuffer::screen_size().unwrap_or((640, 480));
+        let window = &mut self.windows[drag.window_index];
+        let max_x = screen_width.saturating_sub(window.width);
+        let max_y = screen_height.saturating_sub(window.height);
+
+        window.x = clamp_usize(x.saturating_sub(drag.offset_x), 0, max_x);
+        window.y = clamp_usize(
+            y.saturating_sub(drag.offset_y),
+            framebuffer::TOP_BAR_RESERVED_HEIGHT,
+            max_y,
+        );
+        self.redraw();
+    }
+
     fn redraw(&self) {
         framebuffer::redraw_console_base();
 
@@ -241,6 +304,12 @@ pub fn redraw_if_open() {
         if manager.count > 0 {
             manager.redraw();
         }
+    });
+}
+
+pub fn handle_mouse_event(event: MouseEvent) {
+    with_manager(|manager| {
+        manager.handle_mouse_event(event);
     });
 }
 
