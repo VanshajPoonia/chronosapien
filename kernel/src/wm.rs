@@ -177,6 +177,153 @@ fn with_manager<R>(action: impl FnOnce(&mut WindowManager) -> R) -> R {
     })
 }
 
+fn draw_window(window: Window) {
+    let style = WindowStyle::active();
+    let title_y = window.y + 4;
+    let body_y = window.y + TITLE_BAR_HEIGHT;
+    let body_height = window.height.saturating_sub(TITLE_BAR_HEIGHT);
+
+    framebuffer::fill_rect(window.x, window.y, window.width, window.height, style.body_bg);
+
+    if style.title_fill {
+        framebuffer::fill_rect(
+            window.x + 1,
+            window.y + 1,
+            window.width.saturating_sub(2),
+            TITLE_BAR_HEIGHT.saturating_sub(1),
+            style.title_bg,
+        );
+    }
+
+    draw_border(window, style);
+    draw_title(window, style, title_y);
+    draw_close_button(window, style);
+    draw_content(window, style, body_y, body_height);
+}
+
+fn draw_border(window: Window, style: WindowStyle) {
+    match style.border_kind {
+        BorderKind::Flat => {
+            framebuffer::stroke_rect(window.x, window.y, window.width, window.height, style.border);
+        }
+        BorderKind::ThreeD => {
+            framebuffer::stroke_rect(window.x, window.y, window.width, window.height, style.shadow);
+            framebuffer::stroke_rect(
+                window.x + 1,
+                window.y + 1,
+                window.width.saturating_sub(2),
+                window.height.saturating_sub(2),
+                style.highlight,
+            );
+        }
+        BorderKind::Future => {
+            framebuffer::stroke_rect(window.x, window.y, window.width, window.height, style.border);
+            framebuffer::fill_rect(
+                window.x + 1,
+                window.y + TITLE_BAR_HEIGHT,
+                window.width.saturating_sub(2),
+                1,
+                style.title_fg,
+            );
+        }
+    }
+}
+
+fn draw_title(window: Window, style: WindowStyle, title_y: usize) {
+    let max_chars = window.width.saturating_sub(40) / framebuffer::GLYPH_WIDTH;
+
+    draw_text_clipped(
+        window.x + WINDOW_PADDING,
+        title_y,
+        window.title.as_bytes(),
+        max_chars,
+        style.title_fg,
+        style.title_bg,
+    );
+}
+
+fn draw_close_button(window: Window, style: WindowStyle) {
+    let x = close_button_x(window);
+    let y = window.y + 4;
+
+    framebuffer::stroke_rect(x, y, CLOSE_SIZE, CLOSE_SIZE, style.title_fg);
+    framebuffer::draw_text_at(x + 1, y, "X", style.title_fg, style.title_bg);
+}
+
+fn draw_content(window: Window, style: WindowStyle, body_y: usize, body_height: usize) {
+    let max_cols = window.width.saturating_sub(WINDOW_PADDING * 2) / framebuffer::GLYPH_WIDTH;
+    let max_rows = body_height.saturating_sub(WINDOW_PADDING) / framebuffer::GLYPH_HEIGHT;
+    let mut start = 0;
+    let mut len = 0;
+    let mut row = 0;
+    let content = &window.content[..window.content_len];
+
+    for (index, byte) in content.iter().copied().enumerate() {
+        if byte == b'\n' {
+            draw_content_line(window, style, body_y, row, &content[start..start + len], max_cols);
+            row += 1;
+            start = index + 1;
+            len = 0;
+
+            if row >= max_rows {
+                return;
+            }
+        } else if len < max_cols {
+            len += 1;
+        }
+    }
+
+    if row < max_rows {
+        draw_content_line(window, style, body_y, row, &content[start..start + len], max_cols);
+    }
+}
+
+fn draw_content_line(
+    window: Window,
+    style: WindowStyle,
+    body_y: usize,
+    row: usize,
+    bytes: &[u8],
+    max_cols: usize,
+) {
+    if bytes.is_empty() || max_cols == 0 {
+        return;
+    }
+
+    let visible_len = bytes.len().min(max_cols);
+    let text = unsafe { core::str::from_utf8_unchecked(&bytes[..visible_len]) };
+
+    framebuffer::draw_text_at(
+        window.x + WINDOW_PADDING,
+        body_y + WINDOW_PADDING + row * framebuffer::GLYPH_HEIGHT,
+        text,
+        style.body_fg,
+        style.body_bg,
+    );
+}
+
+fn draw_text_clipped(
+    x: usize,
+    y: usize,
+    bytes: &[u8],
+    max_chars: usize,
+    fg: Color,
+    bg: Color,
+) {
+    if max_chars == 0 {
+        return;
+    }
+
+    let visible_len = bytes.len().min(max_chars);
+    let text = unsafe { core::str::from_utf8_unchecked(&bytes[..visible_len]) };
+
+    framebuffer::draw_text_at(x, y, text, fg, bg);
+}
+
+fn close_button_x(window: Window) -> usize {
+    window.x + window.width.saturating_sub(CLOSE_SIZE + 6)
+}
+
 fn clamp_usize(value: usize, min: usize, max: usize) -> usize {
     if value < min {
         min
@@ -185,6 +332,77 @@ fn clamp_usize(value: usize, min: usize, max: usize) -> usize {
     } else {
         value
     }
+}
+
+#[derive(Clone, Copy)]
+struct WindowStyle {
+    body_bg: Color,
+    body_fg: Color,
+    title_bg: Color,
+    title_fg: Color,
+    border: Color,
+    highlight: Color,
+    shadow: Color,
+    title_fill: bool,
+    border_kind: BorderKind,
+}
+
+impl WindowStyle {
+    fn active() -> Self {
+        match crate::theme::active_era() {
+            Era::Eighties => Self {
+                body_bg: Color::BLACK,
+                body_fg: Color::GREEN,
+                title_bg: Color::BLACK,
+                title_fg: Color::GREEN,
+                border: Color::GREEN,
+                highlight: Color::GREEN,
+                shadow: Color::GREEN,
+                title_fill: false,
+                border_kind: BorderKind::Flat,
+            },
+            Era::Nineties => Self {
+                body_bg: Color::LIGHT_GRAY,
+                body_fg: Color::BLACK,
+                title_bg: Color::GRAY,
+                title_fg: Color::BLACK,
+                border: Color::GRAY,
+                highlight: Color::WHITE,
+                shadow: Color::DARK,
+                title_fill: true,
+                border_kind: BorderKind::ThreeD,
+            },
+            Era::TwoThousands => Self {
+                body_bg: Color::LIGHT_GRAY,
+                body_fg: Color::BLACK,
+                title_bg: Color::WHITE,
+                title_fg: Color::BLACK,
+                border: Color::DARK,
+                highlight: Color::WHITE,
+                shadow: Color::DARK,
+                title_fill: true,
+                border_kind: BorderKind::Flat,
+            },
+            Era::Future => Self {
+                body_bg: Color::DARK,
+                body_fg: Color::WHITE,
+                title_bg: Color::DARK,
+                title_fg: Color::WHITE,
+                border: Color::WHITE,
+                highlight: Color::WHITE,
+                shadow: Color::DARKER,
+                title_fill: false,
+                border_kind: BorderKind::Future,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum BorderKind {
+    Flat,
+    ThreeD,
+    Future,
 }
 
 struct ContentBuffer {
