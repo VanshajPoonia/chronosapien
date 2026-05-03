@@ -7,6 +7,7 @@ use crate::keyboard::{self, KeyEvent};
 use crate::memory;
 use crate::theme::{self, Era};
 use crate::timer;
+use crate::wm;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
@@ -153,6 +154,7 @@ fn execute_command(command: &str) {
         command if command == "write" || command.starts_with("write ") => write_file(command),
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
+        command if command == "open" || command.starts_with("open ") => open_window(command),
         command if apps::run(command) => {}
         _ => println!("unknown command: {}", command),
     }
@@ -162,6 +164,7 @@ fn print_help() {
     println!("Commands: help, clear, about, reboot, era, uptime, clock, mem");
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
     println!("Apps: notes, calc, sysinfo");
+    println!("Windows: open notes, open sysinfo");
 }
 
 fn print_about() {
@@ -239,6 +242,22 @@ fn remove_file(command: &str) {
     match fs::remove(name) {
         Ok(()) => {}
         Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn open_window(command: &str) {
+    let name = command.strip_prefix("open").unwrap_or("").trim();
+    let opened = match name {
+        "notes" => wm::open_notes(),
+        "sysinfo" => wm::open_sysinfo(),
+        _ => {
+            println!("Usage: open notes|sysinfo");
+            return;
+        }
+    };
+
+    if !opened {
+        println!("too many windows open");
     }
 }
 

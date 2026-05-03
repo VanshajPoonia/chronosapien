@@ -22,6 +22,7 @@ mod serial;
 mod shell;
 mod theme;
 mod timer;
+mod wm;
 
 use bootloader_api::config::{BootloaderConfig, Mapping};
 use bootloader_api::{entry_point, BootInfo};
