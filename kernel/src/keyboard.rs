@@ -10,6 +10,7 @@ use core::cell::UnsafeCell;
 const STATUS_PORT: u16 = 0x64;
 const DATA_PORT: u16 = 0x60;
 const OUTPUT_BUFFER_FULL: u8 = 1 << 0;
+const AUXILIARY_OUTPUT: u8 = 1 << 5;
 
 #[derive(Clone, Copy, Debug)]
 pub enum KeyEvent {
@@ -41,6 +42,9 @@ pub fn read_key() -> Option<KeyEvent> {
     // whether a keyboard byte is waiting before touching the data port.
     let status = unsafe { inb(STATUS_PORT) };
     if status & OUTPUT_BUFFER_FULL == 0 {
+        return None;
+    }
+    if status & AUXILIARY_OUTPUT != 0 {
         return None;
     }
 

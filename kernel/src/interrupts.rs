@@ -10,9 +10,10 @@ use x86_64::structures::idt::{
     InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
 };
 
-use crate::{gdt, pic, timer};
+use crate::{gdt, mouse, pic, timer};
 
 const TIMER_INTERRUPT_VECTOR: usize = pic::MASTER_PIC_OFFSET as usize;
+const MOUSE_INTERRUPT_VECTOR: usize = pic::SLAVE_PIC_OFFSET as usize + 4;
 
 static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 
@@ -26,6 +27,7 @@ pub fn init() {
             .set_handler_fn(double_fault_handler)
             .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         IDT[TIMER_INTERRUPT_VECTOR].set_handler_fn(timer_interrupt_handler);
+        IDT[MOUSE_INTERRUPT_VECTOR].set_handler_fn(mouse_interrupt_handler);
         IDT.load();
     }
 
@@ -80,6 +82,11 @@ extern "x86-interrupt" fn double_fault_handler(
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     timer::handle_tick();
     pic::end_of_interrupt(pic::TIMER_IRQ);
+}
+
+extern "x86-interrupt" fn mouse_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    mouse::handle_interrupt();
+    pic::end_of_interrupt(pic::MOUSE_IRQ);
 }
 
 fn halt_forever() -> ! {

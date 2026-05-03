@@ -6,6 +6,7 @@
 pub const MASTER_PIC_OFFSET: u8 = 32;
 pub const SLAVE_PIC_OFFSET: u8 = 40;
 pub const TIMER_IRQ: u8 = 0;
+pub const MOUSE_IRQ: u8 = 12;
 
 const PIC_EOI: u8 = 0x20;
 
@@ -21,8 +22,8 @@ const ICW4_8086: u8 = 0x01;
 const MASTER_HAS_SLAVE_ON_IRQ2: u8 = 0x04;
 const SLAVE_CASCADE_IDENTITY: u8 = 0x02;
 
-const UNMASK_IRQ0_ONLY: u8 = 0b1111_1110;
-const MASK_ALL_IRQS: u8 = 0xFF;
+const MASTER_MASK_TIMER_AND_SLAVE: u8 = 0b1111_1010;
+const SLAVE_MASK_MOUSE_ONLY: u8 = 0b1110_1111;
 
 pub fn init() {
     // SAFETY: These are the standard command/data ports for the legacy 8259
@@ -48,8 +49,8 @@ pub fn init() {
         outb(SLAVE_DATA_PORT, ICW4_8086);
         io_wait();
 
-        outb(MASTER_DATA_PORT, UNMASK_IRQ0_ONLY);
-        outb(SLAVE_DATA_PORT, MASK_ALL_IRQS);
+        outb(MASTER_DATA_PORT, MASTER_MASK_TIMER_AND_SLAVE);
+        outb(SLAVE_DATA_PORT, SLAVE_MASK_MOUSE_ONLY);
     }
 }
 

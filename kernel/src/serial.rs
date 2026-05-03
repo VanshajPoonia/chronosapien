@@ -95,11 +95,13 @@ pub fn init() {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
 
-    // SAFETY: Same reasoning as in `init`: this early kernel is single-core,
-    // non-preemptive, and uses the serial port synchronously.
-    unsafe {
-        let _ = (*SERIAL1.0.get()).write_fmt(args);
-    }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Serial output can now happen from IRQ12 mouse clicks, so keep
+        // access to the global UART writer non-reentrant on this single CPU.
+        unsafe {
+            let _ = (*SERIAL1.0.get()).write_fmt(args);
+        }
+    });
 }
 
 unsafe fn outb(port: u16, value: u8) {

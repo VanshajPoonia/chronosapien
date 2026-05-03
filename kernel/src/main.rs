@@ -15,6 +15,7 @@ mod gdt;
 mod interrupts;
 mod keyboard;
 mod memory;
+mod mouse;
 mod panic;
 mod pic;
 mod serial;
@@ -59,6 +60,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     memory::init(boot_info);
     pic::init();
     timer::init();
+    mouse::init();
     x86_64::instructions::interrupts::enable();
 
     let era_name = STARTUP_ERA.name();
