@@ -126,6 +126,81 @@ impl WindowManager {
             draw_window(self.windows[index]);
         }
     }
+
+    fn close(&mut self, index: usize) {
+        if index >= self.count {
+            return;
+        }
+
+        let kind = self.windows[index].kind;
+
+        for move_index in index..self.count - 1 {
+            self.windows[move_index] = self.windows[move_index + 1];
+        }
+
+        self.count -= 1;
+        self.windows[self.count] = Window::empty();
+        self.drag = None;
+        self.redraw();
+
+        crate::serial_println!("[CHRONO] wm: close {}", kind.log_name());
+    }
+
+    fn bring_to_front(&mut self, index: usize) -> usize {
+        if index >= self.count {
+            return index;
+        }
+
+        let window = self.windows[index];
+
+        for move_index in index..self.count - 1 {
+            self.windows[move_index] = self.windows[move_index + 1];
+        }
+
+        let front_index = self.count - 1;
+        self.windows[front_index] = window;
+
+        front_index
+    }
+
+    fn hit_test(&self, x: usize, y: usize) -> Option<usize> {
+        let mut index = self.count;
+
+        while index > 0 {
+            index -= 1;
+            let window = self.windows[index];
+
+            if x >= window.x
+                && x < window.x.saturating_add(window.width)
+                && y >= window.y
+                && y < window.y.saturating_add(window.height)
+            {
+                return Some(index);
+            }
+        }
+
+        None
+    }
+
+    fn in_title_bar(&self, index: usize, x: usize, y: usize) -> bool {
+        let window = self.windows[index];
+
+        x >= window.x
+            && x < window.x.saturating_add(window.width)
+            && y >= window.y
+            && y < window.y.saturating_add(TITLE_BAR_HEIGHT)
+    }
+
+    fn in_close_button(&self, index: usize, x: usize, y: usize) -> bool {
+        let window = self.windows[index];
+        let button_x = close_button_x(window);
+        let button_y = window.y + 4;
+
+        x >= button_x
+            && x < button_x.saturating_add(CLOSE_SIZE)
+            && y >= button_y
+            && y < button_y.saturating_add(CLOSE_SIZE)
+    }
 }
 
 struct GlobalWindowManager(UnsafeCell<WindowManager>);
