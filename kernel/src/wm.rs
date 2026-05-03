@@ -135,6 +135,40 @@ unsafe impl Sync for GlobalWindowManager {}
 static WINDOW_MANAGER: GlobalWindowManager =
     GlobalWindowManager(UnsafeCell::new(WindowManager::new()));
 
+pub fn open_notes() -> bool {
+    let mut content = ContentBuffer::new();
+
+    match crate::fs::read("note.txt") {
+        Ok(text) => content.push_str(text),
+        Err(_) => content.push_str("No note stored."),
+    }
+
+    with_manager(|manager| manager.open(WindowKind::Notes, content))
+}
+
+pub fn open_sysinfo() -> bool {
+    let mut content = ContentBuffer::new();
+    let profile = crate::theme::active_profile();
+    let memory = crate::memory::stats();
+    let uptime = crate::timer::uptime_seconds();
+    let used_kb = memory.heap_used_bytes / 1024;
+
+    let _ = write!(content, "OS: Chronosapian\n");
+    let _ = write!(content, "Era: {}\n", profile.name);
+    let _ = write!(content, "Uptime: {} seconds\n", uptime);
+    let _ = write!(content, "Memory used: {} KB", used_kb);
+
+    with_manager(|manager| manager.open(WindowKind::Sysinfo, content))
+}
+
+pub fn redraw_if_open() {
+    with_manager(|manager| {
+        if manager.count > 0 {
+            manager.redraw();
+        }
+    });
+}
+
 fn with_manager<R>(action: impl FnOnce(&mut WindowManager) -> R) -> R {
     x86_64::instructions::interrupts::without_interrupts(|| {
         // SAFETY: The shell loop is the only WM mutator. Interrupts are kept
@@ -150,5 +184,41 @@ fn clamp_usize(value: usize, min: usize, max: usize) -> usize {
         max
     } else {
         value
+    }
+}
+
+struct ContentBuffer {
+    bytes: [u8; WINDOW_CONTENT_CAPACITY],
+    len: usize,
+}
+
+impl ContentBuffer {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; WINDOW_CONTENT_CAPACITY],
+            len: 0,
+        }
+    }
+
+    fn push_str(&mut self, text: &str) {
+        let _ = self.write_str(text);
+    }
+}
+
+impl Write for ContentBuffer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for byte in s.bytes() {
+            if self.len >= self.bytes.len() {
+                break;
+            }
+
+            self.bytes[self.len] = match byte {
+                b'\n' | 0x20..=0x7e => byte,
+                _ => b'?',
+            };
+            self.len += 1;
+        }
+
+        Ok(())
     }
 }
