@@ -407,6 +407,29 @@ impl Writer {
         }
     }
 
+    fn stroke_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: Color) {
+        if width == 0 || height == 0 {
+            return;
+        }
+
+        self.fill_rect(x, y, width, 1, color);
+        self.fill_rect(
+            x,
+            y.saturating_add(height.saturating_sub(1)),
+            width,
+            1,
+            color,
+        );
+        self.fill_rect(x, y, 1, height, color);
+        self.fill_rect(
+            x.saturating_add(width.saturating_sub(1)),
+            y,
+            1,
+            height,
+            color,
+        );
+    }
+
     fn screen_size(&self) -> Option<(usize, usize)> {
         if !self.initialized {
             return None;
