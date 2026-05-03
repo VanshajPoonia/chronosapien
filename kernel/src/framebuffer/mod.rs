@@ -14,6 +14,28 @@ const TEXT_START_Y: usize = TOP_BAR_HEIGHT;
 const MAX_COLUMNS: usize = 128;
 const MAX_ROWS: usize = 94;
 const CELL_COUNT: usize = MAX_COLUMNS * MAX_ROWS;
+const MOUSE_CURSOR_SIZE: usize = 8;
+const MOUSE_CURSOR_PIXELS: usize = MOUSE_CURSOR_SIZE * MOUSE_CURSOR_SIZE;
+const MOUSE_CURSOR_OUTLINE: [u8; MOUSE_CURSOR_SIZE] = [
+    0b1100_0000,
+    0b1110_0000,
+    0b1111_0000,
+    0b1111_1000,
+    0b1111_1100,
+    0b1111_0000,
+    0b1101_1000,
+    0b1000_1100,
+];
+const MOUSE_CURSOR_FILL: [u8; MOUSE_CURSOR_SIZE] = [
+    0b1000_0000,
+    0b1100_0000,
+    0b1010_0000,
+    0b1001_0000,
+    0b1000_1000,
+    0b1010_0000,
+    0b1001_0000,
+    0b0000_1000,
+];
 
 #[derive(Clone, Copy, Debug)]
 pub struct Color {
@@ -55,6 +77,24 @@ impl Cell {
     }
 }
 
+struct MouseCursor {
+    x: usize,
+    y: usize,
+    visible: bool,
+    background: [Color; MOUSE_CURSOR_PIXELS],
+}
+
+impl MouseCursor {
+    const fn new() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            visible: false,
+            background: [Color::BLACK; MOUSE_CURSOR_PIXELS],
+        }
+    }
+}
+
 pub struct Writer {
     buffer: *mut u8,
     buffer_len: usize,
@@ -67,6 +107,7 @@ pub struct Writer {
     top_bar_foreground: Color,
     top_bar_background: Color,
     cells: [Cell; CELL_COUNT],
+    mouse_cursor: MouseCursor,
     initialized: bool,
 }
 
@@ -91,6 +132,7 @@ impl Writer {
             top_bar_foreground: Color::WHITE,
             top_bar_background: Color::BLUE,
             cells: [Cell::blank(Color::WHITE, Color::BLACK); CELL_COUNT],
+            mouse_cursor: MouseCursor::new(),
             initialized: false,
         }
     }
@@ -345,6 +387,144 @@ impl Writer {
         }
     }
 
+    fn screen_size(&self) -> Option<(usize, usize)> {
+        if !self.initialized {
+            return None;
+        }
+
+        Some((self.info.width, self.info.height))
+    }
+
+    fn set_mouse_cursor_position(&mut self, x: usize, y: usize) {
+        if !self.initialized || self.info.width == 0 || self.info.height == 0 {
+            return;
+        }
+
+        self.hide_mouse_cursor();
+        self.mouse_cursor.x = x.min(self.info.width - 1);
+        self.mouse_cursor.y = y.min(self.info.height - 1);
+        self.show_mouse_cursor();
+    }
+
+    fn with_mouse_cursor_hidden(&mut self, action: impl FnOnce(&mut Self)) {
+        let was_visible = self.mouse_cursor.visible;
+
+        if was_visible {
+            self.hide_mouse_cursor();
+        }
+
+        action(self);
+
+        if was_visible {
+            self.show_mouse_cursor();
+        }
+    }
+
+    fn show_mouse_cursor(&mut self) {
+        if !self.initialized || self.mouse_cursor.visible {
+            return;
+        }
+
+        self.save_mouse_background();
+        self.draw_mouse_cursor();
+        self.mouse_cursor.visible = true;
+    }
+
+    fn hide_mouse_cursor(&mut self) {
+        if !self.initialized || !self.mouse_cursor.visible {
+            return;
+        }
+
+        self.restore_mouse_background();
+        self.mouse_cursor.visible = false;
+    }
+
+    fn save_mouse_background(&mut self) {
+        let cursor_x = self.mouse_cursor.x;
+        let cursor_y = self.mouse_cursor.y;
+
+        for row in 0..MOUSE_CURSOR_SIZE {
+            for col in 0..MOUSE_CURSOR_SIZE {
+                let index = row * MOUSE_CURSOR_SIZE + col;
+                let x = cursor_x + col;
+                let y = cursor_y + row;
+
+                self.mouse_cursor.background[index] = self.read_pixel(x, y);
+            }
+        }
+    }
+
+    fn restore_mouse_background(&mut self) {
+        let cursor_x = self.mouse_cursor.x;
+        let cursor_y = self.mouse_cursor.y;
+
+        for row in 0..MOUSE_CURSOR_SIZE {
+            for col in 0..MOUSE_CURSOR_SIZE {
+                let index = row * MOUSE_CURSOR_SIZE + col;
+                let x = cursor_x + col;
+                let y = cursor_y + row;
+                let color = self.mouse_cursor.background[index];
+
+                self.write_pixel(x, y, color);
+            }
+        }
+    }
+
+    fn draw_mouse_cursor(&mut self) {
+        let cursor_x = self.mouse_cursor.x;
+        let cursor_y = self.mouse_cursor.y;
+
+        for row in 0..MOUSE_CURSOR_SIZE {
+            for col in 0..MOUSE_CURSOR_SIZE {
+                let bit = 0x80 >> col;
+                let x = cursor_x + col;
+                let y = cursor_y + row;
+
+                if MOUSE_CURSOR_FILL[row] & bit != 0 {
+                    self.write_pixel(x, y, Color::WHITE);
+                } else if MOUSE_CURSOR_OUTLINE[row] & bit != 0 {
+                    self.write_pixel(x, y, Color::DARKER);
+                }
+            }
+        }
+    }
+
+    fn read_pixel(&self, x: usize, y: usize) -> Color {
+        if x >= self.info.width || y >= self.info.height {
+            return Color::BLACK;
+        }
+
+        let offset = (y * self.info.stride + x) * self.info.bytes_per_pixel;
+
+        if offset + self.info.bytes_per_pixel > self.buffer_len {
+            return Color::BLACK;
+        }
+
+        let ptr = unsafe { self.buffer.add(offset) };
+
+        match self.info.pixel_format {
+            PixelFormat::Rgb => unsafe {
+                Color::rgb(
+                    core::ptr::read_volatile(ptr),
+                    core::ptr::read_volatile(ptr.add(1)),
+                    core::ptr::read_volatile(ptr.add(2)),
+                )
+            },
+            PixelFormat::Bgr => unsafe {
+                Color::rgb(
+                    core::ptr::read_volatile(ptr.add(2)),
+                    core::ptr::read_volatile(ptr.add(1)),
+                    core::ptr::read_volatile(ptr),
+                )
+            },
+            PixelFormat::U8 => unsafe {
+                let gray = core::ptr::read_volatile(ptr);
+                Color::rgb(gray, gray, gray)
+            },
+            _ => Color::BLACK,
+        }
+    }
+
     fn write_pixel(&mut self, x: usize, y: usize, color: Color) {
         if x >= self.info.width || y >= self.info.height {
             return;
@@ -408,8 +588,8 @@ unsafe impl Sync for GlobalWriter {}
 static WRITER: GlobalWriter = GlobalWriter(UnsafeCell::new(Writer::new()));
 
 pub fn init(framebuffer: &mut FrameBuffer, profile: EraProfile) {
-    // SAFETY: Screen output is serialized through the single shell loop in this
-    // milestone; timer interrupts do not print to the framebuffer.
+    // SAFETY: The framebuffer writer is initialized once during early boot
+    // before interrupts are enabled.
     unsafe {
         (*WRITER.0.get()).init(framebuffer, profile);
     }
@@ -419,39 +599,72 @@ pub fn init(framebuffer: &mut FrameBuffer, profile: EraProfile) {
 }
 
 pub fn clear() {
-    // SAFETY: Same single-writer console model as `init`.
-    unsafe {
-        (*WRITER.0.get()).clear();
-    }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Framebuffer access is serialized by disabling interrupts while
+        // the shell and IRQ12 mouse path can both mutate pixels.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| writer.clear());
+        }
+    });
 }
 
 pub fn backspace() {
-    // SAFETY: Same single-writer console model as `init`.
-    unsafe {
-        (*WRITER.0.get()).backspace();
-    }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| writer.backspace());
+        }
+    });
 }
 
 pub fn set_theme(profile: EraProfile) {
-    // SAFETY: Same single-writer console model as `init`.
-    unsafe {
-        (*WRITER.0.get()).set_theme(profile);
-        (*WRITER.0.get()).clear();
-    }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.set_theme(profile);
+                writer.clear();
+            });
+        }
+    });
 }
 
 pub fn refresh_top_bar() {
-    // SAFETY: Same single-writer console model as `init`.
-    unsafe {
-        (*WRITER.0.get()).refresh_top_bar();
-    }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| writer.refresh_top_bar());
+        }
+    });
 }
 
 pub fn print(args: fmt::Arguments) {
     use core::fmt::Write;
 
-    // SAFETY: Same single-writer console model as `init`.
-    unsafe {
-        let _ = (*WRITER.0.get()).write_fmt(args);
-    }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                let _ = writer.write_fmt(args);
+            });
+        }
+    });
+}
+
+pub fn screen_size() -> Option<(usize, usize)> {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Read-only access to the global writer while interrupts are
+        // disabled, matching the framebuffer mutation paths.
+        unsafe { (*WRITER.0.get()).screen_size() }
+    })
+}
+
+pub fn set_mouse_cursor_position(x: usize, y: usize) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: The IRQ12 mouse handler is the only caller expected to move
+        // this cursor after boot, and interrupts are disabled while mutating it.
+        unsafe {
+            (*WRITER.0.get()).set_mouse_cursor_position(x, y);
+        }
+    });
 }
