@@ -5,6 +5,7 @@ use crate::console;
 use crate::fs::{self, FsError};
 use crate::keyboard::{self, KeyEvent};
 use crate::memory;
+use crate::mouse;
 use crate::theme::{self, Era};
 use crate::timer;
 use crate::wm;
@@ -25,6 +26,8 @@ pub fn run() -> ! {
     draw_cursor();
 
     loop {
+        let mouse_activity = process_mouse_events();
+
         // The shell polls one key at a time. Printable keys edit the fixed
         // buffer and framebuffer line; Enter turns that buffer into a command,
         // runs it, clears the buffer, and redraws the prompt.
@@ -39,6 +42,7 @@ pub fn run() -> ! {
                 }
 
                 show_cursor(&mut cursor_visible);
+                wm::redraw_if_open();
                 idle_ticks = 0;
             }
             Some(KeyEvent::Backspace) => {
@@ -49,6 +53,7 @@ pub fn run() -> ! {
                 }
 
                 show_cursor(&mut cursor_visible);
+                wm::redraw_if_open();
                 idle_ticks = 0;
             }
             Some(KeyEvent::Enter) => {
@@ -59,16 +64,22 @@ pub fn run() -> ! {
                 buffer.clear();
                 print_prompt();
                 show_cursor(&mut cursor_visible);
+                wm::redraw_if_open();
                 idle_ticks = 0;
             }
             Some(_) => {
                 idle_ticks = 0;
             }
             None => {
-                idle_ticks += 1;
+                if mouse_activity {
+                    idle_ticks = 0;
+                } else {
+                    idle_ticks += 1;
+                }
 
                 if idle_ticks >= CURSOR_BLINK_TICKS {
                     toggle_cursor(&mut cursor_visible);
+                    wm::redraw_if_open();
                     idle_ticks = 0;
                 }
 
@@ -76,6 +87,7 @@ pub fn run() -> ! {
                 if uptime != top_bar_second {
                     top_bar_second = uptime;
                     console::refresh_top_bar();
+                    wm::redraw_if_open();
                 }
 
                 cpu_relax();
@@ -88,6 +100,17 @@ fn print_prompt() {
     let profile = theme::active_profile();
 
     print!("{} ", profile.screen_prompt);
+}
+
+fn process_mouse_events() -> bool {
+    let mut handled = false;
+
+    while let Some(event) = mouse::take_event() {
+        wm::handle_mouse_event(event);
+        handled = true;
+    }
+
+    handled
 }
 
 struct CommandBuffer {
@@ -305,6 +328,7 @@ fn switch_era(era: Era) {
     console::set_theme(profile);
     println!("Switched to {} mode.", profile.name);
     serial_println!("[CHRONO] era: {}", profile.name);
+    wm::redraw_if_open();
 }
 
 fn print_era_usage() {
