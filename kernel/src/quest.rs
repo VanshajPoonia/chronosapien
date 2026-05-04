@@ -162,6 +162,20 @@ const QUESTS: &[Quest] = &[
 pub fn run(command: &str) -> bool {
     let command = command.trim();
 
+    match command {
+        "stats" => {
+            crate::serial_println!("[CHRONO] quest: stats");
+            print_stats();
+            return true;
+        }
+        "inventory" => {
+            crate::serial_println!("[CHRONO] quest: inventory");
+            print_inventory();
+            return true;
+        }
+        _ => {}
+    }
+
     if command != "quest" && !command.starts_with("quest ") {
         return false;
     }
@@ -227,4 +241,33 @@ fn print_quest_status() {
             crate::println!("All current quests complete.");
         }
     }
+}
+
+fn print_stats() {
+    let completed = completed_count();
+    let total = QUESTS.len();
+    let locked = total.saturating_sub(completed);
+    let era = crate::theme::active_profile().name;
+
+    crate::println!("PLAYER STATS");
+    crate::println!("Systems Online: {}/{}", completed, total);
+    crate::println!("Artifacts Found: {}", completed);
+    crate::println!("Locked Quests: {}", locked);
+    crate::println!("Era: {}", era);
+}
+
+fn print_inventory() {
+    crate::println!("INVENTORY");
+
+    for quest in QUESTS {
+        if quest.complete {
+            if let Some(item) = quest.inventory {
+                crate::println!("- {}", item);
+            }
+        }
+    }
+}
+
+fn completed_count() -> usize {
+    QUESTS.iter().filter(|quest| quest.complete).count()
 }
