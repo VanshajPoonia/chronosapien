@@ -42,6 +42,8 @@ pub struct Window {
     pub content: [u8; WINDOW_CONTENT_CAPACITY],
     pub content_len: usize,
     kind: WindowKind,
+    /// ID of the scheduler task that owns this window, or 0xFF if none.
+    task_id: u8,
 }
 
 impl Window {
@@ -55,6 +57,7 @@ impl Window {
             content: [0; WINDOW_CONTENT_CAPACITY],
             content_len: 0,
             kind: WindowKind::Notes,
+            task_id: 0xFF,
         }
     }
 }
@@ -81,7 +84,7 @@ impl WindowManager {
         }
     }
 
-    fn open(&mut self, kind: WindowKind, content: ContentBuffer) -> bool {
+    fn open(&mut self, kind: WindowKind, content: ContentBuffer, task_id: u8) -> bool {
         if self.count >= MAX_WINDOWS {
             return false;
         }
@@ -111,6 +114,7 @@ impl WindowManager {
             content: content.bytes,
             content_len: content.len,
             kind,
+            task_id,
         };
         self.count += 1;
         self.redraw();
@@ -273,7 +277,8 @@ unsafe impl Sync for GlobalWindowManager {}
 static WINDOW_MANAGER: GlobalWindowManager =
     GlobalWindowManager(UnsafeCell::new(WindowManager::new()));
 
-pub fn open_notes() -> bool {
+/// Open a Notes window owned by `task_id` (0xFF = no owning task).
+pub fn open_notes(task_id: u8) -> bool {
     let mut content = ContentBuffer::new();
 
     match crate::fs::read("note.txt") {
@@ -281,10 +286,11 @@ pub fn open_notes() -> bool {
         Err(_) => content.push_str("No note stored."),
     }
 
-    with_manager(|manager| manager.open(WindowKind::Notes, content))
+    with_manager(|manager| manager.open(WindowKind::Notes, content, task_id))
 }
 
-pub fn open_sysinfo() -> bool {
+/// Open a Sysinfo window owned by `task_id` (0xFF = no owning task).
+pub fn open_sysinfo(task_id: u8) -> bool {
     let mut content = ContentBuffer::new();
     let profile = crate::theme::active_profile();
     let memory = crate::memory::stats();
@@ -296,7 +302,7 @@ pub fn open_sysinfo() -> bool {
     let _ = write!(content, "Uptime: {} seconds\n", uptime);
     let _ = write!(content, "Memory used: {} KB", used_kb);
 
-    with_manager(|manager| manager.open(WindowKind::Sysinfo, content))
+    with_manager(|manager| manager.open(WindowKind::Sysinfo, content, task_id))
 }
 
 pub fn redraw_if_open() {
