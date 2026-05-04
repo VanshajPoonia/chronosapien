@@ -158,3 +158,36 @@ unsafe fn init_task_stack(bytes: &mut [u8; TASK_STACK_SIZE], entry: fn() -> !) -
     top.sub(8).write(0);                         // rbx
     top.sub(8) as u64                            // initial RSP
 }
+
+/// Save the current task's callee-saved registers and RSP, then load the next
+/// task's RSP and restore its callee-saved registers before returning into it.
+///
+/// `extern "C"` maps arguments to RDI (current_rsp) and RSI (next_rsp) via
+/// the System V AMD64 ABI. The function is `#[naked]` so the compiler emits
+/// no prologue or epilogue — only our assembly.
+#[naked]
+unsafe extern "C" fn context_switch(current_rsp: *mut u64, next_rsp: *const u64) {
+    core::arch::naked_asm!(
+        // Save callee-saved registers onto the current (outgoing) stack.
+        "push rbx",
+        "push rbp",
+        "push r12",
+        "push r13",
+        "push r14",
+        "push r15",
+        // Persist the outgoing RSP (RDI holds current_rsp pointer).
+        "mov [rdi], rsp",
+        // Switch to the incoming stack (RSI holds next_rsp pointer).
+        "mov rsp, [rsi]",
+        // Restore the incoming task's callee-saved registers.
+        "pop r15",
+        "pop r14",
+        "pop r13",
+        "pop r12",
+        "pop rbp",
+        "pop rbx",
+        // Jump into the incoming task: on first run this is its entry function;
+        // on subsequent runs this is the instruction after its last `ret`.
+        "ret",
+    )
+}
