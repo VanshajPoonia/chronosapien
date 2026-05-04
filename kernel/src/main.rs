@@ -18,6 +18,7 @@ mod memory;
 mod mouse;
 mod panic;
 mod pic;
+mod sched;
 mod serial;
 mod shell;
 mod theme;
@@ -71,6 +72,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     println!("{}", profile.boot_welcome);
     println!("Era: {}", profile.name);
 
+    sched::init();
     serial_println!("[CHRONO] boot complete");
 
     shell::run()
