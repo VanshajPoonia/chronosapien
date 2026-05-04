@@ -83,3 +83,15 @@ impl TaskInfo {
         unsafe { core::str::from_utf8_unchecked(&self.name[..self.name_len]) }
     }
 }
+
+/// 16 KiB stack, 16-byte aligned as required by the x86-64 System V ABI.
+#[repr(align(16))]
+#[derive(Clone, Copy)]
+struct TaskStack {
+    bytes: [u8; TASK_STACK_SIZE],
+}
+
+struct Global<T>(UnsafeCell<T>);
+// SAFETY: All accesses are serialised through `without_interrupts`. The kernel
+// is single-core and cooperative, so no two tasks run concurrently.
+unsafe impl<T> Sync for Global<T> {}
