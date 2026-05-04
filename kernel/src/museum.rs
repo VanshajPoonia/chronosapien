@@ -1,11 +1,24 @@
 //! Beginner-friendly educational exhibits for the ChronoOS shell.
 
 const USAGE: &str = "Usage: museum boot|kernel|memory|interrupts|keyboard|serial|era";
+const INNER_WIDTH: usize = 68;
 
 struct Exhibit {
     key: &'static str,
     title: &'static str,
     lines: &'static [&'static str],
+}
+
+#[derive(Clone, Copy)]
+struct FrameStyle {
+    top_left: &'static str,
+    top_fill: &'static str,
+    top_right: &'static str,
+    side_left: &'static str,
+    side_right: &'static str,
+    bottom_left: &'static str,
+    bottom_fill: &'static str,
+    bottom_right: &'static str,
 }
 
 pub fn run(command: &str) -> bool {
@@ -126,9 +139,65 @@ fn find_exhibit(topic: &str) -> Option<Exhibit> {
 }
 
 fn print_exhibit(exhibit: Exhibit) {
-    crate::println!("MUSEUM: {}", exhibit.title);
+    let style = frame_style();
+    let title = exhibit.title;
+
+    print_border(style.top_left, style.top_fill, style.top_right);
+    print_frame_line("", style);
+    crate::println!(
+        "{} {:<width$} {}",
+        style.side_left,
+        MuseumTitle(title),
+        style.side_right,
+        width = INNER_WIDTH
+    );
+    print_frame_line("", style);
 
     for line in exhibit.lines {
-        crate::println!("{}", line);
+        print_frame_line(line, style);
+    }
+
+    print_frame_line("", style);
+    print_border(style.bottom_left, style.bottom_fill, style.bottom_right);
+}
+
+fn frame_style() -> FrameStyle {
+    FrameStyle {
+        top_left: "+",
+        top_fill: "-",
+        top_right: "+",
+        side_left: "|",
+        side_right: "|",
+        bottom_left: "+",
+        bottom_fill: "-",
+        bottom_right: "+",
+    }
+}
+
+fn print_border(left: &str, fill: &str, right: &str) {
+    crate::print!("{}", left);
+
+    for _ in 0..INNER_WIDTH + 2 {
+        crate::print!("{}", fill);
+    }
+
+    crate::println!("{}", right);
+}
+
+fn print_frame_line(line: &str, style: FrameStyle) {
+    crate::println!(
+        "{} {:<width$} {}",
+        style.side_left,
+        line,
+        style.side_right,
+        width = INNER_WIDTH
+    );
+}
+
+struct MuseumTitle(&'static str);
+
+impl core::fmt::Display for MuseumTitle {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "MUSEUM: {}", self.0)
     }
 }
