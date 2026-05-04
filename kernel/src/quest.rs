@@ -29,6 +29,24 @@ const QUESTS: &[Quest] = &[
         flavor: "Pixels become letters. The void gets subtitles.",
         complete: true,
     },
+    Quest {
+        title: "Ears Open",
+        summary: "Keyboard input working",
+        flavor: "The machine listens for tiny scancode spells.",
+        complete: true,
+    },
+    Quest {
+        title: "The Shell",
+        summary: "Commands accepted",
+        flavor: "A prompt appears, and the kernel answers back.",
+        complete: true,
+    },
+    Quest {
+        title: "Time Traveler",
+        summary: "Era switching live",
+        flavor: "One kernel, four costumes, zero paradoxes.",
+        complete: true,
+    },
 ];
 
 pub fn run(command: &str) -> bool {
