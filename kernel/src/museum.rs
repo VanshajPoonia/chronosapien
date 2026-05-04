@@ -110,6 +110,17 @@ fn find_exhibit(topic: &str) -> Option<Exhibit> {
                 "Serial output is the kernel leaving a trail of breadcrumbs.",
             ],
         }),
+        "era" => Some(Exhibit {
+            key: "era",
+            title: "ERA",
+            lines: &[
+                "The era system changes how ChronoOS presents itself.",
+                "The same kernel can feel like 1984, 1995, 2007, or 2040.",
+                "Prompts, colors, top bars, and windows all follow the era.",
+                "The machine underneath stays the same.",
+                "Only its personality changes.",
+            ],
+        }),
         _ => None,
     }
 }
