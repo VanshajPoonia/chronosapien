@@ -163,6 +163,61 @@ pub fn spawn(name: &str, entry: fn() -> !) -> Option<u8> {
     })
 }
 
+/// Terminate the task with the given ID.
+///
+/// Returns `false` when:
+/// - `id` is out of range or the slot is empty/already dead.
+/// - `id` is the *currently running* task — a cooperative task must yield
+///   to another task before it can be terminated.
+pub fn kill(id: u8) -> bool {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let sched = unsafe { &mut *SCHED.0.get() };
+        let idx = id as usize;
+
+        if idx >= MAX_TASKS {
+            return false;
+        }
+
+        if matches!(sched.tasks[idx].state, TaskState::Empty | TaskState::Dead) {
+            return false;
+        }
+
+        if idx == sched.current {
+            // Cannot terminate the currently running task in cooperative mode.
+            return false;
+        }
+
+        sched.tasks[idx].state = TaskState::Dead;
+        sched.count = sched.count.saturating_sub(1);
+        crate::serial_println!("[CHRONO] sched: killed task {}", id);
+        true
+    })
+}
+
+/// Call `f(id, name, state)` for every non-empty, non-dead task slot.
+pub fn for_each_task(mut f: impl FnMut(u8, &str, TaskState)) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let sched = unsafe { &*SCHED.0.get() };
+        for task in &sched.tasks {
+            match task.state {
+                TaskState::Empty | TaskState::Dead => {}
+                state => f(task.id, task.name_str(), state),
+            }
+        }
+    });
+}
+
+fn find_next_ready(sched: &Scheduler) -> usize {
+    let current = sched.current;
+    for offset in 1..=MAX_TASKS {
+        let idx = (current + offset) % MAX_TASKS;
+        if sched.tasks[idx].state == TaskState::Ready {
+            return idx;
+        }
+    }
+    current
+}
+
 // ─── internals ───────────────────────────────────────────────────────────────
 
 fn set_task_name(task: &mut TaskInfo, name: &str) {
