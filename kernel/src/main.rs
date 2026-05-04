@@ -19,6 +19,7 @@ mod mouse;
 mod museum;
 mod panic;
 mod pic;
+mod quest;
 mod sched;
 mod serial;
 mod shell;
