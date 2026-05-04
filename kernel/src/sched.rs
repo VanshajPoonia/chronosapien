@@ -95,3 +95,24 @@ struct Global<T>(UnsafeCell<T>);
 // SAFETY: All accesses are serialised through `without_interrupts`. The kernel
 // is single-core and cooperative, so no two tasks run concurrently.
 unsafe impl<T> Sync for Global<T> {}
+
+struct Scheduler {
+    tasks: [TaskInfo; MAX_TASKS],
+    current: usize,
+    count: usize,
+}
+
+impl Scheduler {
+    const fn new() -> Self {
+        const EMPTY: TaskInfo = TaskInfo::empty();
+        Self {
+            tasks: [EMPTY; MAX_TASKS],
+            current: 0,
+            count: 0,
+        }
+    }
+}
+
+static SCHED: Global<Scheduler> = Global(UnsafeCell::new(Scheduler::new()));
+static STACKS: Global<[TaskStack; MAX_TASKS]> =
+    Global(UnsafeCell::new([TaskStack { bytes: [0; TASK_STACK_SIZE] }; MAX_TASKS]));
