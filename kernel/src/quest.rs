@@ -1,6 +1,9 @@
 //! Retro terminal RPG quests derived from compiled ChronoOS capabilities.
 
+use crate::theme::Era;
+
 const QUEST_USAGE: &str = "Usage: quest list|status";
+const INNER_WIDTH: usize = 72;
 
 #[derive(Clone, Copy)]
 struct Quest {
@@ -10,6 +13,18 @@ struct Quest {
     inventory: Option<&'static str>,
     next_step: &'static str,
     complete: bool,
+}
+
+#[derive(Clone, Copy)]
+struct FrameStyle {
+    top_left: &'static str,
+    top_fill: &'static str,
+    top_right: &'static str,
+    side_left: &'static str,
+    side_right: &'static str,
+    bottom_left: &'static str,
+    bottom_fill: &'static str,
+    bottom_right: &'static str,
 }
 
 const QUESTS: &[Quest] = &[
@@ -270,4 +285,87 @@ fn print_inventory() {
 
 fn completed_count() -> usize {
     QUESTS.iter().filter(|quest| quest.complete).count()
+}
+
+fn frame_style() -> FrameStyle {
+    match crate::theme::active_era() {
+        Era::Eighties => FrameStyle {
+            top_left: "+",
+            top_fill: "=",
+            top_right: "+",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "+",
+            bottom_fill: "=",
+            bottom_right: "+",
+        },
+        Era::Nineties => FrameStyle {
+            top_left: "+",
+            top_fill: "-",
+            top_right: "+",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "+",
+            bottom_fill: "-",
+            bottom_right: "+",
+        },
+        Era::TwoThousands => FrameStyle {
+            top_left: "[",
+            top_fill: "-",
+            top_right: "]",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "[",
+            bottom_fill: "-",
+            bottom_right: "]",
+        },
+        Era::Future => FrameStyle {
+            top_left: "",
+            top_fill: "-",
+            top_right: "",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "",
+            bottom_fill: "-",
+            bottom_right: "",
+        },
+    }
+}
+
+fn print_header(title: &str, style: FrameStyle) {
+    print_border(style.top_left, style.top_fill, style.top_right);
+    print_frame_line("", style);
+    print_frame_line(title, style);
+    print_frame_line("", style);
+}
+
+fn print_footer(style: FrameStyle) {
+    print_frame_line("", style);
+    print_border(style.bottom_left, style.bottom_fill, style.bottom_right);
+}
+
+fn print_border(left: &str, fill: &str, right: &str) {
+    crate::print!("{}", left);
+
+    let fill_width = if left.is_empty() && right.is_empty() {
+        INNER_WIDTH + 4
+    } else {
+        INNER_WIDTH + 2
+    };
+
+    for _ in 0..fill_width {
+        crate::print!("{}", fill);
+    }
+
+    crate::println!("{}", right);
+}
+
+fn print_frame_line(text: impl core::fmt::Display, style: FrameStyle) {
+    crate::println!(
+        "{} {:<width$} {}",
+        style.side_left,
+        text,
+        style.side_right,
+        width = INNER_WIDTH
+    );
 }
