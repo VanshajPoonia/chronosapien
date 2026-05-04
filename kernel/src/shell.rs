@@ -207,6 +207,7 @@ fn print_help() {
     println!("Windows: open notes, open sysinfo");
     println!("Tasks: tasks, kill <id>");
     println!("Museum: museum boot|kernel|memory|interrupts|keyboard|serial|era");
+    println!("Quests: quest list, quest status, stats, inventory");
 }
 
 fn print_about() {
