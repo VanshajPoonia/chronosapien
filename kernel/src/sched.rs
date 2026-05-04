@@ -116,3 +116,45 @@ impl Scheduler {
 static SCHED: Global<Scheduler> = Global(UnsafeCell::new(Scheduler::new()));
 static STACKS: Global<[TaskStack; MAX_TASKS]> =
     Global(UnsafeCell::new([TaskStack { bytes: [0; TASK_STACK_SIZE] }; MAX_TASKS]));
+
+// ─── internals ───────────────────────────────────────────────────────────────
+
+fn set_task_name(task: &mut TaskInfo, name: &str) {
+    let bytes = name.as_bytes();
+    let len = bytes.len().min(TASK_NAME_LEN);
+    task.name[..len].copy_from_slice(&bytes[..len]);
+    task.name_len = len;
+}
+
+/// Write an initial call frame onto a fresh task stack so the first
+/// `context_switch` into the task jumps to `entry`.
+///
+/// Frame layout (high address → low address, each cell is 8 bytes):
+///
+/// ```text
+///   stack_top - 8   │ 0            │ alignment dummy
+///   stack_top - 16  │ entry as u64 │ ← "return address" consumed by `ret`
+///   stack_top - 24  │ 0            │ r15
+///   stack_top - 32  │ 0            │ r14
+///   stack_top - 40  │ 0            │ r13
+///   stack_top - 48  │ 0            │ r12
+///   stack_top - 56  │ 0            │ rbp
+///   stack_top - 64  │ 0            │ rbx  ← initial RSP saved here
+/// ```
+///
+/// After `context_switch` pops six registers and executes `ret`, RSP =
+/// `stack_top - 8`. Since `stack_top` is 16-byte aligned (repr(align(16))),
+/// `stack_top - 8` is 8 mod 16 — exactly the alignment the x86-64 ABI
+/// requires at a function's entry point.
+unsafe fn init_task_stack(bytes: &mut [u8; TASK_STACK_SIZE], entry: fn() -> !) -> u64 {
+    let top = bytes.as_mut_ptr().add(TASK_STACK_SIZE) as *mut u64;
+    top.sub(1).write(0);                         // alignment dummy
+    top.sub(2).write((entry as usize) as u64);   // first "return address"
+    top.sub(3).write(0);                         // r15
+    top.sub(4).write(0);                         // r14
+    top.sub(5).write(0);                         // r13
+    top.sub(6).write(0);                         // r12
+    top.sub(7).write(0);                         // rbp
+    top.sub(8).write(0);                         // rbx
+    top.sub(8) as u64                            // initial RSP
+}
