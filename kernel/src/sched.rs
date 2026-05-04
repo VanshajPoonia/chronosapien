@@ -134,6 +134,35 @@ pub fn init() {
     crate::serial_println!("[CHRONO] sched: initialized, task 0 = shell");
 }
 
+/// Spawn a new task that will start executing at `entry` on its next turn.
+///
+/// Returns the assigned task ID, or `None` if all 8 slots are occupied.
+pub fn spawn(name: &str, entry: fn() -> !) -> Option<u8> {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let sched = unsafe { &mut *SCHED.0.get() };
+
+        // Reuse Dead slots so killing and re-spawning works indefinitely.
+        let slot = (0..MAX_TASKS)
+            .find(|&i| matches!(sched.tasks[i].state, TaskState::Empty | TaskState::Dead))?;
+
+        let task_rsp = unsafe {
+            let stacks = &mut *STACKS.0.get();
+            init_task_stack(&mut stacks[slot].bytes, entry)
+        };
+
+        let task = &mut sched.tasks[slot];
+        *task = TaskInfo::empty();
+        task.id = slot as u8;
+        set_task_name(task, name);
+        task.state = TaskState::Ready;
+        task.rsp = task_rsp;
+        sched.count += 1;
+
+        crate::serial_println!("[CHRONO] sched: spawned task {} ({})", slot, name);
+        Some(slot as u8)
+    })
+}
+
 // ─── internals ───────────────────────────────────────────────────────────────
 
 fn set_task_name(task: &mut TaskInfo, name: &str) {
