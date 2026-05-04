@@ -200,6 +200,7 @@ impl WindowManager {
         }
 
         let kind = self.windows[index].kind;
+        let task_id = self.windows[index].task_id;
 
         for move_index in index..self.count - 1 {
             self.windows[move_index] = self.windows[move_index + 1];
@@ -209,6 +210,11 @@ impl WindowManager {
         self.windows[self.count] = Window::empty();
         self.drag = None;
         self.redraw();
+
+        // Kill the owning task when the user closes the window via the X button.
+        if task_id != 0xFF {
+            crate::sched::kill(task_id);
+        }
 
         crate::serial_println!("[CHRONO] wm: close {}", kind.log_name());
     }
@@ -303,6 +309,20 @@ pub fn open_sysinfo(task_id: u8) -> bool {
     let _ = write!(content, "Memory used: {} KB", used_kb);
 
     with_manager(|manager| manager.open(WindowKind::Sysinfo, content, task_id))
+}
+
+/// Close the window whose `task_id` matches the given ID, if one exists.
+pub fn close_for_task(task_id: u8) {
+    with_manager(|manager| {
+        for i in 0..manager.count {
+            if manager.windows[i].task_id == task_id {
+                // `close` also calls `sched::kill`; that's harmless since the
+                // task is already dead by the time we reach here from the shell.
+                manager.close(i);
+                return;
+            }
+        }
+    });
 }
 
 pub fn redraw_if_open() {
