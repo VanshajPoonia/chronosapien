@@ -6,6 +6,7 @@ use crate::fs::{self, FsError};
 use crate::keyboard::{self, KeyEvent};
 use crate::memory;
 use crate::mouse;
+use crate::sched;
 use crate::theme::{self, Era};
 use crate::timer;
 use crate::wm;
@@ -21,6 +22,9 @@ pub fn run() -> ! {
     let mut cursor_visible = true;
     let mut idle_ticks = 0;
     let mut top_bar_second = timer::uptime_seconds();
+    // Throttle cooperative yields to once per timer tick (100 Hz) so we do not
+    // flood the serial log or waste cycles context-switching in a tight loop.
+    let mut last_yield_tick = 0u64;
 
     print_prompt();
     draw_cursor();
@@ -88,6 +92,13 @@ pub fn run() -> ! {
                     top_bar_second = uptime;
                     console::refresh_top_bar();
                     wm::redraw_if_open();
+                }
+
+                // Yield to other tasks once per timer tick.
+                let now = timer::ticks();
+                if now != last_yield_tick {
+                    last_yield_tick = now;
+                    sched::yield_now();
                 }
 
                 cpu_relax();
@@ -178,6 +189,8 @@ fn execute_command(command: &str) {
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         command if command == "open" || command.starts_with("open ") => open_window(command),
+        "tasks" => list_tasks(),
+        command if command == "kill" || command.starts_with("kill ") => kill_task(command),
         command if apps::run(command) => {}
         _ => println!("unknown command: {}", command),
     }
@@ -188,6 +201,7 @@ fn print_help() {
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
+    println!("Tasks: tasks, kill <id>");
 }
 
 fn print_about() {
@@ -270,17 +284,81 @@ fn remove_file(command: &str) {
 
 fn open_window(command: &str) {
     let name = command.strip_prefix("open").unwrap_or("").trim();
-    let opened = match name {
-        "notes" => wm::open_notes(),
-        "sysinfo" => wm::open_sysinfo(),
+
+    match name {
+        "notes" => {
+            // Spawn the task first so we can hand its ID to the window.
+            let task_id = sched::spawn("notes", apps::notes_task_entry).unwrap_or(0xFF);
+            if !wm::open_notes(task_id) {
+                // Window failed to open — roll back the task slot.
+                sched::kill(task_id);
+                println!("too many windows open");
+            }
+        }
+        "sysinfo" => {
+            let task_id = sched::spawn("sysinfo", apps::sysinfo_task_entry).unwrap_or(0xFF);
+            if !wm::open_sysinfo(task_id) {
+                sched::kill(task_id);
+                println!("too many windows open");
+            }
+        }
         _ => {
             println!("Usage: open notes|sysinfo");
+        }
+    }
+}
+
+fn list_tasks() {
+    println!("ID  NAME     STATE");
+    sched::for_each_task(|id, name, state| {
+        let state_str = match state {
+            sched::TaskState::Running => "running",
+            sched::TaskState::Ready => "ready",
+            sched::TaskState::Blocked => "blocked",
+            _ => "?",
+        };
+        println!("{:<3} {:<8} {}", id, name, state_str);
+    });
+}
+
+fn kill_task(command: &str) {
+    let rest = command.strip_prefix("kill").unwrap_or("").trim();
+
+    let id: u8 = match rest.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            println!("Usage: kill <id>");
             return;
         }
     };
 
-    if !opened {
-        println!("too many windows open");
+    // Collect the name before killing so we can print it in the confirmation.
+    let mut name_buf = [0u8; 16];
+    let mut name_len = 0usize;
+    let mut found = false;
+    sched::for_each_task(|tid, name, _state| {
+        if tid == id {
+            found = true;
+            let bytes = name.as_bytes();
+            let len = bytes.len().min(16);
+            name_buf[..len].copy_from_slice(&bytes[..len]);
+            name_len = len;
+        }
+    });
+
+    if !found {
+        println!("kill: no such task {}", id);
+        return;
+    }
+
+    // SAFETY: name_buf is always written from valid UTF-8 bytes above.
+    let name_str = unsafe { core::str::from_utf8_unchecked(&name_buf[..name_len]) };
+
+    if sched::kill(id) {
+        wm::close_for_task(id); // close the associated window, if any
+        println!("Task {} ({}) terminated", id, name_str);
+    } else {
+        println!("kill: cannot terminate task {} ({})", id, name_str);
     }
 }
 
