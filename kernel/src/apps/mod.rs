@@ -4,6 +4,20 @@ mod calc;
 mod notes;
 mod sysinfo;
 
+/// Task entry point for a Notes window — yields cooperatively in a loop.
+pub fn notes_task_entry() -> ! {
+    loop {
+        crate::sched::yield_now();
+    }
+}
+
+/// Task entry point for a Sysinfo window — yields cooperatively in a loop.
+pub fn sysinfo_task_entry() -> ! {
+    loop {
+        crate::sched::yield_now();
+    }
+}
+
 pub fn run(command: &str) -> bool {
     // Return true only when the shell command belongs to a built-in app.
     if command == "notes" || command.starts_with("notes ") {
