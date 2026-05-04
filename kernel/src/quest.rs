@@ -65,6 +65,24 @@ const QUESTS: &[Quest] = &[
         flavor: "Pages align. The heap opens its first room.",
         complete: true,
     },
+    Quest {
+        title: "Pack Rat",
+        summary: "In-memory filesystem online",
+        flavor: "Tiny files find a temporary home.",
+        complete: true,
+    },
+    Quest {
+        title: "Tiny Guild",
+        summary: "Built-in apps available",
+        flavor: "Notes, math, and sysinfo join the party.",
+        complete: true,
+    },
+    Quest {
+        title: "Silver Pointer",
+        summary: "Mouse input online",
+        flavor: "The cursor learns to wander.",
+        complete: true,
+    },
 ];
 
 pub fn run(command: &str) -> bool {
