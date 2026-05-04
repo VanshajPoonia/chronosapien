@@ -231,56 +231,78 @@ fn print_usage() {
 }
 
 fn print_quest_list() {
-    crate::println!("QUEST LIST");
+    let style = frame_style();
+
+    print_header("QUEST LIST", style);
 
     for quest in QUESTS {
         let marker = if quest.complete { "[x]" } else { "[ ]" };
-        crate::println!("{} {:<16} - {}", marker, quest.title, quest.summary);
+        print_frame_line(
+            QuestLine {
+                marker,
+                title: quest.title,
+                summary: quest.summary,
+            },
+            style,
+        );
 
         if quest.complete {
-            crate::println!("    {}", quest.flavor);
+            print_frame_line(FlavorLine(quest.flavor), style);
         }
     }
+
+    print_footer(style);
 }
 
 fn print_quest_status() {
-    crate::println!("QUEST STATUS");
+    let style = frame_style();
+
+    print_header("QUEST STATUS", style);
 
     match QUESTS.iter().find(|quest| !quest.complete) {
         Some(quest) => {
-            crate::println!("Current: {}", quest.title);
-            crate::println!("{}", quest.summary);
-            crate::println!("Next: {}", quest.next_step);
+            print_frame_line("Active Quest", style);
+            print_frame_line(QuestTitle(quest.title), style);
+            print_frame_line(quest.summary, style);
+            print_frame_line(NextStep(quest.next_step), style);
         }
         None => {
-            crate::println!("All current quests complete.");
+            print_frame_line("All current quests complete.", style);
         }
     }
+
+    print_footer(style);
 }
 
 fn print_stats() {
+    let style = frame_style();
     let completed = completed_count();
     let total = QUESTS.len();
     let locked = total.saturating_sub(completed);
     let era = crate::theme::active_profile().name;
 
-    crate::println!("PLAYER STATS");
-    crate::println!("Systems Online: {}/{}", completed, total);
-    crate::println!("Artifacts Found: {}", completed);
-    crate::println!("Locked Quests: {}", locked);
-    crate::println!("Era: {}", era);
+    print_header("PLAYER STATS", style);
+    print_frame_line(StatLine("Systems Online", completed, total), style);
+    print_frame_line(CountLine("Artifacts Found", completed), style);
+    print_frame_line(CountLine("Locked Quests", locked), style);
+    print_frame_line(EraLine(era), style);
+    print_footer(style);
 }
 
 fn print_inventory() {
-    crate::println!("INVENTORY");
+    let style = frame_style();
+
+    print_header("INVENTORY", style);
 
     for quest in QUESTS {
         if quest.complete {
             if let Some(item) = quest.inventory {
-                crate::println!("- {}", item);
+                print_frame_line(InventoryLine(item), style);
             }
         }
     }
+
+    print_footer(style);
 }
 
 fn completed_count() -> usize {
@@ -368,4 +390,76 @@ fn print_frame_line(text: impl core::fmt::Display, style: FrameStyle) {
         style.side_right,
         width = INNER_WIDTH
     );
+}
+
+struct QuestLine {
+    marker: &'static str,
+    title: &'static str,
+    summary: &'static str,
+}
+
+impl core::fmt::Display for QuestLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            formatter,
+            "{} {:<16} - {}",
+            self.marker, self.title, self.summary
+        )
+    }
+}
+
+struct FlavorLine(&'static str);
+
+impl core::fmt::Display for FlavorLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "    {}", self.0)
+    }
+}
+
+struct QuestTitle(&'static str);
+
+impl core::fmt::Display for QuestTitle {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "Current: {}", self.0)
+    }
+}
+
+struct NextStep(&'static str);
+
+impl core::fmt::Display for NextStep {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "Next: {}", self.0)
+    }
+}
+
+struct StatLine(&'static str, usize, usize);
+
+impl core::fmt::Display for StatLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "{}: {}/{}", self.0, self.1, self.2)
+    }
+}
+
+struct CountLine(&'static str, usize);
+
+impl core::fmt::Display for CountLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "{}: {}", self.0, self.1)
+    }
+}
+
+struct EraLine(&'static str);
+
+impl core::fmt::Display for EraLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "Era: {}", self.0)
+    }
+}
+
+struct InventoryLine(&'static str);
+
+impl core::fmt::Display for InventoryLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "- {}", self.0)
+    }
 }
