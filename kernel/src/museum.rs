@@ -88,6 +88,28 @@ fn find_exhibit(topic: &str) -> Option<Exhibit> {
                 "It is how the machine says: something happened.",
             ],
         }),
+        "keyboard" => Some(Exhibit {
+            key: "keyboard",
+            title: "KEYBOARD",
+            lines: &[
+                "The PS/2 keyboard sends small numbers called scancodes.",
+                "ChronoOS turns those scancodes into keys and characters.",
+                "Polling means the shell asks for keys in a loop.",
+                "Interrupts mean the keyboard can call the CPU when ready.",
+                "Both are ways to turn key presses into commands.",
+            ],
+        }),
+        "serial" => Some(Exhibit {
+            key: "serial",
+            title: "SERIAL",
+            lines: &[
+                "COM1 is an old but reliable serial port.",
+                "It sends text one byte at a time outside the main screen.",
+                "Developers use it because it works even when graphics fail.",
+                "ChronoOS logs boot steps, commands, and device events there.",
+                "Serial output is the kernel leaving a trail of breadcrumbs.",
+            ],
+        }),
         _ => None,
     }
 }
