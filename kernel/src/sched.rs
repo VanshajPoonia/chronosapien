@@ -218,6 +218,49 @@ fn find_next_ready(sched: &Scheduler) -> usize {
     current
 }
 
+/// Voluntarily give up the CPU to the next Ready task.
+///
+/// Performs a round-robin scan starting one slot past the current task. If no
+/// other task is Ready the function returns immediately without switching.
+/// Every switch is logged to serial: `[CHRONO] sched: switch A -> B`.
+pub fn yield_now() {
+    // Plan the switch inside the interrupt-disabled window so the scheduler
+    // state is consistent. The assembly switch itself runs outside because it
+    // must not be inside a closure (it changes RSP mid-execution).
+    let switch = x86_64::instructions::interrupts::without_interrupts(|| {
+        let sched = unsafe { &mut *SCHED.0.get() };
+        let current = sched.current;
+        let next = find_next_ready(sched);
+
+        if next == current {
+            return None;
+        }
+
+        crate::serial_println!(
+            "[CHRONO] sched: switch {} -> {}",
+            sched.tasks[current].name_str(),
+            sched.tasks[next].name_str(),
+        );
+
+        sched.tasks[current].state = TaskState::Ready;
+        sched.tasks[next].state = TaskState::Running;
+        sched.current = next;
+
+        // These pointers address fields inside the static SCHED array and
+        // remain valid after the closure exits.
+        let curr_rsp = &mut sched.tasks[current].rsp as *mut u64 as usize;
+        let next_rsp = &sched.tasks[next].rsp as *const u64 as usize;
+
+        Some((curr_rsp, next_rsp))
+    });
+
+    if let Some((curr, next)) = switch {
+        // SAFETY: Both pointers come from the static SCHED array. The naked
+        // function uses the System V AMD64 calling convention (RDI, RSI).
+        unsafe { context_switch(curr as *mut u64, next as *const u64) };
+    }
+}
+
 // ─── internals ───────────────────────────────────────────────────────────────
 
 fn set_task_name(task: &mut TaskInfo, name: &str) {
