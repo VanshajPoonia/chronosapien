@@ -117,6 +117,23 @@ static SCHED: Global<Scheduler> = Global(UnsafeCell::new(Scheduler::new()));
 static STACKS: Global<[TaskStack; MAX_TASKS]> =
     Global(UnsafeCell::new([TaskStack { bytes: [0; TASK_STACK_SIZE] }; MAX_TASKS]));
 
+// ─── public API ──────────────────────────────────────────────────────────────
+
+/// Register the current execution context as task 0 ("shell") and mark it
+/// Running. Must be called exactly once, before any `spawn` or `yield_now`.
+pub fn init() {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let sched = unsafe { &mut *SCHED.0.get() };
+        let task = &mut sched.tasks[0];
+        task.id = 0;
+        set_task_name(task, "shell");
+        task.state = TaskState::Running;
+        sched.current = 0;
+        sched.count = 1;
+    });
+    crate::serial_println!("[CHRONO] sched: initialized, task 0 = shell");
+}
+
 // ─── internals ───────────────────────────────────────────────────────────────
 
 fn set_task_name(task: &mut TaskInfo, name: &str) {
