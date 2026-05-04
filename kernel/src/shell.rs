@@ -6,6 +6,7 @@ use crate::fs::{self, FsError};
 use crate::keyboard::{self, KeyEvent};
 use crate::memory;
 use crate::mouse;
+use crate::museum;
 use crate::sched;
 use crate::theme::{self, Era};
 use crate::timer;
@@ -191,6 +192,7 @@ fn execute_command(command: &str) {
         command if command == "open" || command.starts_with("open ") => open_window(command),
         "tasks" => list_tasks(),
         command if command == "kill" || command.starts_with("kill ") => kill_task(command),
+        command if museum::run(command) => {}
         command if apps::run(command) => {}
         _ => println!("unknown command: {}", command),
     }

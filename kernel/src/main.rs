@@ -16,6 +16,7 @@ mod interrupts;
 mod keyboard;
 mod memory;
 mod mouse;
+mod museum;
 mod panic;
 mod pic;
 mod sched;
