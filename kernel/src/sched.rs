@@ -54,3 +54,32 @@ pub enum TaskState {
     /// Task has been terminated; the slot will be reused on the next spawn.
     Dead,
 }
+
+#[derive(Clone, Copy)]
+struct TaskInfo {
+    id: u8,
+    name: [u8; TASK_NAME_LEN],
+    name_len: usize,
+    state: TaskState,
+    /// Saved RSP. Written by `context_switch` each time the task yields, read
+    /// back when the task is resumed.
+    rsp: u64,
+}
+
+impl TaskInfo {
+    const fn empty() -> Self {
+        Self {
+            id: 0,
+            name: [0; TASK_NAME_LEN],
+            name_len: 0,
+            state: TaskState::Empty,
+            rsp: 0,
+        }
+    }
+
+    fn name_str(&self) -> &str {
+        // SAFETY: name bytes are always written from valid UTF-8 input via
+        // `set_task_name`, so the slice is guaranteed to be valid UTF-8.
+        unsafe { core::str::from_utf8_unchecked(&self.name[..self.name_len]) }
+    }
+}
