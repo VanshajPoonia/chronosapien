@@ -66,6 +66,28 @@ fn find_exhibit(topic: &str) -> Option<Exhibit> {
                 "User commands are the visible tip of that work.",
             ],
         }),
+        "memory" => Some(Exhibit {
+            key: "memory",
+            title: "MEMORY",
+            lines: &[
+                "RAM is the fast workspace the CPU can read and write.",
+                "ChronoOS reads the memory map to find usable frames.",
+                "Paging maps virtual addresses to physical memory.",
+                "The heap is a managed area for growing data structures.",
+                "Together, they let the kernel use memory safely.",
+            ],
+        }),
+        "interrupts" => Some(Exhibit {
+            key: "interrupts",
+            title: "INTERRUPTS",
+            lines: &[
+                "An interrupt is a signal that asks the CPU for attention.",
+                "The IDT is a table of handlers for those signals.",
+                "ChronoOS loads the IDT so exceptions and devices have paths.",
+                "Timers, faults, and hardware events can all enter this way.",
+                "It is how the machine says: something happened.",
+            ],
+        }),
         _ => None,
     }
 }
