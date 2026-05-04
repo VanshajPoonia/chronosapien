@@ -47,6 +47,24 @@ const QUESTS: &[Quest] = &[
         flavor: "One kernel, four costumes, zero paradoxes.",
         complete: true,
     },
+    Quest {
+        title: "Gatekeeper",
+        summary: "IDT and exceptions loaded",
+        flavor: "The CPU now knows where to knock.",
+        complete: true,
+    },
+    Quest {
+        title: "The Watchmaker",
+        summary: "Timer interrupt ticking",
+        flavor: "The PIT starts counting heartbeats.",
+        complete: true,
+    },
+    Quest {
+        title: "Mind Palace",
+        summary: "Memory and heap online",
+        flavor: "Pages align. The heap opens its first room.",
+        complete: true,
+    },
 ];
 
 pub fn run(command: &str) -> bool {
