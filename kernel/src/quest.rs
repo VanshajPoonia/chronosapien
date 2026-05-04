@@ -83,6 +83,24 @@ const QUESTS: &[Quest] = &[
         flavor: "The cursor learns to wander.",
         complete: true,
     },
+    Quest {
+        title: "Glass Panes",
+        summary: "Window manager online",
+        flavor: "Little rooms appear inside the screen.",
+        complete: true,
+    },
+    Quest {
+        title: "Many Hands",
+        summary: "Cooperative multitasking online",
+        flavor: "Tasks take turns like polite adventurers.",
+        complete: true,
+    },
+    Quest {
+        title: "Museum Curator",
+        summary: "Museum mode unlocked",
+        flavor: "The kernel starts explaining itself.",
+        complete: true,
+    },
 ];
 
 pub fn run(command: &str) -> bool {
