@@ -1,5 +1,7 @@
 //! Beginner-friendly educational exhibits for the ChronoOS shell.
 
+use crate::theme::Era;
+
 const USAGE: &str = "Usage: museum boot|kernel|memory|interrupts|keyboard|serial|era";
 const INNER_WIDTH: usize = 68;
 
@@ -162,22 +164,60 @@ fn print_exhibit(exhibit: Exhibit) {
 }
 
 fn frame_style() -> FrameStyle {
-    FrameStyle {
-        top_left: "+",
-        top_fill: "-",
-        top_right: "+",
-        side_left: "|",
-        side_right: "|",
-        bottom_left: "+",
-        bottom_fill: "-",
-        bottom_right: "+",
+    match crate::theme::active_era() {
+        Era::Eighties => FrameStyle {
+            top_left: "+",
+            top_fill: "=",
+            top_right: "+",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "+",
+            bottom_fill: "=",
+            bottom_right: "+",
+        },
+        Era::Nineties => FrameStyle {
+            top_left: "+",
+            top_fill: "-",
+            top_right: "+",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "+",
+            bottom_fill: "-",
+            bottom_right: "+",
+        },
+        Era::TwoThousands => FrameStyle {
+            top_left: "[",
+            top_fill: "-",
+            top_right: "]",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "[",
+            bottom_fill: "-",
+            bottom_right: "]",
+        },
+        Era::Future => FrameStyle {
+            top_left: "",
+            top_fill: "-",
+            top_right: "",
+            side_left: "|",
+            side_right: "|",
+            bottom_left: "",
+            bottom_fill: "-",
+            bottom_right: "",
+        },
     }
 }
 
 fn print_border(left: &str, fill: &str, right: &str) {
     crate::print!("{}", left);
 
-    for _ in 0..INNER_WIDTH + 2 {
+    let fill_width = if left.is_empty() && right.is_empty() {
+        INNER_WIDTH + 4
+    } else {
+        INNER_WIDTH + 2
+    };
+
+    for _ in 0..fill_width {
         crate::print!("{}", fill);
     }
 
