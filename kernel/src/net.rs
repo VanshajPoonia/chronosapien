@@ -300,3 +300,105 @@ fn snapshot() -> Snapshot {
         }
     })
 }
+
+fn send_gateway_arp() {
+    let mut frame = [0u8; 64];
+    let Some((mac, _)) = local_link_info() else {
+        println!("net: rtl8139 not initialized");
+        return;
+    };
+
+    build_ethernet_header(&mut frame, BROADCAST_MAC, mac, ETHER_TYPE_ARP);
+    build_arp_packet(
+        &mut frame[ETHERNET_HEADER_LEN..ETHERNET_HEADER_LEN + ARP_PACKET_LEN],
+        1,
+        mac,
+        LOCAL_IP,
+        [0; 6],
+        GATEWAY_IP,
+    );
+    transmit(&frame[..ETHERNET_HEADER_LEN + ARP_PACKET_LEN]);
+    crate::serial_println!(
+        "[CHRONO] net: ARP request for {}.{}.{}.{}",
+        GATEWAY_IP[0],
+        GATEWAY_IP[1],
+        GATEWAY_IP[2],
+        GATEWAY_IP[3]
+    );
+}
+
+fn send_udp(dest_ip: [u8; 4], dest_port: u16, payload: &[u8]) {
+    let Some((mac, gateway_mac)) = local_link_info() else {
+        println!("net: rtl8139 not initialized");
+        return;
+    };
+
+    let Some(dest_mac) = gateway_mac else {
+        println!("net: gateway unresolved; sending ARP first");
+        send_gateway_arp();
+        return;
+    };
+
+    let payload_len = min(payload.len(), 512);
+    let udp_len = UDP_HEADER_LEN + payload_len;
+    let ip_len = IPV4_HEADER_LEN + udp_len;
+    let frame_len = ETHERNET_HEADER_LEN + ip_len;
+    let mut frame = [0u8; 1514];
+
+    build_ethernet_header(&mut frame, dest_mac, mac, ETHER_TYPE_IPV4);
+    build_ipv4_header(
+        &mut frame[ETHERNET_HEADER_LEN..ETHERNET_HEADER_LEN + IPV4_HEADER_LEN],
+        ip_len as u16,
+        LOCAL_IP,
+        dest_ip,
+        IP_PROTOCOL_UDP,
+    );
+    build_udp_header(
+        &mut frame[ETHERNET_HEADER_LEN + IPV4_HEADER_LEN..],
+        DEFAULT_UDP_PORT,
+        dest_port,
+        udp_len as u16,
+    );
+    frame[ETHERNET_HEADER_LEN + IPV4_HEADER_LEN + UDP_HEADER_LEN..frame_len]
+        .copy_from_slice(&payload[..payload_len]);
+
+    transmit(&frame[..frame_len]);
+    crate::serial_println!(
+        "[CHRONO] net: UDP tx {} bytes to {}.{}.{}.{}:{}",
+        payload_len,
+        dest_ip[0],
+        dest_ip[1],
+        dest_ip[2],
+        dest_ip[3],
+        dest_port
+    );
+}
+
+fn local_link_info() -> Option<([u8; 6], Option<[u8; 6]>)> {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &*NET.0.get();
+        state.nic.map(|nic| (nic.mac, state.gateway_mac))
+    })
+}
+
+fn transmit(frame: &[u8]) {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &mut *NET.0.get();
+        let Some(mut nic) = state.nic else {
+            return;
+        };
+
+        let index = nic.tx_index % TX_BUFFER_COUNT;
+        let tx_buffers = &mut *TX_BUFFERS.0.get();
+        let length = min(frame.len(), TX_BUFFER_LEN);
+        tx_buffers.bytes[index][..length].copy_from_slice(&frame[..length]);
+
+        let tx_address = tx_buffers.bytes[index].as_ptr() as u32;
+        io::outl(nic.io_base + TX_ADDR0 + (index as u16 * 4), tx_address);
+        io::outl(nic.io_base + TX_STATUS0 + (index as u16 * 4), length as u32);
+
+        nic.tx_index = (nic.tx_index + 1) % TX_BUFFER_COUNT;
+        state.nic = Some(nic);
+        state.tx_packets = state.tx_packets.saturating_add(1);
+    });
+}
