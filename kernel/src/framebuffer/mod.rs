@@ -2,7 +2,6 @@
 
 mod font;
 
-use bootloader_api::info::{FrameBuffer, FrameBufferInfo, PixelFormat};
 use core::cell::UnsafeCell;
 use core::fmt;
 
@@ -45,6 +44,30 @@ pub struct Color {
     pub red: u8,
     pub green: u8,
     pub blue: u8,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PixelFormat {
+    Rgb,
+    Bgr,
+    U8,
+    Unknown,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct FramebufferInfo {
+    pub byte_len: usize,
+    pub width: usize,
+    pub height: usize,
+    pub pixel_format: PixelFormat,
+    pub bytes_per_pixel: usize,
+    pub stride: usize,
+}
+
+#[derive(Clone, Copy)]
+pub struct Framebuffer {
+    pub address: *mut u8,
+    pub info: FramebufferInfo,
 }
 
 impl Color {
