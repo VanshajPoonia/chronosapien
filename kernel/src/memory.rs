@@ -6,7 +6,6 @@
 //! memory behavior easy to inspect while the kernel is still small.
 
 use alloc::alloc::{alloc, Layout};
-use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
 use core::alloc::{GlobalAlloc, Layout as CoreLayout};
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -15,6 +14,8 @@ use x86_64::structures::paging::{
     FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, Size4KiB,
 };
 use x86_64::{PhysAddr, VirtAddr};
+
+use crate::boot::{BootContext, MemoryRegion, MemoryRegionKind};
 
 pub const HEAP_START: u64 = 0x200000;
 pub const HEAP_SIZE: u64 = 1024 * 1024;
@@ -34,10 +35,10 @@ pub struct MemoryStats {
     pub heap_used_bytes: u64,
 }
 
-pub fn init(boot_info: &'static bootloader_api::BootInfo) {
-    TOTAL_MEMORY_BYTES.store(total_memory_bytes(&boot_info.memory_regions), Ordering::Relaxed);
+pub fn init(boot_context: &'static BootContext) {
+    TOTAL_MEMORY_BYTES.store(total_memory_bytes(boot_context.memory_regions), Ordering::Relaxed);
 
-    if !heap_range_is_usable(&boot_info.memory_regions) {
+    if !heap_range_is_usable(boot_context.memory_regions) {
         crate::serial_println!(
             "[CHRONO] mem: heap range {:#x}..{:#x} is not usable",
             HEAP_START,
@@ -46,15 +47,15 @@ pub fn init(boot_info: &'static bootloader_api::BootInfo) {
         panic!("heap range is not usable");
     }
 
-    let Some(physical_memory_offset) = boot_info.physical_memory_offset.into_option() else {
+    let Some(physical_memory_offset) = boot_context.physical_memory_offset else {
         crate::serial_println!("[CHRONO] mem: physical memory offset missing");
         panic!("physical memory mapping missing");
     };
     let physical_memory_offset = VirtAddr::new(physical_memory_offset);
     let mut mapper = unsafe { init_offset_page_table(physical_memory_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::new(&boot_info.memory_regions) };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::new(boot_context.memory_regions) };
 
-    identity_map_kernel(boot_info, &mut mapper, &mut frame_allocator);
+    identity_map_kernel(boot_context, &mut mapper, &mut frame_allocator);
     map_heap(&mut mapper, &mut frame_allocator);
     ALLOCATOR.init(HEAP_START as usize, HEAP_SIZE as usize);
     leak_boot_allocation();
@@ -74,14 +75,14 @@ pub fn stats() -> MemoryStats {
     }
 }
 
-fn total_memory_bytes(memory_regions: &MemoryRegions) -> u64 {
+fn total_memory_bytes(memory_regions: &[MemoryRegion]) -> u64 {
     memory_regions
         .iter()
         .map(|region| region.end - region.start)
         .sum()
 }
 
-fn heap_range_is_usable(memory_regions: &MemoryRegions) -> bool {
+fn heap_range_is_usable(memory_regions: &[MemoryRegion]) -> bool {
     let heap_end = HEAP_START + HEAP_SIZE;
 
     memory_regions.iter().any(|region| {
