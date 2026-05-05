@@ -7,7 +7,10 @@
 
 extern crate alloc;
 
+use core::cell::UnsafeCell;
+
 mod apps;
+mod boot;
 mod console;
 mod framebuffer;
 mod fs;
@@ -41,7 +44,31 @@ static BOOTLOADER_CONFIG: BootloaderConfig = {
 
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
+struct BootContextCell(UnsafeCell<Option<boot::BootContext>>);
+
+unsafe impl Sync for BootContextCell {}
+
+static BOOT_CONTEXT: BootContextCell = BootContextCell(UnsafeCell::new(None));
+
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
+    let context = boot::context_from_bootloader(boot_info);
+    boot_with_context(context)
+}
+
+#[no_mangle]
+pub extern "sysv64" fn chrono_custom_entry(info: *const boot::ChronoBootInfo) -> ! {
+    let context = unsafe { boot::context_from_custom(info) };
+    boot_with_context(context)
+}
+
+fn boot_with_context(context: boot::BootContext) -> ! {
+    let boot_context = unsafe {
+        *BOOT_CONTEXT.0.get() = Some(context);
+        (*BOOT_CONTEXT.0.get())
+            .as_ref()
+            .expect("boot context was just stored")
+    };
+
     x86_64::instructions::interrupts::disable();
 
     serial::init();
@@ -50,18 +77,14 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     theme::set_active_era(STARTUP_ERA);
     let profile = theme::active_profile();
-    let Some(framebuffer) = boot_info.framebuffer.as_mut() else {
-        serial_println!("[CHRONO] fb: missing framebuffer");
-        panic!("bootloader did not provide a framebuffer");
-    };
 
-    console::init(framebuffer, profile);
+    console::init(boot_context.framebuffer, profile);
     serial_println!("[CHRONO] console initialized");
 
     gdt::init();
     interrupts::init();
     interrupts::trigger_test_breakpoint();
-    memory::init(boot_info);
+    memory::init(boot_context);
     pic::init();
     timer::init();
     mouse::init();
