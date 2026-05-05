@@ -4,13 +4,12 @@
 //! framebuffer details stay in `framebuffer`, so the rest of the kernel can use
 //! familiar `print!` and `println!` macros.
 
-use bootloader_api::info::FrameBuffer;
 use core::fmt;
 
-use crate::framebuffer;
+use crate::framebuffer::{self, Framebuffer};
 use crate::theme::EraProfile;
 
-pub fn init(framebuffer: &mut FrameBuffer, profile: EraProfile) {
+pub fn init(framebuffer: Framebuffer, profile: EraProfile) {
     framebuffer::init(framebuffer, profile);
 }
 
