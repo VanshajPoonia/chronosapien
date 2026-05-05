@@ -16,11 +16,14 @@ mod framebuffer;
 mod fs;
 mod gdt;
 mod interrupts;
+mod io;
 mod keyboard;
 mod memory;
 mod mouse;
 mod museum;
+mod net;
 mod panic;
+mod pci;
 mod pic;
 mod quest;
 mod sched;
@@ -88,6 +91,7 @@ fn boot_with_context(context: boot::BootContext) -> ! {
     pic::init();
     timer::init();
     mouse::init();
+    net::init();
     x86_64::instructions::interrupts::enable();
 
     let era_name = STARTUP_ERA.name();
