@@ -39,10 +39,13 @@ chronosapien/
 |       |-- fs.rs
 |       |-- gdt.rs
 |       |-- interrupts.rs
+|       |-- io.rs
 |       |-- keyboard.rs
 |       |-- main.rs
 |       |-- memory.rs
+|       |-- net.rs
 |       |-- panic.rs
+|       |-- pci.rs
 |       |-- pic.rs
 |       |-- serial.rs
 |       |-- shell.rs
@@ -58,6 +61,7 @@ chronosapien/
 |   |-- architecture.md
 |   |-- boot-flow.md
 |   |-- custom-bootloader.md
+|   |-- networking.md
 |   `-- roadmap.md
 |-- tools/
 |   `-- custom_image_builder.rs
@@ -79,10 +83,13 @@ chronosapien/
 - `kernel/src/fs.rs` stores a tiny heap-backed in-memory file list.
 - `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
+- `kernel/src/io.rs` provides shared x86 port I/O helpers for device drivers.
 - `kernel/src/keyboard.rs` polls the PS/2 keyboard and turns scancodes into simple key events.
 - `kernel/src/main.rs` is the kernel entrypoint and first boot flow.
 - `kernel/src/memory.rs` reads the bootloader memory map, identity maps early pages, and provides a bump heap.
+- `kernel/src/net.rs` drives QEMU RTL8139 networking with ARP and UDP.
 - `kernel/src/panic.rs` handles panics in a `no_std` environment.
+- `kernel/src/pci.rs` scans PCI config space for supported devices.
 - `kernel/src/pic.rs` remaps the legacy PIC so hardware IRQs start at IDT vector 32.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
@@ -97,6 +104,7 @@ chronosapien/
 - `docs/architecture.md` explains what code is ours and what is borrowed.
 - `docs/boot-flow.md` explains the startup path in plain language.
 - `docs/custom-bootloader.md` explains the custom bootloader path.
+- `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
 - `tools/custom_image_builder.rs` packages the custom boot image.
 
 ## Dependencies
@@ -111,7 +119,8 @@ chronosapien/
   control registers, and page-table types.
 
 Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, the
-bump heap, and the tiny apps are implemented directly in this repo.
+bump heap, RTL8139 networking, and the tiny apps are implemented directly in
+this repo.
 
 ## Current State
 
@@ -129,6 +138,7 @@ The kernel currently:
 - polls the PS/2 keyboard and runs a small command shell,
 - supports era switching,
 - includes built-in `notes`, `calc`, and `sysinfo` apps,
+- detects QEMU's RTL8139 NIC and can send ARP plus UDP packets,
 - logs the boot sequence to the QEMU terminal,
 - keeps the implementation intentionally small and readable.
 
@@ -261,6 +271,9 @@ Built-ins:
 - `uptime` prints elapsed seconds from the PIT tick counter.
 - `clock` prints raw PIT ticks.
 - `mem` prints total memory, heap location, and used heap space.
+- `net` prints RTL8139 MAC, static IP, gateway state, and TX/RX counts.
+- `net arp` sends an ARP request for QEMU's `10.0.2.2` gateway.
+- `net send [ip port text]` sends a UDP packet.
 - `ls` lists in-memory files.
 - `cat <name>` prints a file's contents.
 - `write <name> <content>` creates or overwrites a heap-backed file.
