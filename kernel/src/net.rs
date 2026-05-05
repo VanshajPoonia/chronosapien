@@ -183,3 +183,120 @@ pub fn init() {
         nic.mac[5]
     );
 }
+
+pub fn poll() {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &mut *NET.0.get();
+        let Some(mut nic) = state.nic else {
+            return;
+        };
+
+        poll_rtl8139(state, &mut nic);
+        state.nic = Some(nic);
+    });
+}
+
+pub fn run(command: &str) -> bool {
+    let command = command.trim();
+    if command != "net" && !command.starts_with("net ") {
+        return false;
+    }
+
+    let rest = command.strip_prefix("net").unwrap_or("").trim_start();
+    if rest.is_empty() {
+        print_status();
+        return true;
+    }
+
+    if rest == "arp" {
+        send_gateway_arp();
+        return true;
+    }
+
+    if rest == "send" {
+        send_udp(GATEWAY_IP, DEFAULT_UDP_PORT, DEFAULT_UDP_PAYLOAD);
+        return true;
+    }
+
+    if let Some(args) = rest.strip_prefix("send ") {
+        run_send_command(args);
+        return true;
+    }
+
+    println!("Usage: net | net arp | net send [ip port text]");
+    true
+}
+
+fn run_send_command(args: &str) {
+    let args = args.trim_start();
+    let Some((ip_text, rest)) = split_token(args) else {
+        println!("Usage: net send <ip> <port> <text>");
+        return;
+    };
+    let Some((port_text, payload)) = split_token(rest.trim_start()) else {
+        println!("Usage: net send <ip> <port> <text>");
+        return;
+    };
+
+    let Some(ip) = parse_ipv4(ip_text) else {
+        println!("invalid IP address");
+        return;
+    };
+    let Some(port) = parse_u16(port_text) else {
+        println!("invalid UDP port");
+        return;
+    };
+
+    send_udp(ip, port, payload.trim_start().as_bytes());
+}
+
+fn print_status() {
+    let snapshot = snapshot();
+
+    match snapshot.mac {
+        Some(mac) => println!(
+            "MAC: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+        ),
+        None => println!("MAC: not initialized"),
+    }
+    println!(
+        "IP:  {}.{}.{}.{} (static)",
+        snapshot.ip[0], snapshot.ip[1], snapshot.ip[2], snapshot.ip[3]
+    );
+    println!(
+        "GW:  {}.{}.{}.{} {}",
+        snapshot.gateway_ip[0],
+        snapshot.gateway_ip[1],
+        snapshot.gateway_ip[2],
+        snapshot.gateway_ip[3],
+        if snapshot.gateway_mac.is_some() {
+            "learned"
+        } else {
+            "unresolved"
+        }
+    );
+    println!(
+        "MASK: {}.{}.{}.{}",
+        snapshot.netmask[0], snapshot.netmask[1], snapshot.netmask[2], snapshot.netmask[3]
+    );
+    println!("TX:  {} packets", snapshot.tx_packets);
+    println!("RX:  {} packets", snapshot.rx_packets);
+}
+
+fn snapshot() -> Snapshot {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &*NET.0.get();
+
+        Snapshot {
+            initialized: state.initialized,
+            mac: state.nic.map(|nic| nic.mac),
+            ip: LOCAL_IP,
+            netmask: NETMASK,
+            gateway_ip: GATEWAY_IP,
+            gateway_mac: state.gateway_mac,
+            tx_packets: state.tx_packets,
+            rx_packets: state.rx_packets,
+        }
+    })
+}
