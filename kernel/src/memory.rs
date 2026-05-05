@@ -107,13 +107,13 @@ fn map_heap(mapper: &mut OffsetPageTable, frame_allocator: &mut BootInfoFrameAll
 }
 
 fn identity_map_kernel(
-    boot_info: &bootloader_api::BootInfo,
+    boot_context: &BootContext,
     mapper: &mut OffsetPageTable,
     frame_allocator: &mut BootInfoFrameAllocator,
 ) {
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-    let kernel_start = boot_info.kernel_addr;
-    let kernel_end = boot_info.kernel_addr + boot_info.kernel_len;
+    let kernel_start = boot_context.kernel_addr;
+    let kernel_end = boot_context.kernel_addr + boot_context.kernel_len;
 
     if kernel_end <= kernel_start {
         return;
@@ -168,12 +168,12 @@ fn leak_boot_allocation() {
 }
 
 pub struct BootInfoFrameAllocator {
-    memory_regions: &'static MemoryRegions,
+    memory_regions: &'static [MemoryRegion],
     next: usize,
 }
 
 impl BootInfoFrameAllocator {
-    pub unsafe fn new(memory_regions: &'static MemoryRegions) -> Self {
+    pub unsafe fn new(memory_regions: &'static [MemoryRegion]) -> Self {
         Self {
             memory_regions,
             next: 0,
