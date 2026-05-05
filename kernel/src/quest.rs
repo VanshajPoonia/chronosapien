@@ -330,6 +330,7 @@ fn print_stats() {
 
 fn print_inventory() {
     let style = frame_style();
+    let mut printed = false;
 
     print_header("INVENTORY", style);
 
@@ -337,8 +338,13 @@ fn print_inventory() {
         if quest.state.is_complete() {
             if let Some(item) = quest.inventory {
                 print_frame_line(InventoryLine(item), style);
+                printed = true;
             }
         }
+    }
+
+    if !printed {
+        print_frame_line("No capabilities unlocked yet.", style);
     }
 
     print_footer(style);
