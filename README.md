@@ -68,13 +68,14 @@ chronosapien/
 
 - `Cargo.toml` sets up the Rust workspace.
 - `build.rs` uses the bootloader 0.11 BIOS image builder to create the bootable image.
+- `boot/` contains the optional custom BIOS bootloader stages.
 - `src/main.rs` is a small host-side helper that reports the generated image path.
 - `rust-toolchain.toml` pins the nightly toolchain and required components.
 - `.cargo/config.toml` sets the default kernel target and enables nightly artifact dependencies.
 - `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader_api` and `x86_64`.
 - `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
-- `kernel/src/framebuffer/` draws text and the top bar into the bootloader framebuffer.
+- `kernel/src/framebuffer/` draws text and the top bar into the boot framebuffer.
 - `kernel/src/fs.rs` stores a tiny heap-backed in-memory file list.
 - `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
