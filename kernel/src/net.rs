@@ -402,3 +402,136 @@ fn transmit(frame: &[u8]) {
         state.tx_packets = state.tx_packets.saturating_add(1);
     });
 }
+
+unsafe fn poll_rtl8139(state: &mut NetState, nic: &mut Rtl8139) {
+    let rx_buffer = &mut (*RX_BUFFER.0.get()).bytes;
+    let mut processed = 0;
+
+    while io::inb(nic.io_base + COMMAND) & COMMAND_RX_BUFFER_EMPTY == 0 && processed < 4 {
+        if nic.rx_offset + 4 >= RX_BUFFER_LEN {
+            nic.rx_offset = 0;
+        }
+
+        let status = read_le_u16(rx_buffer, nic.rx_offset);
+        let length = read_le_u16(rx_buffer, nic.rx_offset + 2) as usize;
+
+        if status & RX_OK == 0 || length < 4 || length > 1600 {
+            nic.rx_offset = 0;
+            io::outw(nic.io_base + RX_BUF_PTR, 0);
+            break;
+        }
+
+        let packet_len = length - 4;
+        let packet_start = nic.rx_offset + 4;
+        let packet_end = packet_start + packet_len;
+
+        if packet_end <= RX_BUFFER_LEN {
+            handle_rx_packet(state, &rx_buffer[packet_start..packet_end]);
+            state.rx_packets = state.rx_packets.saturating_add(1);
+        }
+
+        nic.rx_offset = (nic.rx_offset + length + 4 + 3) & !3;
+        if nic.rx_offset >= 8192 {
+            nic.rx_offset -= 8192;
+        }
+
+        io::outw(
+            nic.io_base + RX_BUF_PTR,
+            (nic.rx_offset as u16).wrapping_sub(16),
+        );
+        io::outw(nic.io_base + INTERRUPT_STATUS, 0xFFFF);
+        processed += 1;
+    }
+}
+
+fn handle_rx_packet(state: &mut NetState, packet: &[u8]) {
+    if packet.len() < ETHERNET_HEADER_LEN {
+        return;
+    }
+
+    let ether_type = be_u16(packet, 12);
+    match ether_type {
+        ETHER_TYPE_ARP => handle_arp(state, packet),
+        ETHER_TYPE_IPV4 => handle_ipv4(packet),
+        _ => {}
+    }
+}
+
+fn handle_arp(state: &mut NetState, packet: &[u8]) {
+    if packet.len() < ETHERNET_HEADER_LEN + ARP_PACKET_LEN {
+        return;
+    }
+
+    let arp = &packet[ETHERNET_HEADER_LEN..];
+    let opcode = be_u16(arp, 6);
+    let sender_mac = [arp[8], arp[9], arp[10], arp[11], arp[12], arp[13]];
+    let sender_ip = [arp[14], arp[15], arp[16], arp[17]];
+    let target_ip = [arp[24], arp[25], arp[26], arp[27]];
+
+    if opcode == 2 && sender_ip == GATEWAY_IP && target_ip == LOCAL_IP {
+        state.gateway_mac = Some(sender_mac);
+        crate::serial_println!(
+            "[CHRONO] net: ARP reply from {}.{}.{}.{}",
+            sender_ip[0],
+            sender_ip[1],
+            sender_ip[2],
+            sender_ip[3]
+        );
+    }
+}
+
+fn handle_ipv4(packet: &[u8]) {
+    if packet.len() < ETHERNET_HEADER_LEN + IPV4_HEADER_LEN {
+        return;
+    }
+
+    let ip = &packet[ETHERNET_HEADER_LEN..];
+    let header_len = ((ip[0] & 0x0F) as usize) * 4;
+    if header_len < IPV4_HEADER_LEN || ip.len() < header_len + UDP_HEADER_LEN {
+        return;
+    }
+
+    let total_len = be_u16(ip, 2) as usize;
+    if total_len > ip.len() || ip[9] != IP_PROTOCOL_UDP {
+        return;
+    }
+
+    let src_ip = [ip[12], ip[13], ip[14], ip[15]];
+    let dest_ip = [ip[16], ip[17], ip[18], ip[19]];
+    if dest_ip != LOCAL_IP {
+        return;
+    }
+
+    let udp = &ip[header_len..total_len];
+    if udp.len() < UDP_HEADER_LEN {
+        return;
+    }
+
+    let src_port = be_u16(udp, 0);
+    let dest_port = be_u16(udp, 2);
+    let udp_len = be_u16(udp, 4) as usize;
+    if udp_len < UDP_HEADER_LEN || udp_len > udp.len() {
+        return;
+    }
+
+    let payload = &udp[UDP_HEADER_LEN..udp_len];
+    crate::serial_print!(
+        "[CHRONO] net: UDP rx {} bytes from {}.{}.{}.{}:{} -> {}: ",
+        payload.len(),
+        src_ip[0],
+        src_ip[1],
+        src_ip[2],
+        src_ip[3],
+        src_port,
+        dest_port
+    );
+    for byte in payload.iter().copied().take(48) {
+        let printable = if byte.is_ascii_graphic() || byte == b' ' {
+            byte
+        } else {
+            b'.'
+        };
+        crate::serial_print!("{}", printable as char);
+    }
+    crate::serial_println!("");
+}
