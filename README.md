@@ -12,6 +12,13 @@ few built-in apps.
 chronosapien/
 |-- Cargo.toml
 |-- build.rs
+|-- boot/
+|   |-- stage1/
+|   |   `-- stage1.asm
+|   `-- stage2/
+|       |-- stage2_long.asm
+|       |-- stage2_pm.rs
+|       `-- stage2_real.asm
 |-- rust-toolchain.toml
 |-- src/
 |   `-- main.rs
