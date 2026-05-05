@@ -35,6 +35,13 @@ impl QuestState {
             Self::Locked => "[ ]",
         }
     }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Complete => "complete",
+            Self::Locked => "locked",
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -266,6 +273,7 @@ fn print_quest_list() {
                 marker: quest.state.marker(),
                 title: quest.title,
                 summary: quest.summary,
+                status: quest.state.label(),
             },
             style,
         );
@@ -438,14 +446,15 @@ struct QuestLine {
     marker: &'static str,
     title: &'static str,
     summary: &'static str,
+    status: &'static str,
 }
 
 impl core::fmt::Display for QuestLine {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             formatter,
-            "{} {:<16} - {}",
-            self.marker, self.title, self.summary
+            "{} {:<16} - {} [{}]",
+            self.marker, self.title, self.summary, self.status
         )
     }
 }
