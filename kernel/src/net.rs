@@ -111,3 +111,75 @@ static RX_BUFFER: GlobalRx = GlobalRx(UnsafeCell::new(RxBuffer {
 static TX_BUFFERS: GlobalTx = GlobalTx(UnsafeCell::new(TxBuffers {
     bytes: [[0; TX_BUFFER_LEN]; TX_BUFFER_COUNT],
 }));
+
+pub fn init() {
+    let Some(device) = pci::find_device(RTL8139_VENDOR_ID, RTL8139_DEVICE_ID) else {
+        crate::serial_println!("[CHRONO] net: rtl8139 not found");
+        return;
+    };
+
+    let bar0 = device.bar0();
+    if bar0 & 1 == 0 {
+        crate::serial_println!("[CHRONO] net: rtl8139 BAR0 is not an I/O BAR");
+        return;
+    }
+
+    let io_base = (bar0 & !3) as u16;
+    device.enable_io_and_bus_mastering();
+
+    crate::serial_println!(
+        "[CHRONO] net: rtl8139 found bus={} device={} function={} io={:#x}",
+        device.bus,
+        device.device,
+        device.function,
+        io_base
+    );
+
+    let mut nic = Rtl8139 {
+        io_base,
+        mac: [0; 6],
+        tx_index: 0,
+        rx_offset: 0,
+    };
+
+    unsafe {
+        io::outb(io_base + CONFIG1, 0x00);
+        io::outb(io_base + COMMAND, COMMAND_RESET);
+        for _ in 0..100_000 {
+            if io::inb(io_base + COMMAND) & COMMAND_RESET == 0 {
+                break;
+            }
+        }
+
+        for index in 0..nic.mac.len() {
+            nic.mac[index] = io::inb(io_base + IDR0 + index as u16);
+        }
+
+        io::outl(io_base + RX_BUF, rx_buffer_address());
+        io::outw(io_base + INTERRUPT_MASK, 0);
+        io::outw(io_base + INTERRUPT_STATUS, 0xFFFF);
+        io::outl(io_base + RX_CONFIG, 0x0000_008F);
+        io::outl(io_base + TX_CONFIG, 0);
+        io::outb(io_base + COMMAND, COMMAND_RX_ENABLE | COMMAND_TX_ENABLE);
+        io::outw(io_base + RX_BUF_PTR, 0);
+    }
+
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &mut *NET.0.get();
+        state.initialized = true;
+        state.nic = Some(nic);
+        state.gateway_mac = None;
+        state.tx_packets = 0;
+        state.rx_packets = 0;
+    });
+
+    crate::serial_println!(
+        "[CHRONO] net: mac {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        nic.mac[0],
+        nic.mac[1],
+        nic.mac[2],
+        nic.mac[3],
+        nic.mac[4],
+        nic.mac[5]
+    );
+}
