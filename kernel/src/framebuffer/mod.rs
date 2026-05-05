@@ -124,7 +124,7 @@ impl MouseCursor {
 pub struct Writer {
     buffer: *mut u8,
     buffer_len: usize,
-    info: FrameBufferInfo,
+    info: FramebufferInfo,
     column_position: usize,
     columns: usize,
     rows: usize,
@@ -142,7 +142,7 @@ impl Writer {
         Self {
             buffer: core::ptr::null_mut(),
             buffer_len: 0,
-            info: FrameBufferInfo {
+            info: FramebufferInfo {
                 byte_len: 0,
                 width: 0,
                 height: 0,
@@ -163,10 +163,10 @@ impl Writer {
         }
     }
 
-    fn init(&mut self, framebuffer: &mut FrameBuffer, profile: EraProfile) {
-        self.info = framebuffer.info();
+    fn init(&mut self, framebuffer: Framebuffer, profile: EraProfile) {
+        self.info = framebuffer.info;
         self.buffer_len = self.info.byte_len;
-        self.buffer = framebuffer.buffer_mut().as_mut_ptr();
+        self.buffer = framebuffer.address;
         match self.info.pixel_format {
             PixelFormat::Rgb | PixelFormat::Bgr if self.info.bytes_per_pixel >= 3 => {}
             PixelFormat::U8 if self.info.bytes_per_pixel >= 1 => {}
@@ -653,14 +653,14 @@ unsafe impl Sync for GlobalWriter {}
 
 static WRITER: GlobalWriter = GlobalWriter(UnsafeCell::new(Writer::new()));
 
-pub fn init(framebuffer: &mut FrameBuffer, profile: EraProfile) {
+pub fn init(framebuffer: Framebuffer, profile: EraProfile) {
     // SAFETY: The framebuffer writer is initialized once during early boot
     // before interrupts are enabled.
     unsafe {
         (*WRITER.0.get()).init(framebuffer, profile);
     }
 
-    let info = framebuffer.info();
+    let info = framebuffer.info;
     crate::serial_println!("[CHRONO] fb: {}x{} initialized", info.width, info.height);
 }
 
