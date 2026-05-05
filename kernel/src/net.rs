@@ -535,3 +535,91 @@ fn handle_ipv4(packet: &[u8]) {
     }
     crate::serial_println!("");
 }
+
+fn build_ethernet_header(frame: &mut [u8], dest: [u8; 6], source: [u8; 6], ether_type: u16) {
+    frame[0..6].copy_from_slice(&dest);
+    frame[6..12].copy_from_slice(&source);
+    put_be_u16(frame, 12, ether_type);
+}
+
+fn build_arp_packet(
+    packet: &mut [u8],
+    opcode: u16,
+    sender_mac: [u8; 6],
+    sender_ip: [u8; 4],
+    target_mac: [u8; 6],
+    target_ip: [u8; 4],
+) {
+    put_be_u16(packet, 0, 1);
+    put_be_u16(packet, 2, ETHER_TYPE_IPV4);
+    packet[4] = 6;
+    packet[5] = 4;
+    put_be_u16(packet, 6, opcode);
+    packet[8..14].copy_from_slice(&sender_mac);
+    packet[14..18].copy_from_slice(&sender_ip);
+    packet[18..24].copy_from_slice(&target_mac);
+    packet[24..28].copy_from_slice(&target_ip);
+}
+
+fn build_ipv4_header(
+    header: &mut [u8],
+    total_len: u16,
+    source_ip: [u8; 4],
+    dest_ip: [u8; 4],
+    protocol: u8,
+) {
+    header[..IPV4_HEADER_LEN].fill(0);
+    header[0] = 0x45;
+    header[1] = 0;
+    put_be_u16(header, 2, total_len);
+    put_be_u16(header, 4, 1);
+    put_be_u16(header, 6, 0);
+    header[8] = 64;
+    header[9] = protocol;
+    header[12..16].copy_from_slice(&source_ip);
+    header[16..20].copy_from_slice(&dest_ip);
+    let checksum = ipv4_checksum(&header[..IPV4_HEADER_LEN]);
+    put_be_u16(header, 10, checksum);
+}
+
+fn build_udp_header(header: &mut [u8], source_port: u16, dest_port: u16, udp_len: u16) {
+    put_be_u16(header, 0, source_port);
+    put_be_u16(header, 2, dest_port);
+    put_be_u16(header, 4, udp_len);
+    put_be_u16(header, 6, 0);
+}
+
+fn ipv4_checksum(header: &[u8]) -> u16 {
+    let mut sum = 0u32;
+    let mut index = 0;
+
+    while index + 1 < header.len() {
+        sum += be_u16(header, index) as u32;
+        index += 2;
+    }
+
+    while sum >> 16 != 0 {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+
+    !(sum as u16)
+}
+
+fn rx_buffer_address() -> u32 {
+    unsafe { (*RX_BUFFER.0.get()).bytes.as_mut_ptr() as u32 }
+}
+
+fn read_le_u16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
+}
+
+fn be_u16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_be_bytes([bytes[offset], bytes[offset + 1]])
+}
+
+fn put_be_u16(bytes: &mut [u8], offset: usize, value: u16) {
+    let [high, low] = value.to_be_bytes();
+    bytes[offset] = high;
+    bytes[offset + 1] = low;
+}
+
