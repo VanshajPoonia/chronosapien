@@ -623,3 +623,54 @@ fn put_be_u16(bytes: &mut [u8], offset: usize, value: u16) {
     bytes[offset + 1] = low;
 }
 
+fn parse_ipv4(text: &str) -> Option<[u8; 4]> {
+    let mut octets = [0u8; 4];
+    let mut count = 0;
+
+    for part in text.split('.') {
+        if count >= octets.len() {
+            return None;
+        }
+        octets[count] = parse_u8(part)?;
+        count += 1;
+    }
+
+    if count == 4 {
+        Some(octets)
+    } else {
+        None
+    }
+}
+
+fn split_token(text: &str) -> Option<(&str, &str)> {
+    let index = text.find(' ')?;
+    Some((&text[..index], &text[index + 1..]))
+}
+
+fn parse_u8(text: &str) -> Option<u8> {
+    let value = parse_u16(text)?;
+    if value <= u8::MAX as u16 {
+        Some(value as u8)
+    } else {
+        None
+    }
+}
+
+fn parse_u16(text: &str) -> Option<u16> {
+    if text.is_empty() {
+        return None;
+    }
+
+    let mut value = 0u32;
+    for byte in text.bytes() {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        value = value * 10 + (byte - b'0') as u32;
+        if value > u16::MAX as u32 {
+            return None;
+        }
+    }
+
+    Some(value as u16)
+}
