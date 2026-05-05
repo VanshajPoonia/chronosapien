@@ -89,11 +89,15 @@ chronosapien/
 - `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
 - `scripts/build.ps1` builds the bootable disk image.
+- `scripts/build-custom.ps1` builds the optional custom sector-0 BIOS image.
 - `scripts/run.ps1` runs the image in QEMU.
+- `scripts/run-custom.ps1` runs the custom BIOS image in QEMU.
 - `scripts/debug-serial.ps1` runs QEMU with display disabled and serial output enabled.
 - `docs/roadmap.md` lists Milestone 1 and the next steps.
 - `docs/architecture.md` explains what code is ours and what is borrowed.
 - `docs/boot-flow.md` explains the startup path in plain language.
+- `docs/custom-bootloader.md` explains the custom bootloader path.
+- `tools/custom_image_builder.rs` packages the custom boot image.
 
 ## Dependencies
 
