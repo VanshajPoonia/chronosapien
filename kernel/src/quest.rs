@@ -319,7 +319,12 @@ fn print_stats() {
     print_frame_line(StatLine("Systems Online", progress.completed, progress.total), style);
     print_frame_line(CountLine("Artifacts Found", progress.completed), style);
     print_frame_line(CountLine("Locked Quests", progress.locked), style);
+    print_frame_line(RankLine(rank_for(progress.completed, progress.total)), style);
     print_frame_line(EraLine(era), style);
+    match active_quest() {
+        Some(quest) => print_frame_line(QuestTitle(quest.title), style),
+        None => print_frame_line("Current: All quests complete", style),
+    }
     print_footer(style);
 }
 
@@ -356,6 +361,22 @@ fn progress() -> QuestProgress {
         completed,
         locked: total.saturating_sub(completed),
         total,
+    }
+}
+
+fn active_quest() -> Option<&'static Quest> {
+    QUESTS.iter().find(|quest| !quest.state.is_complete())
+}
+
+fn rank_for(completed: usize, total: usize) -> &'static str {
+    if completed == total {
+        "Chronomancer"
+    } else if completed * 4 >= total * 3 {
+        "Kernel Knight"
+    } else if completed * 2 >= total {
+        "Boot Squire"
+    } else {
+        "Novice Operator"
     }
 }
 
@@ -504,6 +525,14 @@ struct CountLine(&'static str, usize);
 impl core::fmt::Display for CountLine {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(formatter, "{}: {}", self.0, self.1)
+    }
+}
+
+struct RankLine(&'static str);
+
+impl core::fmt::Display for RankLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "Rank: {}", self.0)
     }
 }
 
