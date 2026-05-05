@@ -7,6 +7,7 @@ use crate::keyboard::{self, KeyEvent};
 use crate::memory;
 use crate::mouse;
 use crate::museum;
+use crate::net;
 use crate::quest;
 use crate::sched;
 use crate::theme::{self, Era};
@@ -100,6 +101,7 @@ pub fn run() -> ! {
                 let now = timer::ticks();
                 if now != last_yield_tick {
                     last_yield_tick = now;
+                    net::poll();
                     sched::yield_now();
                 }
 
@@ -193,6 +195,7 @@ fn execute_command(command: &str) {
         command if command == "open" || command.starts_with("open ") => open_window(command),
         "tasks" => list_tasks(),
         command if command == "kill" || command.starts_with("kill ") => kill_task(command),
+        command if net::run(command) => {}
         command if museum::run(command) => {}
         command if quest::run(command) => {}
         command if apps::run(command) => {}
@@ -206,6 +209,7 @@ fn print_help() {
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
     println!("Tasks: tasks, kill <id>");
+    println!("Network: net, net arp, net send [ip port text]");
     println!("Museum: museum boot|kernel|memory|interrupts|keyboard|serial|era");
     println!("Quests: quest list, quest status, stats, inventory");
 }
