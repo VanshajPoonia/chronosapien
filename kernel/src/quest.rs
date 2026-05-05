@@ -254,8 +254,11 @@ fn print_usage() {
 
 fn print_quest_list() {
     let style = frame_style();
+    let progress = progress();
 
     print_header("QUEST LIST", style);
+    print_frame_line(ProgressLine(progress.completed, progress.total), style);
+    print_frame_line("", style);
 
     for quest in QUESTS {
         print_frame_line(
@@ -277,8 +280,12 @@ fn print_quest_list() {
 
 fn print_quest_status() {
     let style = frame_style();
+    let progress = progress();
 
     print_header("QUEST STATUS", style);
+    print_frame_line(ProgressLine(progress.completed, progress.total), style);
+    print_frame_line(CountLine("Locked Quests", progress.locked), style);
+    print_frame_line("", style);
 
     match QUESTS.iter().find(|quest| !quest.state.is_complete()) {
         Some(quest) => {
@@ -297,15 +304,13 @@ fn print_quest_status() {
 
 fn print_stats() {
     let style = frame_style();
-    let completed = completed_count();
-    let total = QUESTS.len();
-    let locked = total.saturating_sub(completed);
+    let progress = progress();
     let era = crate::theme::active_profile().name;
 
     print_header("PLAYER STATS", style);
-    print_frame_line(StatLine("Systems Online", completed, total), style);
-    print_frame_line(CountLine("Artifacts Found", completed), style);
-    print_frame_line(CountLine("Locked Quests", locked), style);
+    print_frame_line(StatLine("Systems Online", progress.completed, progress.total), style);
+    print_frame_line(CountLine("Artifacts Found", progress.completed), style);
+    print_frame_line(CountLine("Locked Quests", progress.locked), style);
     print_frame_line(EraLine(era), style);
     print_footer(style);
 }
@@ -326,11 +331,24 @@ fn print_inventory() {
     print_footer(style);
 }
 
-fn completed_count() -> usize {
-    QUESTS
+struct QuestProgress {
+    completed: usize,
+    locked: usize,
+    total: usize,
+}
+
+fn progress() -> QuestProgress {
+    let completed = QUESTS
         .iter()
         .filter(|quest| quest.state.is_complete())
-        .count()
+        .count();
+    let total = QUESTS.len();
+
+    QuestProgress {
+        completed,
+        locked: total.saturating_sub(completed),
+        total,
+    }
 }
 
 fn frame_style() -> FrameStyle {
@@ -461,6 +479,14 @@ struct StatLine(&'static str, usize, usize);
 impl core::fmt::Display for StatLine {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(formatter, "{}: {}/{}", self.0, self.1, self.2)
+    }
+}
+
+struct ProgressLine(usize, usize);
+
+impl core::fmt::Display for ProgressLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "Quest Progress: {}/{}", self.0, self.1)
     }
 }
 
