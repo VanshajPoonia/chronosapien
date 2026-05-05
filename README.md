@@ -50,12 +50,17 @@ chronosapien/
 |       `-- timer.rs
 |-- scripts/
 |   |-- build.ps1
+|   |-- build-custom.ps1
 |   |-- debug-serial.ps1
+|   |-- run-custom.ps1
 |   `-- run.ps1
 |-- docs/
 |   |-- architecture.md
 |   |-- boot-flow.md
+|   |-- custom-bootloader.md
 |   `-- roadmap.md
+|-- tools/
+|   `-- custom_image_builder.rs
 `-- .gitignore
 ```
 
