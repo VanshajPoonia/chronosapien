@@ -12,7 +12,29 @@ struct Quest {
     flavor: &'static str,
     inventory: Option<&'static str>,
     next_step: &'static str,
-    complete: bool,
+    state: QuestState,
+}
+
+#[derive(Clone, Copy)]
+enum QuestState {
+    Complete,
+    Locked,
+}
+
+impl QuestState {
+    const fn is_complete(self) -> bool {
+        match self {
+            Self::Complete => true,
+            Self::Locked => false,
+        }
+    }
+
+    const fn marker(self) -> &'static str {
+        match self {
+            Self::Complete => "[x]",
+            Self::Locked => "[ ]",
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -34,7 +56,7 @@ const QUESTS: &[Quest] = &[
         flavor: "The first spark catches. ChronoOS wakes.",
         inventory: None,
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Voice of God",
@@ -42,7 +64,7 @@ const QUESTS: &[Quest] = &[
         flavor: "A debug voice echoes through COM1.",
         inventory: Some("Serial Logging"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "First Words",
@@ -50,7 +72,7 @@ const QUESTS: &[Quest] = &[
         flavor: "Pixels become letters. The void gets subtitles.",
         inventory: Some("Framebuffer Console"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Ears Open",
@@ -58,7 +80,7 @@ const QUESTS: &[Quest] = &[
         flavor: "The machine listens for tiny scancode spells.",
         inventory: Some("Keyboard"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "The Shell",
@@ -66,7 +88,7 @@ const QUESTS: &[Quest] = &[
         flavor: "A prompt appears, and the kernel answers back.",
         inventory: Some("Shell"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Time Traveler",
@@ -74,7 +96,7 @@ const QUESTS: &[Quest] = &[
         flavor: "One kernel, four costumes, zero paradoxes.",
         inventory: Some("Era Engine"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Gatekeeper",
@@ -82,7 +104,7 @@ const QUESTS: &[Quest] = &[
         flavor: "The CPU now knows where to knock.",
         inventory: Some("IDT"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "The Watchmaker",
@@ -90,7 +112,7 @@ const QUESTS: &[Quest] = &[
         flavor: "The PIT starts counting heartbeats.",
         inventory: Some("PIT Timer"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Mind Palace",
@@ -98,7 +120,7 @@ const QUESTS: &[Quest] = &[
         flavor: "Pages align. The heap opens its first room.",
         inventory: Some("Heap"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Pack Rat",
@@ -106,7 +128,7 @@ const QUESTS: &[Quest] = &[
         flavor: "Tiny files find a temporary home.",
         inventory: Some("Filesystem"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Tiny Guild",
@@ -114,7 +136,7 @@ const QUESTS: &[Quest] = &[
         flavor: "Notes, math, and sysinfo join the party.",
         inventory: Some("Apps"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Silver Pointer",
@@ -122,7 +144,7 @@ const QUESTS: &[Quest] = &[
         flavor: "The cursor learns to wander.",
         inventory: Some("Mouse"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Glass Panes",
@@ -130,7 +152,7 @@ const QUESTS: &[Quest] = &[
         flavor: "Little rooms appear inside the screen.",
         inventory: Some("Windows"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Many Hands",
@@ -138,7 +160,7 @@ const QUESTS: &[Quest] = &[
         flavor: "Tasks take turns like polite adventurers.",
         inventory: Some("Multitasking"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Museum Curator",
@@ -146,7 +168,7 @@ const QUESTS: &[Quest] = &[
         flavor: "The kernel starts explaining itself.",
         inventory: Some("Museum Mode"),
         next_step: "",
-        complete: true,
+        state: QuestState::Complete,
     },
     Quest {
         title: "Swift Fingers",
@@ -154,7 +176,7 @@ const QUESTS: &[Quest] = &[
         flavor: "",
         inventory: None,
         next_step: "Replace keyboard polling with IRQ-driven input.",
-        complete: false,
+        state: QuestState::Locked,
     },
     Quest {
         title: "Reclaimer",
@@ -162,7 +184,7 @@ const QUESTS: &[Quest] = &[
         flavor: "",
         inventory: None,
         next_step: "Upgrade the bump heap so freed memory can be reused.",
-        complete: false,
+        state: QuestState::Locked,
     },
     Quest {
         title: "Stone Archive",
@@ -170,7 +192,7 @@ const QUESTS: &[Quest] = &[
         flavor: "",
         inventory: None,
         next_step: "Add disk-backed storage so files survive reboot.",
-        complete: false,
+        state: QuestState::Locked,
     },
 ];
 
@@ -236,17 +258,16 @@ fn print_quest_list() {
     print_header("QUEST LIST", style);
 
     for quest in QUESTS {
-        let marker = if quest.complete { "[x]" } else { "[ ]" };
         print_frame_line(
             QuestLine {
-                marker,
+                marker: quest.state.marker(),
                 title: quest.title,
                 summary: quest.summary,
             },
             style,
         );
 
-        if quest.complete {
+        if quest.state.is_complete() {
             print_frame_line(FlavorLine(quest.flavor), style);
         }
     }
@@ -259,7 +280,7 @@ fn print_quest_status() {
 
     print_header("QUEST STATUS", style);
 
-    match QUESTS.iter().find(|quest| !quest.complete) {
+    match QUESTS.iter().find(|quest| !quest.state.is_complete()) {
         Some(quest) => {
             print_frame_line("Active Quest", style);
             print_frame_line(QuestTitle(quest.title), style);
@@ -295,7 +316,7 @@ fn print_inventory() {
     print_header("INVENTORY", style);
 
     for quest in QUESTS {
-        if quest.complete {
+        if quest.state.is_complete() {
             if let Some(item) = quest.inventory {
                 print_frame_line(InventoryLine(item), style);
             }
@@ -306,7 +327,10 @@ fn print_inventory() {
 }
 
 fn completed_count() -> usize {
-    QUESTS.iter().filter(|quest| quest.complete).count()
+    QUESTS
+        .iter()
+        .filter(|quest| quest.state.is_complete())
+        .count()
 }
 
 fn frame_style() -> FrameStyle {
