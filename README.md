@@ -152,6 +152,12 @@ Install QEMU:
 winget install qemu
 ```
 
+Install NASM if you want to build the optional custom bootloader path:
+
+```powershell
+winget install NASM.NASM
+```
+
 ## Exact build and run commands
 
 Build:
@@ -166,6 +172,16 @@ Run:
 ```powershell
 .\scripts\run.ps1
 ```
+
+Optional custom bootloader image:
+
+```powershell
+.\scripts\build-custom.ps1
+.\scripts\run-custom.ps1
+```
+
+The custom path starts from our own sector-0 Stage 1 loader. The normal
+`chronosapien-bios.img` path remains the fallback.
 
 Serial-only debug run:
 
