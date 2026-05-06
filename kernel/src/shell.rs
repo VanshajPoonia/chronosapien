@@ -205,7 +205,7 @@ fn execute_command(command: &str) {
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem");
+    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem, ring3");
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
