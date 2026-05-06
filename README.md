@@ -278,6 +278,7 @@ Built-ins:
 - `uptime` prints elapsed seconds from the PIT tick counter.
 - `clock` prints raw PIT ticks.
 - `mem` prints total memory, heap location, and used heap space.
+- `ring3` enters the opt-in user mode demo and intentionally catches a privileged-instruction fault.
 - `net` prints RTL8139 MAC, static IP, gateway state, and TX/RX counts.
 - `net arp` sends an ARP request for QEMU's `10.0.2.2` gateway.
 - `net send [ip port text]` sends a UDP packet.
