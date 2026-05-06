@@ -178,6 +178,14 @@ const QUESTS: &[Quest] = &[
         state: QuestState::Complete,
     },
     Quest {
+        title: "Stone Archive",
+        summary: "Persistent disk storage",
+        flavor: "Words settle into stone and survive the reboot storm.",
+        inventory: Some("Disk Storage"),
+        next_step: "",
+        state: QuestState::Complete,
+    },
+    Quest {
         title: "Swift Fingers",
         summary: "Interrupt-driven keyboard input",
         flavor: "",
@@ -191,14 +199,6 @@ const QUESTS: &[Quest] = &[
         flavor: "",
         inventory: None,
         next_step: "Upgrade the bump heap so freed memory can be reused.",
-        state: QuestState::Locked,
-    },
-    Quest {
-        title: "Stone Archive",
-        summary: "Persistent disk storage",
-        flavor: "",
-        inventory: None,
-        next_step: "Add disk-backed storage so files survive reboot.",
         state: QuestState::Locked,
     },
 ];
