@@ -386,6 +386,9 @@ fn print_fs_error(name: &str, error: FsError) {
         FsError::NotFound => println!("file not found: {}", name),
         FsError::EmptyName | FsError::InvalidName => println!("invalid filename"),
         FsError::NameTooLong => println!("filename too long"),
+        FsError::FileTooLarge => println!("file too large"),
+        FsError::NoSpace => println!("not enough disk space"),
+        FsError::Disk => println!("disk error"),
     }
 }
 
