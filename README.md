@@ -85,7 +85,7 @@ chronosapien/
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
 - `kernel/src/framebuffer/` draws text and the top bar into the boot framebuffer.
 - `kernel/src/fs.rs` mounts ChronoFS from disk, with a heap fallback if the disk is missing.
-- `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
+- `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with double-fault and ring-transition stacks.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
 - `kernel/src/io.rs` provides shared x86 port I/O helpers for device drivers.
 - `kernel/src/keyboard.rs` polls the PS/2 keyboard and turns scancodes into simple key events.
