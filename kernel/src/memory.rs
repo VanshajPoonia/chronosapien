@@ -19,6 +19,9 @@ use crate::boot::{BootContext, MemoryRegion, MemoryRegionKind};
 
 pub const HEAP_START: u64 = 0x200000;
 pub const HEAP_SIZE: u64 = 1024 * 1024;
+pub const USER_CODE_START: u64 = 0x400000;
+pub const USER_STACK_START: u64 = 0x401000;
+pub const USER_STACK_SIZE: u64 = PAGE_SIZE;
 
 const PAGE_SIZE: u64 = 4096;
 
@@ -46,6 +49,23 @@ pub fn init(boot_context: &'static BootContext) {
         );
         panic!("heap range is not usable");
     }
+    if !user_demo_range_is_usable(boot_context.memory_regions) {
+        crate::serial_println!(
+            "[CHRONO] mem: ring3 demo range {:#x}..{:#x} is not usable",
+            USER_CODE_START,
+            USER_STACK_START + USER_STACK_SIZE
+        );
+        panic!("ring3 demo range is not usable");
+    }
+    if ranges_overlap(
+        USER_CODE_START,
+        USER_STACK_START + USER_STACK_SIZE,
+        boot_context.kernel_addr,
+        boot_context.kernel_addr + boot_context.kernel_len,
+    ) {
+        crate::serial_println!("[CHRONO] mem: ring3 demo range overlaps kernel image");
+        panic!("ring3 demo range overlaps kernel");
+    }
 
     let Some(physical_memory_offset) = boot_context.physical_memory_offset else {
         crate::serial_println!("[CHRONO] mem: physical memory offset missing");
@@ -55,6 +75,9 @@ pub fn init(boot_context: &'static BootContext) {
     let mut mapper = unsafe { init_offset_page_table(physical_memory_offset) };
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::new(boot_context.memory_regions) };
 
+    // Map user pages first so any newly-created parent page-table entries keep
+    // the USER bit needed for ring 3 instruction fetches and stack accesses.
+    map_user_demo_pages(&mut mapper, &mut frame_allocator);
     identity_map_kernel(boot_context, &mut mapper, &mut frame_allocator);
     map_heap(&mut mapper, &mut frame_allocator);
     ALLOCATOR.init(HEAP_START as usize, HEAP_SIZE as usize);
@@ -90,6 +113,36 @@ fn heap_range_is_usable(memory_regions: &[MemoryRegion]) -> bool {
             && region.start <= HEAP_START
             && region.end >= heap_end
     })
+}
+
+fn user_demo_range_is_usable(memory_regions: &[MemoryRegion]) -> bool {
+    let user_demo_end = USER_STACK_START + USER_STACK_SIZE;
+
+    memory_regions.iter().any(|region| {
+        region.kind == MemoryRegionKind::Usable
+            && region.start <= USER_CODE_START
+            && region.end >= user_demo_end
+    })
+}
+
+fn ranges_overlap(left_start: u64, left_end: u64, right_start: u64, right_end: u64) -> bool {
+    left_start < right_end && right_start < left_end
+}
+
+fn map_user_demo_pages(
+    mapper: &mut OffsetPageTable,
+    frame_allocator: &mut BootInfoFrameAllocator,
+) {
+    let flags = PageTableFlags::PRESENT
+        | PageTableFlags::WRITABLE
+        | PageTableFlags::USER_ACCESSIBLE;
+
+    for address in [USER_CODE_START, USER_STACK_START] {
+        let frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(PhysAddr::new(address));
+        identity_map_frame(mapper, frame_allocator, frame, flags);
+    }
+
+    crate::serial_println!("[CHRONO] mem: ring3 demo pages mapped");
 }
 
 fn map_heap(mapper: &mut OffsetPageTable, frame_allocator: &mut BootInfoFrameAllocator) {
@@ -137,7 +190,14 @@ fn identity_map_frame(
 ) {
     match unsafe { mapper.identity_map(frame, flags, frame_allocator) } {
         Ok(flush) => flush.flush(),
-        Err(x86_64::structures::paging::mapper::MapToError::PageAlreadyMapped(_)) => {}
+        Err(x86_64::structures::paging::mapper::MapToError::PageAlreadyMapped(_)) => {
+            let page: Page<Size4KiB> =
+                Page::containing_address(VirtAddr::new(frame.start_address().as_u64()));
+            match unsafe { mapper.update_flags(page, flags) } {
+                Ok(flush) => flush.flush(),
+                Err(error) => panic!("identity map flag update failed: {:?}", error),
+            }
+        }
         Err(error) => panic!("identity map failed: {:?}", error),
     }
 }
@@ -197,6 +257,7 @@ impl BootInfoFrameAllocator {
                 PhysFrame::range_inclusive(start_frame, end_frame)
             })
             .filter(|frame| !frame_is_heap_frame(*frame))
+            .filter(|frame| !frame_is_user_demo_frame(*frame))
     }
 }
 
@@ -212,6 +273,12 @@ fn frame_is_heap_frame(frame: PhysFrame<Size4KiB>) -> bool {
     let start = frame.start_address().as_u64();
 
     start >= HEAP_START && start < HEAP_START + HEAP_SIZE
+}
+
+fn frame_is_user_demo_frame(frame: PhysFrame<Size4KiB>) -> bool {
+    let start = frame.start_address().as_u64();
+
+    start == USER_CODE_START || start == USER_STACK_START
 }
 
 pub struct BumpAllocator {
