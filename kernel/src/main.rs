@@ -10,6 +10,7 @@ extern crate alloc;
 use core::cell::UnsafeCell;
 
 mod apps;
+mod ata;
 mod boot;
 mod console;
 mod framebuffer;
