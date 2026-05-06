@@ -63,6 +63,7 @@ chronosapien/
 |   |-- boot-flow.md
 |   |-- custom-bootloader.md
 |   |-- networking.md
+|   |-- ring3.md
 |   |-- storage.md
 |   `-- roadmap.md
 |-- tools/
@@ -108,6 +109,7 @@ chronosapien/
 - `docs/boot-flow.md` explains the startup path in plain language.
 - `docs/custom-bootloader.md` explains the custom bootloader path.
 - `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
+- `docs/ring3.md` explains the opt-in user mode privilege demo.
 - `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
 - `tools/custom_image_builder.rs` packages the custom boot image.
 
