@@ -187,6 +187,7 @@ fn execute_command(command: &str) {
         "uptime" => print_uptime(),
         "clock" => print_clock(),
         "mem" => print_memory(),
+        "ring3" => crate::ring3::run_demo(),
         "ls" => list_files(),
         command if command == "cat" || command.starts_with("cat ") => cat_file(command),
         command if command == "write" || command.starts_with("write ") => write_file(command),
