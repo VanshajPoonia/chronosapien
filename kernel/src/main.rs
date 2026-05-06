@@ -27,6 +27,7 @@ mod panic;
 mod pci;
 mod pic;
 mod quest;
+mod ring3;
 mod sched;
 mod serial;
 mod shell;
