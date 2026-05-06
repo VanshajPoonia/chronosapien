@@ -345,9 +345,10 @@ use the heap.
 ## Interrupts and timer in simple terms
 
 The GDT gives the CPU valid segment descriptors and a Task State Segment for the
-double-fault stack. The IDT tells the CPU which Rust handler to call for
-exceptions and interrupts. Chronosapian currently handles breakpoints, page faults,
-double faults, and timer IRQs.
+double-fault stack plus ring 3 to ring 0 stack transitions. The IDT tells the
+CPU which Rust handler to call for exceptions and interrupts. Chronosapian
+currently handles breakpoints, general protection faults, page faults, double
+faults, and timer IRQs.
 
 The PIT is programmed to fire IRQ0 about 100 times per second. The legacy PIC is
 remapped so IRQ0 reaches IDT vector 32 instead of colliding with CPU exception
