@@ -10,7 +10,7 @@ use x86_64::structures::idt::{
     InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
 };
 
-use crate::{gdt, mouse, pic, timer};
+use crate::{gdt, mouse, pic, ring3, timer};
 
 const TIMER_INTERRUPT_VECTOR: usize = pic::MASTER_PIC_OFFSET as usize;
 const MOUSE_INTERRUPT_VECTOR: usize = pic::SLAVE_PIC_OFFSET as usize + 4;
@@ -22,6 +22,8 @@ pub fn init() {
     // have the ABI expected by the CPU, and the table remains static forever.
     unsafe {
         IDT.breakpoint.set_handler_fn(breakpoint_handler);
+        IDT.general_protection_fault
+            .set_handler_fn(general_protection_fault_handler);
         IDT.page_fault.set_handler_fn(page_fault_handler);
         IDT.double_fault
             .set_handler_fn(double_fault_handler)
@@ -61,6 +63,37 @@ extern "x86-interrupt" fn page_fault_handler(
         error_code
     );
     crate::serial_println!("[CHRONO] page fault stack frame: {:#?}", stack_frame);
+
+    halt_forever();
+}
+
+extern "x86-interrupt" fn general_protection_fault_handler(
+    mut stack_frame: InterruptStackFrame,
+    error_code: u64,
+) {
+    let rip = stack_frame.instruction_pointer.as_u64();
+
+    if ring3::is_demo_privilege_fault(rip) {
+        crate::serial_println!("[CHRONO] ring3: transition ok");
+        crate::serial_println!(
+            "[CHRONO] ring3: privilege violation caught — GP fault at {:#x}",
+            rip
+        );
+        unsafe {
+            stack_frame
+                .as_mut()
+                .update(|frame| frame.instruction_pointer += 1u64);
+        }
+        return;
+    }
+
+    crate::println!("EXCEPTION: GENERAL PROTECTION FAULT");
+    crate::serial_println!(
+        "[CHRONO] interrupt: general protection fault at {:#x} error={:#x}",
+        rip,
+        error_code
+    );
+    crate::serial_println!("[CHRONO] #GP stack frame: {:#?}", stack_frame);
 
     halt_forever();
 }
