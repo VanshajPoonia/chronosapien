@@ -1,11 +1,11 @@
-//! Heap-only note app backed by the in-memory filesystem.
+//! Tiny note app backed by the shared filesystem facade.
 
 const NOTE_FILE: &str = "note.txt";
 
 pub fn run(args: &str) {
     let args = args.trim();
 
-    // Notes are intentionally one-line and heap-only for this milestone.
+    // Notes are intentionally one-line for this milestone.
     if args.is_empty() {
         crate::println!("Usage: notes <text> | notes read");
         return;
