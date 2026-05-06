@@ -17,3 +17,17 @@ instructions such as `hlt`.
 Ring 3 exists so a bug in an application does not automatically become a bug in
 the kernel. If user code tries something privileged, the CPU raises an exception
 instead of allowing the operation.
+
+## GDT Descriptors
+
+The Global Descriptor Table still matters in 64-bit mode even though most
+old-style segmentation is disabled. ChronoOS keeps kernel descriptors and adds
+ring 3 descriptors:
+
+- kernel code: ring 0 code segment used by the kernel
+- kernel data: ring 0 data descriptor kept explicit for teaching
+- user code: ring 3 code segment loaded into `CS` by `iretq`
+- user data: ring 3 data segment loaded into `SS` by `iretq`
+- TSS: system descriptor pointing at the Task State Segment
+
+The ring 3 code and data descriptors have Descriptor Privilege Level 3. That
