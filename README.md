@@ -3,8 +3,8 @@
 Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
 a `no_std` x86_64 kernel in QEMU, renders a framebuffer graphics console, logs
 to serial, runs a tiny era-themed shell, handles CPU exceptions and timer
-interrupts, and now has early memory management, an in-memory filesystem, and a
-few built-in apps.
+interrupts, and now has early memory management, persistent ATA-backed storage,
+networking, and a few built-in apps.
 
 ## Folder structure
 
@@ -32,6 +32,7 @@ chronosapien/
 |       |   |-- mod.rs
 |       |   |-- notes.rs
 |       |   `-- sysinfo.rs
+|       |-- ata.rs
 |       |-- console.rs
 |       |-- framebuffer/
 |       |   |-- font.rs
@@ -62,6 +63,7 @@ chronosapien/
 |   |-- boot-flow.md
 |   |-- custom-bootloader.md
 |   |-- networking.md
+|   |-- storage.md
 |   `-- roadmap.md
 |-- tools/
 |   `-- custom_image_builder.rs
@@ -78,9 +80,10 @@ chronosapien/
 - `.cargo/config.toml` sets the default kernel target and enables nightly artifact dependencies.
 - `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader_api` and `x86_64`.
 - `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
+- `kernel/src/ata.rs` reads and writes sectors through QEMU's ATA PIO IDE disk.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
 - `kernel/src/framebuffer/` draws text and the top bar into the boot framebuffer.
-- `kernel/src/fs.rs` stores a tiny heap-backed in-memory file list.
+- `kernel/src/fs.rs` mounts ChronoFS from disk, with a heap fallback if the disk is missing.
 - `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
 - `kernel/src/io.rs` provides shared x86 port I/O helpers for device drivers.
@@ -105,6 +108,7 @@ chronosapien/
 - `docs/boot-flow.md` explains the startup path in plain language.
 - `docs/custom-bootloader.md` explains the custom bootloader path.
 - `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
+- `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
 - `tools/custom_image_builder.rs` packages the custom boot image.
 
 ## Dependencies
@@ -119,8 +123,8 @@ chronosapien/
   control registers, and page-table types.
 
 Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, the
-bump heap, RTL8139 networking, and the tiny apps are implemented directly in
-this repo.
+bump heap, ATA PIO storage, RTL8139 networking, and the tiny apps are
+implemented directly in this repo.
 
 ## Current State
 
@@ -133,7 +137,7 @@ The kernel currently:
 - handles breakpoint, page fault, and double fault exceptions,
 - remaps the PIC and runs a 100Hz PIT timer interrupt,
 - initializes a 1MiB bump heap from the bootloader memory map,
-- keeps a tiny in-memory filesystem for shell files and notes,
+- mounts a tiny ChronoFS disk so shell files and notes survive reboot,
 - prints a compact boot banner below the top bar,
 - polls the PS/2 keyboard and runs a small command shell,
 - supports era switching,
@@ -208,7 +212,7 @@ Optional direct commands:
 ```powershell
 $hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
 cargo build -p chronosapien --target $hostTarget
-qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img -serial stdio
+qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img,if=ide,index=0,media=disk -drive format=raw,file=target\x86_64-unknown-none\debug\chronofs-data.img,if=ide,index=1,media=disk -serial stdio
 ```
 
 ## Boot Flow in Plain Language
@@ -257,6 +261,7 @@ Shell commands and apps add serial lines like:
 [CHRONO] app: sysinfo launched
 [CHRONO] cmd: write hello.txt Hi there
 [CHRONO] fs: write hello.txt
+[CHRONO] disk: write sector 42
 ```
 
 ## Shell Commands
@@ -274,14 +279,14 @@ Built-ins:
 - `net` prints RTL8139 MAC, static IP, gateway state, and TX/RX counts.
 - `net arp` sends an ARP request for QEMU's `10.0.2.2` gateway.
 - `net send [ip port text]` sends a UDP packet.
-- `ls` lists in-memory files.
+- `ls` lists files from the mounted ChronoFS disk, or the heap fallback.
 - `cat <name>` prints a file's contents.
-- `write <name> <content>` creates or overwrites a heap-backed file.
-- `rm <name>` deletes an in-memory file.
+- `write <name> <content>` creates or overwrites a persistent file.
+- `rm <name>` deletes a file.
 
 Tiny apps:
 
-- `notes <text>` stores one short note as `note.txt` in the in-memory filesystem.
+- `notes <text>` stores one short persistent note as `note.txt`.
 - `notes read` prints `note.txt`.
 - `calc <int> +|-|*|/ <int>` evaluates one integer operation.
 - `sysinfo` prints era-styled OS, era, uptime, and memory usage.
@@ -359,23 +364,34 @@ allocation moves a pointer forward, and freeing is a no-op. This is tiny and
 predictable, but replacing notes or allocating more objects consumes heap space
 until reboot.
 
-## In-memory filesystem in simple terms
+## Persistent filesystem in simple terms
 
-Chronosapian now has a tiny volatile filesystem. It does not talk to a disk yet:
-files live only in heap memory and disappear on reboot.
+Chronosapian now has a tiny disk-backed filesystem named ChronoFS. The run
+scripts attach a separate 16 MiB IDE data disk, so the boot image remains
+untouched and sector 0 of the data disk can hold filesystem metadata.
 
-The filesystem stores a heap-allocated `Vec<File>`, where each `File` contains a
-name `String` and a content `String`. That data structure preserves insertion
-order for `ls`, is easy to inspect while learning, and keeps the implementation
-small. Looking up, overwriting, or removing a file uses a linear search through
-the vector. That is acceptable for this milestone because the expected file
-count is tiny. Filenames are single shell tokens and can be up to 32 bytes long.
+The ATA driver uses PIO mode: the CPU waits for the disk, then copies one
+512-byte sector at a time through port `0x1F0`. ChronoFS uses LBA numbers, so
+the disk is just sector `0`, sector `1`, sector `2`, and so on.
+
+ChronoFS keeps a small heap cache for shell reads, but disk is the source of
+truth after mount. If the second disk is missing or broken, the kernel falls
+back to the old heap-only file list and logs that choice to serial.
+
+Current limits:
+
+- filenames are at most 32 bytes,
+- filenames cannot contain whitespace,
+- file contents are one shell line,
+- each file can use at most 64 KiB,
+- there are 64 file slots,
+- no journaling exists yet, so killing QEMU during a write can corrupt files.
 
 ## What to build next
 
 1. Add interrupt-driven keyboard input instead of polling.
 2. Replace the bump heap with an allocator that can reuse freed memory.
-3. Add persistent disk-backed storage.
+3. Add crash recovery or a journal for disk writes.
 4. Add more app-like shell programs after the kernel basics stay stable.
 
 ## What is ours and what is borrowed
@@ -387,7 +403,7 @@ Ours:
 - GDT, IDT, PIC, and PIT setup
 - Exception and timer handlers
 - Basic memory management and bump allocation
-- In-memory filesystem
+- ATA PIO storage and ChronoFS
 - Theme and era model
 - Shell commands and tiny built-in apps
 - Scripts and docs
