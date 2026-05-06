@@ -31,3 +31,36 @@ ring 3 descriptors:
 - TSS: system descriptor pointing at the Task State Segment
 
 The ring 3 code and data descriptors have Descriptor Privilege Level 3. That
+tells the CPU they are valid selectors for user mode.
+
+## TSS
+
+The Task State Segment is not used for hardware task switching in this kernel.
+In long mode, its important job is stack selection. When an interrupt or
+exception arrives while the CPU is running at ring 3, the CPU needs a trusted
+ring 0 stack before it can safely call a kernel handler. ChronoOS stores that
+stack pointer in `TSS.privilege_stack_table[0]`.
+
+The existing double-fault Interrupt Stack Table entry remains separate. That
+keeps double faults on their emergency stack while normal ring 3 traps use the
+ring 0 privilege stack.
+
+## General Protection Fault
+
+A general protection fault, or `#GP`, is the CPU saying that an instruction or
+state transition violated x86 protection rules. In this demo, the user page
+starts with `hlt`. `hlt` is privileged, so executing it at ring 3 raises `#GP`.
+The kernel handler recognizes that exact instruction pointer, logs the caught
+violation, skips the one-byte `hlt`, and returns to user mode.
+
+Expected serial lines:
+
+```text
+[CHRONO] kernel: entered ring 3
+[CHRONO] ring3: transition ok
+[CHRONO] ring3: privilege violation caught — GP fault at 0x...
+```
+
+After the handler skips `hlt`, the user code enters a tiny infinite loop. This
+milestone is the foundation for future system calls, but it does not add system
+calls yet.
