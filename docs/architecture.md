@@ -11,6 +11,7 @@ Chronosapian is split into **our code** and **borrowed infrastructure** on purpo
 - The polling keyboard reader in `kernel/src/keyboard.rs`
 - The framebuffer text renderer in `kernel/src/framebuffer/`
 - The ATA PIO disk driver and ChronoFS filesystem
+- The opt-in ring 3 privilege transition demo
 - The era model in `kernel/src/theme.rs`
 - The startup welcome message
 - The PowerShell helper scripts and documentation
@@ -50,15 +51,17 @@ overwriting it.
 
 Chronosapian loads its own Global Descriptor Table (GDT) during early boot. In
 x86_64 long mode, old-style segmentation is mostly disabled, but the CPU still
-needs a valid code segment. The GDT also contains the Task State Segment (TSS),
-which gives the CPU a dedicated stack to use for especially dangerous
-exceptions.
+needs valid code and data descriptors to move between kernel ring 0 and user
+ring 3. The GDT also contains the Task State Segment (TSS), which gives the CPU
+dedicated stacks to use for especially dangerous exceptions and for traps from
+ring 3 back into the kernel.
 
 The Interrupt Descriptor Table (IDT) is the CPU's exception and interrupt
 vector table. Chronosapian registers Rust handlers for breakpoint, page fault, and
-double fault entries, then loads the table with `lidt`. These handlers use
-Rust's `extern "x86-interrupt"` ABI so the compiler preserves the stack layout
-that the CPU expects.
+double fault entries, plus a general protection fault handler for the ring 3
+demo, then loads the table with `lidt`. These handlers use Rust's
+`extern "x86-interrupt"` ABI so the compiler preserves the stack layout that
+the CPU expects.
 
 A double fault happens when the CPU encounters a second exception while trying
 to deliver or handle an earlier one. If the normal stack is already corrupted,
@@ -66,6 +69,11 @@ handling the double fault on that same stack can immediately become a triple
 fault and reset the machine. Chronosapian assigns double faults a separate TSS
 Interrupt Stack Table entry so the handler has a clean stack to report the
 failure.
+
+The `ring3` shell command builds an `iretq` frame that enters a tiny
+user-accessible code page. The first user instruction is privileged, so the CPU
+raises a general protection fault instead of executing it. That proves the
+privilege boundary is active without adding system calls yet.
 
 ## PIT timer and PIC remapping
 
