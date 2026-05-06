@@ -89,6 +89,7 @@ fn boot_with_context(context: boot::BootContext) -> ! {
     interrupts::init();
     interrupts::trigger_test_breakpoint();
     memory::init(boot_context);
+    fs::init();
     pic::init();
     timer::init();
     mouse::init();
