@@ -10,6 +10,7 @@ Chronosapian is split into **our code** and **borrowed infrastructure** on purpo
 - The public console layer in `kernel/src/console.rs`
 - The polling keyboard reader in `kernel/src/keyboard.rs`
 - The framebuffer text renderer in `kernel/src/framebuffer/`
+- The ATA PIO disk driver and ChronoFS filesystem
 - The era model in `kernel/src/theme.rs`
 - The startup welcome message
 - The PowerShell helper scripts and documentation
@@ -102,6 +103,19 @@ The heap uses a bump allocator. A bump allocator keeps one pointer to the next
 free byte and moves it forward for each allocation. That makes it tiny and
 predictable, but freeing memory is a no-op, so used heap space never comes back
 until the kernel grows a more complete allocator.
+
+## Persistent storage
+
+Chronosapian attaches a separate QEMU IDE data disk for shell files. The kernel
+talks to that disk with ATA PIO on the primary IDE channel: commands and status
+go through ports `0x1F0..0x1F7`, and sector data is copied as 256 16-bit words
+per 512-byte sector.
+
+The disk format is ChronoFS. Sector 0 is a superblock with the magic number,
+layout, file count, and checksum. The next sectors hold a fixed file table and
+a free-sector bitmap. File data is stored in contiguous sector runs. This is
+easy to inspect, but it has no journal, so an interrupted write can leave
+metadata inconsistent.
 
 ## What still hides low-level behavior
 
