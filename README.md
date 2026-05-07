@@ -50,6 +50,7 @@ chronosapien/
 |       |-- pic.rs
 |       |-- serial.rs
 |       |-- shell.rs
+|       |-- syscall.rs
 |       |-- theme.rs
 |       `-- timer.rs
 |-- scripts/
@@ -65,6 +66,7 @@ chronosapien/
 |   |-- networking.md
 |   |-- ring3.md
 |   |-- storage.md
+|   |-- syscalls.md
 |   `-- roadmap.md
 |-- tools/
 |   `-- custom_image_builder.rs
