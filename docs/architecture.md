@@ -73,7 +73,14 @@ failure.
 The `ring3` shell command builds an `iretq` frame that enters a tiny
 user-accessible code page. The first user instruction is privileged, so the CPU
 raises a general protection fault instead of executing it. That proves the
-privilege boundary is active without adding system calls yet.
+privilege boundary is active independently from the syscall demo.
+
+The `syshello` command uses the same ring 3 entry machinery but runs a tiny
+user program that executes `SYSCALL`. Chronosapian configures the x86_64 syscall
+MSRs during boot, switches from the user stack to a dedicated kernel syscall
+stack on entry, dispatches the request by the number in `rax`, and returns with
+`SYSRET` for normal calls. This gives user mode a controlled way to ask for
+kernel services without jumping directly into kernel functions.
 
 ## PIT timer and PIC remapping
 
