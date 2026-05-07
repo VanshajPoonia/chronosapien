@@ -40,7 +40,7 @@ Initial syscall numbers:
 | --- | --- | --- |
 | `1` | `sys_write(fd, buf, len)` | Write bytes to screen (`fd=1`) or serial (`fd=2`). |
 | `2` | `sys_read(fd, buf, len)` | Read one keyboard line from stdin (`fd=0`). |
-| `3` | `sys_exit(code)` | End the current demo by logging and parking the CPU. |
+| `3` | `sys_exit(code)` | Exit an ELF process back to the shell, or park the older demo. |
 | `4` | `sys_uptime()` | Return the PIT tick count. |
 
 In debug builds, the kernel logs calls to serial, for example:
@@ -72,6 +72,6 @@ sys_exit(0)
 ```
 
 The text appears on the framebuffer from ring 3 through the kernel syscall
-dispatcher. This is the foundation for future user programs, but there is still
-no ELF loader, process scheduler, per-process address space, or syscall-based
-shell return path.
+dispatcher. The separate `exec` path now uses the same syscall ABI for static
+ELF programs, but there is still no process scheduler, dynamic linker, argv, or
+environment.
