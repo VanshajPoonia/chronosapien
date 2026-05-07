@@ -34,6 +34,7 @@ chronosapien/
 |       |   `-- sysinfo.rs
 |       |-- ata.rs
 |       |-- console.rs
+|       |-- elf.rs
 |       |-- framebuffer/
 |       |   |-- font.rs
 |       |   `-- mod.rs
@@ -48,6 +49,7 @@ chronosapien/
 |       |-- panic.rs
 |       |-- pci.rs
 |       |-- pic.rs
+|       |-- process.rs
 |       |-- serial.rs
 |       |-- shell.rs
 |       |-- syscall.rs
@@ -56,6 +58,7 @@ chronosapien/
 |-- scripts/
 |   |-- build.ps1
 |   |-- build-custom.ps1
+|   |-- build-user.ps1
 |   |-- debug-serial.ps1
 |   |-- run-custom.ps1
 |   `-- run.ps1
@@ -63,13 +66,18 @@ chronosapien/
 |   |-- architecture.md
 |   |-- boot-flow.md
 |   |-- custom-bootloader.md
+|   |-- elf.md
 |   |-- networking.md
 |   |-- ring3.md
 |   |-- storage.md
 |   |-- syscalls.md
 |   `-- roadmap.md
 |-- tools/
+|   |-- chronofs_put.rs
 |   `-- custom_image_builder.rs
+|-- user/
+|   |-- hello.c
+|   `-- user.ld
 `-- .gitignore
 ```
 
@@ -85,6 +93,7 @@ chronosapien/
 - `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
 - `kernel/src/ata.rs` reads and writes sectors through QEMU's ATA PIO IDE disk.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
+- `kernel/src/elf.rs` parses the static ELF64 subset used by `exec`.
 - `kernel/src/framebuffer/` draws text and the top bar into the boot framebuffer.
 - `kernel/src/fs.rs` mounts ChronoFS from disk, with a heap fallback if the disk is missing.
 - `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with double-fault and ring-transition stacks.
@@ -97,6 +106,7 @@ chronosapien/
 - `kernel/src/panic.rs` handles panics in a `no_std` environment.
 - `kernel/src/pci.rs` scans PCI config space for supported devices.
 - `kernel/src/pic.rs` remaps the legacy PIC so hardware IRQs start at IDT vector 32.
+- `kernel/src/process.rs` builds a foreground user address space and enters ELF programs.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
 - `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
@@ -104,6 +114,7 @@ chronosapien/
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
 - `scripts/build.ps1` builds the bootable disk image.
 - `scripts/build-custom.ps1` builds the optional custom sector-0 BIOS image.
+- `scripts/build-user.ps1` builds `hello.elf` and installs it into the ChronoFS data disk.
 - `scripts/run.ps1` runs the image in QEMU.
 - `scripts/run-custom.ps1` runs the custom BIOS image in QEMU.
 - `scripts/debug-serial.ps1` runs QEMU with display disabled and serial output enabled.
@@ -111,11 +122,14 @@ chronosapien/
 - `docs/architecture.md` explains what code is ours and what is borrowed.
 - `docs/boot-flow.md` explains the startup path in plain language.
 - `docs/custom-bootloader.md` explains the custom bootloader path.
+- `docs/elf.md` explains ELF64 headers, `PT_LOAD`, process page tables, and testing.
 - `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
 - `docs/ring3.md` explains the opt-in user mode privilege demo.
 - `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
 - `docs/syscalls.md` explains the first SYSCALL/SYSRET ABI and ring 3 hello demo.
+- `tools/chronofs_put.rs` injects binary files such as `hello.elf` into a ChronoFS data image.
 - `tools/custom_image_builder.rs` packages the custom boot image.
+- `user/hello.c` and `user/user.ld` build the first static user-space ELF.
 
 ## Dependencies
 
@@ -284,6 +298,7 @@ Built-ins:
 - `mem` prints total memory, heap location, and used heap space.
 - `ring3` enters the opt-in user mode demo and intentionally catches a privileged-instruction fault.
 - `syshello` enters ring 3 and prints through `sys_write`.
+- `exec <name>` loads a static ELF64 file from ChronoFS and runs it in user mode.
 - `net` prints RTL8139 MAC, static IP, gateway state, and TX/RX counts.
 - `net arp` sends an ARP request for QEMU's `10.0.2.2` gateway.
 - `net send [ip port text]` sends a UDP packet.
