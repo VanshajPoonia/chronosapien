@@ -25,7 +25,7 @@ const ENTRIES_PER_SECTOR: usize = SECTOR_SIZE / FILE_ENTRY_SIZE;
 #[derive(Clone)]
 struct File {
     name: String,
-    content: String,
+    content: Vec<u8>,
 }
 
 struct FsState {
@@ -153,7 +153,7 @@ impl DiskState {
     fn write_file(
         &mut self,
         name: &str,
-        content: &str,
+        content: &[u8],
         files: &mut Vec<File>,
     ) -> Result<(), FsError> {
         if content.len() > MAX_FILE_BYTES {
@@ -179,7 +179,7 @@ impl DiskState {
             self.find_free_run(sector_count).ok_or(FsError::NoSpace)?
         };
 
-        write_content(start_sector, sector_count, content.as_bytes())?;
+        write_content(start_sector, sector_count, content)?;
 
         if same_location && old_entry.sector_count > sector_count {
             self.mark_range(
@@ -330,8 +330,15 @@ pub fn list(mut visit: impl FnMut(&str)) -> bool {
     !state.files.is_empty()
 }
 
-/// Returns a borrowed file body from the global filesystem cache.
+/// Returns a borrowed UTF-8 file body from the global filesystem cache.
 pub fn read(name: &str) -> Result<&'static str, FsError> {
+    let bytes = read_bytes(name)?;
+
+    core::str::from_utf8(bytes).map_err(|_| FsError::Disk)
+}
+
+/// Returns a borrowed binary file body from the global filesystem cache.
+pub fn read_bytes(name: &str) -> Result<&'static [u8], FsError> {
     validate_name(name)?;
 
     let state: &'static FsState = unsafe { &*FS.0.get() };
@@ -340,11 +347,15 @@ pub fn read(name: &str) -> Result<&'static str, FsError> {
         .files
         .iter()
         .find(|file| file.name == name)
-        .map(|file| file.content.as_str())
+        .map(|file| file.content.as_slice())
         .ok_or(FsError::NotFound)
 }
 
 pub fn write(name: &str, content: &str) -> Result<(), FsError> {
+    write_bytes(name, content.as_bytes())
+}
+
+pub fn write_bytes(name: &str, content: &[u8]) -> Result<(), FsError> {
     validate_name(name)?;
 
     let state = unsafe { &mut *FS.0.get() };
@@ -559,7 +570,7 @@ fn write_entry(entry: &DiskEntry, bytes: &mut [u8]) {
     bytes[16..48].copy_from_slice(&entry.name);
 }
 
-fn read_content(start_sector: u32, sector_count: u32, size: usize) -> Result<String, FsError> {
+fn read_content(start_sector: u32, sector_count: u32, size: usize) -> Result<Vec<u8>, FsError> {
     let mut data = Vec::new();
 
     for sector in start_sector..start_sector + sector_count {
@@ -569,7 +580,7 @@ fn read_content(start_sector: u32, sector_count: u32, size: usize) -> Result<Str
     }
 
     data.truncate(size);
-    String::from_utf8(data).map_err(|_| FsError::Disk)
+    Ok(data)
 }
 
 fn write_content(start_sector: u32, sector_count: u32, content: &[u8]) -> Result<(), FsError> {
@@ -590,13 +601,14 @@ fn sectors_for(byte_len: usize) -> u32 {
     ((byte_len + SECTOR_SIZE - 1) / SECTOR_SIZE).max(1) as u32
 }
 
-fn upsert_cache(files: &mut Vec<File>, name: &str, content: &str) {
+fn upsert_cache(files: &mut Vec<File>, name: &str, content: &[u8]) {
     if let Some(file) = files.iter_mut().find(|file| file.name == name) {
-        file.content = String::from(content);
+        file.content.clear();
+        file.content.extend_from_slice(content);
     } else {
         files.push(File {
             name: String::from(name),
-            content: String::from(content),
+            content: Vec::from(content),
         });
     }
 }
