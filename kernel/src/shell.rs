@@ -192,6 +192,7 @@ fn execute_command(command: &str) {
         "ls" => list_files(),
         command if command == "cat" || command.starts_with("cat ") => cat_file(command),
         command if command == "write" || command.starts_with("write ") => write_file(command),
+        command if command == "exec" || command.starts_with("exec ") => exec_file(command),
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         command if command == "open" || command.starts_with("open ") => open_window(command),
@@ -207,7 +208,7 @@ fn execute_command(command: &str) {
 
 fn print_help() {
     println!("Commands: help, clear, about, reboot, era, uptime, clock, mem, ring3, syshello");
-    println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
+    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
     println!("Tasks: tasks, kill <id>");
@@ -290,6 +291,23 @@ fn remove_file(command: &str) {
 
     match fs::remove(name) {
         Ok(()) => {}
+        Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn exec_file(command: &str) {
+    let name = command.strip_prefix("exec").unwrap_or("").trim();
+
+    if name.is_empty() {
+        println!("Usage: exec <name>");
+        return;
+    }
+
+    match fs::read_bytes(name) {
+        Ok(bytes) => match crate::process::exec_elf(name, bytes) {
+            Ok(code) => println!("[process exited: {}]", code),
+            Err(error) => print_exec_error(name, error),
+        },
         Err(error) => print_fs_error(name, error),
     }
 }
@@ -391,6 +409,21 @@ fn print_fs_error(name: &str, error: FsError) {
         FsError::FileTooLarge => println!("file too large"),
         FsError::NoSpace => println!("not enough disk space"),
         FsError::Disk => println!("disk error"),
+    }
+}
+
+fn print_exec_error(name: &str, error: crate::process::ExecError) {
+    match error {
+        crate::process::ExecError::AlreadyRunning => println!("exec: process already running"),
+        crate::process::ExecError::BadElf(crate::elf::ElfError::BadMagic) => {
+            println!("exec: not an ELF file: {}", name)
+        }
+        crate::process::ExecError::BadElf(crate::elf::ElfError::Unsupported) => {
+            println!("exec: unsupported ELF: {}", name)
+        }
+        crate::process::ExecError::BadElf(_) => println!("exec: malformed ELF: {}", name),
+        crate::process::ExecError::OutOfMemory => println!("exec: out of memory"),
+        crate::process::ExecError::TooManyRanges => println!("exec: too many ELF segments"),
     }
 }
 
