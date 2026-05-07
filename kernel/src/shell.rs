@@ -188,6 +188,7 @@ fn execute_command(command: &str) {
         "clock" => print_clock(),
         "mem" => print_memory(),
         "ring3" => crate::ring3::run_demo(),
+        "syshello" => crate::ring3::run_syshello(),
         "ls" => list_files(),
         command if command == "cat" || command.starts_with("cat ") => cat_file(command),
         command if command == "write" || command.starts_with("write ") => write_file(command),
@@ -205,7 +206,7 @@ fn execute_command(command: &str) {
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem, ring3");
+    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem, ring3, syshello");
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
