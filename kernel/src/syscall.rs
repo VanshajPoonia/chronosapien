@@ -5,7 +5,7 @@
 //! module switches to a dedicated kernel stack before calling Rust code.
 
 use crate::keyboard::{self, KeyEvent};
-use crate::{console, gdt, memory, timer};
+use crate::{console, gdt, memory, process, timer};
 
 pub const SYS_WRITE: u64 = 1;
 pub const SYS_READ: u64 = 2;
@@ -174,6 +174,12 @@ fn sys_read(fd: u64, buffer: u64, len: u64) -> u64 {
 
 fn sys_exit(code: u64) -> ! {
     debug_log_exit(code);
+    if process::exit_current_if_active(code) {
+        loop {
+            x86_64::instructions::hlt();
+        }
+    }
+
     crate::serial_println!("[CHRONO] syscall: user task exited code={}", code);
     crate::println!("[user exited: {}]", code);
 
@@ -201,7 +207,9 @@ fn user_range_is_valid(buffer: u64, len: u64) -> bool {
         return false;
     };
 
-    buffer >= memory::USER_CODE_START && end <= memory::USER_STACK_START + memory::USER_STACK_SIZE
+    process::user_range_is_valid(buffer, len)
+        || (buffer >= memory::USER_CODE_START
+            && end <= memory::USER_STACK_START + memory::USER_STACK_SIZE)
 }
 
 fn debug_log_write(fd: u64, len: u64) {
