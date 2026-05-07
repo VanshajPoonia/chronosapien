@@ -62,5 +62,5 @@ Expected serial lines:
 ```
 
 After the handler skips `hlt`, the user code enters a tiny infinite loop. This
-milestone is the foundation for future system calls, but it does not add system
-calls yet.
+demo stays focused on privilege enforcement; `docs/syscalls.md` covers the
+separate `SYSCALL/SYSRET` path that builds on this foundation.
