@@ -82,6 +82,13 @@ stack on entry, dispatches the request by the number in `rax`, and returns with
 `SYSRET` for normal calls. This gives user mode a controlled way to ask for
 kernel services without jumping directly into kernel functions.
 
+The `exec` command reads a static ELF64 file from ChronoFS, validates its
+program headers, creates a foreground process page table, maps each `PT_LOAD`
+segment into the ELF user window, and enters the file's entry point in ring 3.
+Kernel mappings remain supervisor-only in the process page table so syscalls and
+exceptions still work after CR3 changes, while user buffers are checked against
+the active process ranges.
+
 ## PIT timer and PIC remapping
 
 Chronosapian uses the legacy Programmable Interval Timer (PIT) for a simple uptime
