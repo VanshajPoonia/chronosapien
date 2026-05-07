@@ -31,6 +31,7 @@ mod ring3;
 mod sched;
 mod serial;
 mod shell;
+mod syscall;
 mod theme;
 mod timer;
 mod wm;
@@ -87,6 +88,7 @@ fn boot_with_context(context: boot::BootContext) -> ! {
     serial_println!("[CHRONO] console initialized");
 
     gdt::init();
+    syscall::init();
     interrupts::init();
     interrupts::trigger_test_breakpoint();
     memory::init(boot_context);
