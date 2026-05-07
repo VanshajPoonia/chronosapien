@@ -99,6 +99,7 @@ chronosapien/
 - `kernel/src/pic.rs` remaps the legacy PIC so hardware IRQs start at IDT vector 32.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
+- `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
 - `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
 - `scripts/build.ps1` builds the bootable disk image.
@@ -113,6 +114,7 @@ chronosapien/
 - `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
 - `docs/ring3.md` explains the opt-in user mode privilege demo.
 - `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
+- `docs/syscalls.md` explains the first SYSCALL/SYSRET ABI and ring 3 hello demo.
 - `tools/custom_image_builder.rs` packages the custom boot image.
 
 ## Dependencies
