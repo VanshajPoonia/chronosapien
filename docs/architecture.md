@@ -121,6 +121,43 @@ waveform reach the speaker; clearing those two bits preserves the rest of the
 port state and silences the tone. Sound events are logged to serial, for example
 `[CHRONO] sound: beep 440hz 500ms`.
 
+## Symmetric multiprocessing
+
+Chronosapian's first SMP milestone starts with two QEMU CPUs using `-smp 2`.
+The bootstrap processor (BSP) is core 0: firmware starts it first, and it owns
+early boot, device setup, and the shell. Application processors (APs) are the
+other CPUs. They wait until the BSP discovers them in the ACPI MADT table and
+sends startup commands through the local APIC.
+
+ACPI's MADT lists the local APIC IDs for usable processors and the local APIC
+MMIO address. The BSP parses RSDP, XSDT or RSDT, and MADT directly from the
+physical-memory mapping passed by the bootloader. If those tables are missing,
+Chronosapian logs the fallback and continues as a single-core kernel.
+
+AP startup uses the classic INIT-SIPI-SIPI sequence. INIT resets the target AP,
+the first SIPI points it at a low-memory trampoline page, and the second SIPI is
+sent for compatibility with hardware that misses the first one. The trampoline
+switches the AP from real mode to protected mode to long mode, loads the shared
+kernel page table, then jumps into Rust. Each online core loads its own GDT,
+IDT, TSS, double-fault stack, and ring 0 stack before entering the cooperative
+scheduler.
+
+SMP also changes synchronization. Disabling interrupts only stops interrupts on
+the current CPU; it does not stop another CPU from editing the same global data.
+Chronosapian uses a small spinlock for shared kernel state such as serial output
+and scheduler tables. A spinlock is an atomic busy-wait lock: one core flips an
+atomic flag to take ownership, while other cores spin until the flag is released.
+
+Modern x86 systems, including QEMU's emulated machine, keep normal memory cache
+coherent across cores. That means all cores eventually see the same memory
+contents, but atomics and acquire/release ordering still matter: they define
+when updates protected by locks become visible to other cores.
+
+The v1 scheduler remains cooperative. Timer preemption, IOAPIC routing, x2APIC,
+CPU hotplug, and live task migration are intentionally left for later. Ready
+tasks are assigned to the least-loaded online core when spawned, APs run ready
+kernel tasks from the shared table, and the shell stays on core 0.
+
 ## Basic memory management
 
 Chronosapian reads the bootloader's memory map to learn which physical RAM ranges

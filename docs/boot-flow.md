@@ -32,8 +32,11 @@ The QEMU terminal shows:
 [CHRONO] interrupt: breakpoint at 0x...
 [CHRONO] breakpoint resolved
 [CHRONO] mem: heap initialized at 0x200000 size 1MB
+[CHRONO] smp: BSP online (core 0)
 [CHRONO] timer: PIT initialized at 100Hz
 [CHRONO] active era: 1984
+[CHRONO] smp: core 1 online
+[CHRONO] smp: 2 cores ready
 [CHRONO] sound: beep 880hz 90ms
 [CHRONO] sound: beep 660hz 90ms
 [CHRONO] sound: beep 440hz 140ms
@@ -50,6 +53,9 @@ and the `clock` command reports the raw tick count.
 
 The `beep <hz>` command programs PIT channel 2, opens the PC speaker gate on
 port `0x61`, and plays the requested tone for 500ms.
+
+The `cores` command reports the number of online CPU cores and how many
+cooperative tasks are assigned to each one.
 
 The `mem` command reports total memory from the bootloader memory map and shows
 the fixed 1MiB bump heap at `0x200000`.
