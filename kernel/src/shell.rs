@@ -187,6 +187,7 @@ fn execute_command(command: &str) {
         "uptime" => print_uptime(),
         "clock" => print_clock(),
         "mem" => print_memory(),
+        "cores" => print_cores(),
         command if command == "beep" || command.starts_with("beep ") => beep(command),
         "ring3" => crate::ring3::run_demo(),
         "syshello" => crate::ring3::run_syshello(),
@@ -209,7 +210,7 @@ fn execute_command(command: &str) {
 
 fn print_help() {
     println!(
-        "Commands: help, clear, about, reboot, era, uptime, clock, mem, beep <hz>, ring3, syshello"
+        "Commands: help, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
     );
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>");
     println!("Apps: notes, calc, sysinfo");
@@ -244,6 +245,16 @@ fn print_memory() {
         stats.heap_start
     );
     println!("Used: {} KB", stats.heap_used_bytes / 1024);
+}
+
+fn print_cores() {
+    let counts = crate::smp::tasks_per_core();
+    let core_count = crate::smp::core_count();
+
+    println!("Cores: {}", core_count);
+    for core_id in 0..core_count {
+        println!("core {}: {} task(s)", core_id, counts[core_id]);
+    }
 }
 
 fn beep(command: &str) {
