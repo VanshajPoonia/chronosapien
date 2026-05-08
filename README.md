@@ -4,7 +4,8 @@ Chronosapian is a beginner-friendly hobby operating system project in Rust. It b
 a `no_std` x86_64 kernel in QEMU, renders a framebuffer graphics console, logs
 to serial, runs a tiny era-themed shell, handles CPU exceptions and timer
 interrupts, plays PC speaker tones, and now has early memory management,
-persistent ATA-backed storage, networking, and a few built-in apps.
+persistent ATA-backed storage, networking, UEFI boot packaging, and a few
+built-in apps.
 
 ## Folder structure
 
@@ -58,13 +59,20 @@ chronosapien/
 |       |-- syscall.rs
 |       |-- theme.rs
 |       `-- timer.rs
+|-- uefi-loader/
+|   |-- Cargo.toml
+|   `-- src/
+|       `-- main.rs
 |-- scripts/
 |   |-- build.ps1
 |   |-- build-custom.ps1
+|   |-- build-uefi.ps1
 |   |-- build-user.ps1
 |   |-- debug-serial.ps1
 |   |-- run-custom.ps1
-|   `-- run.ps1
+|   |-- run-uefi.ps1
+|   |-- run.ps1
+|   `-- write-usb.ps1
 |-- docs/
 |   |-- architecture.md
 |   |-- boot-flow.md
@@ -74,10 +82,12 @@ chronosapien/
 |   |-- ring3.md
 |   |-- storage.md
 |   |-- syscalls.md
+|   |-- uefi.md
 |   `-- roadmap.md
 |-- tools/
 |   |-- chronofs_put.rs
-|   `-- custom_image_builder.rs
+|   |-- custom_image_builder.rs
+|   `-- uefi_image_builder.rs
 |-- user/
 |   |-- hello.c
 |   `-- user.ld
@@ -118,12 +128,16 @@ chronosapien/
 - `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
 - `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
+- `uefi-loader/` builds the Rust `BOOTX64.EFI` application for UEFI firmware.
 - `scripts/build.ps1` builds the bootable disk image.
 - `scripts/build-custom.ps1` builds the optional custom sector-0 BIOS image.
+- `scripts/build-uefi.ps1` builds the UEFI loader and GPT/FAT32 ESP image.
 - `scripts/build-user.ps1` builds `hello.elf` and installs it into the ChronoFS data disk.
 - `scripts/run.ps1` runs the image in QEMU.
 - `scripts/run-custom.ps1` runs the custom BIOS image in QEMU.
+- `scripts/run-uefi.ps1` runs the UEFI image in QEMU with OVMF.
 - `scripts/debug-serial.ps1` runs QEMU with display disabled and serial output enabled.
+- `scripts/write-usb.ps1` is a guarded raw writer for the UEFI USB image.
 - `docs/roadmap.md` lists Milestone 1 and the next steps.
 - `docs/architecture.md` explains what code is ours and what is borrowed.
 - `docs/boot-flow.md` explains the startup path in plain language.
@@ -133,8 +147,10 @@ chronosapien/
 - `docs/ring3.md` explains the opt-in user mode privilege demo.
 - `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
 - `docs/syscalls.md` explains the first SYSCALL/SYSRET ABI and ring 3 hello demo.
+- `docs/uefi.md` explains the UEFI loader, ESP image, GOP framebuffer, and real hardware notes.
 - `tools/chronofs_put.rs` injects binary files such as `hello.elf` into a ChronoFS data image.
 - `tools/custom_image_builder.rs` packages the custom boot image.
+- `tools/uefi_image_builder.rs` packages the UEFI GPT/FAT32 ESP image.
 - `user/hello.c` and `user/user.ld` build the first static user-space ELF.
 
 ## Dependencies
@@ -144,6 +160,9 @@ chronosapien/
 - `bootloader_api`
   The kernel-facing boot API. It provides the memory map, physical-memory
   offset, and framebuffer metadata.
+- `uefi`
+  The UEFI-loader crate dependency. It provides Boot Services wrappers, GOP
+  access, ESP file access, and the `ExitBootServices()` helper.
 - `x86_64`
   A `no_std` helper crate for descriptor tables, interrupt stack frames,
   control registers, and page-table types.
@@ -157,6 +176,7 @@ apps are implemented directly in this repo.
 The kernel currently:
 
 - boots through the borrowed `bootloader` crate,
+- can also boot through the Rust UEFI loader from a GPT/FAT32 ESP image,
 - initializes COM1 serial logging,
 - initializes a framebuffer graphics console with an era-colored top bar,
 - loads a GDT and IDT,
@@ -186,6 +206,7 @@ winget install Rustlang.Rustup
 rustup toolchain install nightly
 rustup component add rust-src llvm-tools-preview --toolchain nightly
 rustup target add x86_64-unknown-none --toolchain nightly
+rustup target add x86_64-unknown-uefi --toolchain nightly
 ```
 
 Install QEMU:
@@ -225,6 +246,18 @@ Optional custom bootloader image:
 The custom path starts from our own sector-0 Stage 1 loader. The normal
 `chronosapien-bios.img` path remains the fallback.
 
+UEFI boot image:
+
+```powershell
+.\scripts\build-uefi.ps1
+.\scripts\run-uefi.ps1
+```
+
+The UEFI path creates `target\x86_64-unknown-none\debug\chronosapien-uefi.img`,
+a GPT disk with a FAT32 ESP containing `EFI\BOOT\BOOTX64.EFI` and
+`CHRONO\KERNEL.ELF`. For real hardware, disable Secure Boot unless signing is
+added and write the image with `.\scripts\write-usb.ps1`.
+
 Serial-only debug run:
 
 ```powershell
@@ -245,13 +278,14 @@ qemu-system-x86_64 -smp 2 -drive format=raw,file=target\x86_64-unknown-none\debu
 
 ## Boot Flow in Plain Language
 
-QEMU emulates an x86_64 machine and boots a disk image. The borrowed
-`bootloader` crate performs the early machine setup we are intentionally
-skipping for now, sets up a 1024x768 framebuffer, then jumps into our Rust
-kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes serial
-and framebuffer output, loads descriptor tables, triggers one test breakpoint
-exception, initializes memory, starts the timer, prints the startup banner, and
-enters the shell.
+QEMU emulates an x86_64 machine and boots a disk image. The BIOS image uses the
+borrowed `bootloader` crate to perform early machine setup, set up a framebuffer,
+and jump into our Rust kernel entrypoint. The UEFI image uses our Rust
+`BOOTX64.EFI` loader to read the kernel from the ESP, configure GOP, exit Boot
+Services, and jump into the same kernel handoff. Our code starts in
+`kernel/src/main.rs`, initializes serial and framebuffer output, loads descriptor
+tables, triggers one test breakpoint exception, initializes memory, starts the
+timer, prints the startup banner, and enters the shell.
 
 The graphical console shows a top bar plus shell output:
 
@@ -450,12 +484,14 @@ Ours:
 - Exception and timer handlers
 - Basic memory management and bump allocation
 - ATA PIO storage and ChronoFS
+- UEFI loader and ESP image builder
 - Theme and era model
 - Shell commands and tiny built-in apps
 - Scripts and docs
 
 Borrowed:
 - The `bootloader` crate
+- The `uefi` crate
 - The `x86_64` crate for low-level CPU data structures
 - QEMU
 - Rust bare-metal toolchain support
