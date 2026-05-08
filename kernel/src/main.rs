@@ -33,6 +33,7 @@ mod ring3;
 mod sched;
 mod serial;
 mod shell;
+mod sound;
 mod syscall;
 mod theme;
 mod timer;
@@ -103,6 +104,7 @@ fn boot_with_context(context: boot::BootContext) -> ! {
 
     let era_name = STARTUP_ERA.name();
     serial_println!("[CHRONO] active era: {}", era_name);
+    sound::play_boot_chime(theme::active_era());
     keyboard::init();
 
     println!("{}", profile.boot_welcome);
