@@ -273,6 +273,9 @@ With `-serial stdio`, the QEMU terminal shows:
 [CHRONO] mem: heap initialized at 0x200000 size 1MB
 [CHRONO] timer: PIT initialized at 100Hz
 [CHRONO] active era: 1984
+[CHRONO] sound: beep 880hz 90ms
+[CHRONO] sound: beep 660hz 90ms
+[CHRONO] sound: beep 440hz 140ms
 [CHRONO] keyboard initialized
 [CHRONO] boot complete
 ```
@@ -299,6 +302,7 @@ Built-ins:
 - `uptime` prints elapsed seconds from the PIT tick counter.
 - `clock` prints raw PIT ticks.
 - `mem` prints total memory, heap location, and used heap space.
+- `beep <hz>` plays a PC speaker tone for 500ms.
 - `ring3` enters the opt-in user mode demo and intentionally catches a privileged-instruction fault.
 - `syshello` enters ring 3 and prints through `sys_write`.
 - `exec <name>` loads a static ELF64 file from ChronoFS and runs it in user mode.
@@ -377,6 +381,12 @@ The PIT is programmed to fire IRQ0 about 100 times per second. The legacy PIC is
 remapped so IRQ0 reaches IDT vector 32 instead of colliding with CPU exception
 vectors 0 through 31. Each timer interrupt increments an atomic tick counter and
 sends an end-of-interrupt command back to the PIC.
+
+The same PIT chip also feeds the PC speaker through channel 2. For `beep 440`,
+Chronosapian calculates a channel 2 divisor from the PIT input clock:
+`round(1_193_182 / 440)`. It writes that divisor to port `0x42`, then uses port
+`0x61` to open the speaker gate. Bit 0 enables the channel 2 gate, bit 1
+connects the speaker output, and clearing those bits silences the tone.
 
 ## Memory management in simple terms
 
