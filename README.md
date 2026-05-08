@@ -52,7 +52,9 @@ chronosapien/
 |       |-- process.rs
 |       |-- serial.rs
 |       |-- shell.rs
+|       |-- smp.rs
 |       |-- sound.rs
+|       |-- spinlock.rs
 |       |-- syscall.rs
 |       |-- theme.rs
 |       `-- timer.rs
@@ -110,7 +112,9 @@ chronosapien/
 - `kernel/src/process.rs` builds a foreground user address space and enters ELF programs.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
+- `kernel/src/smp.rs` discovers CPU cores and starts APs for cooperative SMP.
 - `kernel/src/sound.rs` drives PIT channel 2 and the PC speaker gate for tones.
+- `kernel/src/spinlock.rs` provides a small atomic lock for SMP-safe globals.
 - `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
 - `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
@@ -158,6 +162,7 @@ The kernel currently:
 - loads a GDT and IDT,
 - handles breakpoint, page fault, and double fault exceptions,
 - remaps the PIC and runs a 100Hz PIT timer interrupt,
+- discovers ACPI MADT CPU entries and starts APs in QEMU with `-smp 2`,
 - drives PIT channel 2 and the PC speaker for era-specific boot chimes,
 - initializes a 1MiB bump heap from the bootloader memory map,
 - mounts a tiny ChronoFS disk so shell files and notes survive reboot,
@@ -235,7 +240,7 @@ Optional direct commands:
 ```powershell
 $hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
 cargo build -p chronosapien --target $hostTarget
-qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img,if=ide,index=0,media=disk -drive format=raw,file=target\x86_64-unknown-none\debug\chronofs-data.img,if=ide,index=1,media=disk -serial stdio
+qemu-system-x86_64 -smp 2 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img,if=ide,index=0,media=disk -drive format=raw,file=target\x86_64-unknown-none\debug\chronofs-data.img,if=ide,index=1,media=disk -serial stdio
 ```
 
 ## Boot Flow in Plain Language
@@ -271,8 +276,11 @@ With `-serial stdio`, the QEMU terminal shows:
 [CHRONO] interrupt: breakpoint at 0x...
 [CHRONO] breakpoint resolved
 [CHRONO] mem: heap initialized at 0x200000 size 1MB
+[CHRONO] smp: BSP online (core 0)
 [CHRONO] timer: PIT initialized at 100Hz
 [CHRONO] active era: 1984
+[CHRONO] smp: core 1 online
+[CHRONO] smp: 2 cores ready
 [CHRONO] sound: beep 880hz 90ms
 [CHRONO] sound: beep 660hz 90ms
 [CHRONO] sound: beep 440hz 140ms
@@ -302,6 +310,7 @@ Built-ins:
 - `uptime` prints elapsed seconds from the PIT tick counter.
 - `clock` prints raw PIT ticks.
 - `mem` prints total memory, heap location, and used heap space.
+- `cores` prints online CPU cores and tasks assigned to each core.
 - `beep <hz>` plays a PC speaker tone for 500ms.
 - `ring3` enters the opt-in user mode demo and intentionally catches a privileged-instruction fault.
 - `syshello` enters ring 3 and prints through `sys_write`.
