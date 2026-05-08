@@ -1,7 +1,8 @@
 //! Serial logging for early debugging over QEMU's virtual COM1 port.
 
-use core::cell::UnsafeCell;
 use core::fmt;
+
+use crate::spinlock::SpinLock;
 
 const COM1_PORT: u16 = 0x3F8;
 
@@ -76,32 +77,16 @@ impl fmt::Write for SerialPort {
     }
 }
 
-struct GlobalSerial(UnsafeCell<SerialPort>);
-
-unsafe impl Sync for GlobalSerial {}
-
-static SERIAL1: GlobalSerial = GlobalSerial(UnsafeCell::new(SerialPort::empty()));
+static SERIAL1: SpinLock<SerialPort> = SpinLock::new(SerialPort::empty());
 
 pub fn init() {
-    // SAFETY: Early in this kernel there is only one execution context and we
-    // never enable interrupts before using serial output, so taking a mutable
-    // reference to this global is safe for now. Later, when interrupts or SMP
-    // arrive, this will need a real synchronization strategy.
-    unsafe {
-        (*SERIAL1.0.get()).init();
-    }
+    SERIAL1.lock_irq().init();
 }
 
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
 
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        // SAFETY: Serial output can now happen from IRQ12 mouse clicks, so keep
-        // access to the global UART writer non-reentrant on this single CPU.
-        unsafe {
-            let _ = (*SERIAL1.0.get()).write_fmt(args);
-        }
-    });
+    let _ = SERIAL1.lock_irq().write_fmt(args);
 }
 
 unsafe fn outb(port: u16, value: u8) {
