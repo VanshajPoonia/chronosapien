@@ -16,7 +16,6 @@ use crate::wm;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
-const CURSOR_BLINK_TICKS: usize = 80_000;
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 
@@ -84,7 +83,7 @@ pub fn run() -> ! {
                     idle_ticks += 1;
                 }
 
-                if idle_ticks >= CURSOR_BLINK_TICKS {
+                if idle_ticks >= theme::active_profile().cursor_blink_ticks {
                     toggle_cursor(&mut cursor_visible);
                     wm::redraw_if_open();
                     idle_ticks = 0;
@@ -518,11 +517,15 @@ fn reboot() -> ! {
 }
 
 fn draw_cursor() {
-    print!("_");
+    let profile = theme::active_profile();
+
+    print!("{}", profile.cursor_glyph);
 }
 
 fn erase_cursor() {
-    console::backspace();
+    for _ in 0..theme::active_profile().cursor_glyph.len() {
+        console::backspace();
+    }
 }
 
 fn show_cursor(cursor_visible: &mut bool) {
