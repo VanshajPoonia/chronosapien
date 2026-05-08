@@ -3,8 +3,8 @@
 Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
 a `no_std` x86_64 kernel in QEMU, renders a framebuffer graphics console, logs
 to serial, runs a tiny era-themed shell, handles CPU exceptions and timer
-interrupts, and now has early memory management, persistent ATA-backed storage,
-networking, and a few built-in apps.
+interrupts, plays PC speaker tones, and now has early memory management,
+persistent ATA-backed storage, networking, and a few built-in apps.
 
 ## Folder structure
 
@@ -52,6 +52,7 @@ chronosapien/
 |       |-- process.rs
 |       |-- serial.rs
 |       |-- shell.rs
+|       |-- sound.rs
 |       |-- syscall.rs
 |       |-- theme.rs
 |       `-- timer.rs
@@ -109,6 +110,7 @@ chronosapien/
 - `kernel/src/process.rs` builds a foreground user address space and enters ELF programs.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
+- `kernel/src/sound.rs` drives PIT channel 2 and the PC speaker gate for tones.
 - `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
 - `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
@@ -142,9 +144,9 @@ chronosapien/
   A `no_std` helper crate for descriptor tables, interrupt stack frames,
   control registers, and page-table types.
 
-Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, the
-bump heap, ATA PIO storage, RTL8139 networking, and the tiny apps are
-implemented directly in this repo.
+Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, PC
+speaker tones, the bump heap, ATA PIO storage, RTL8139 networking, and the tiny
+apps are implemented directly in this repo.
 
 ## Current State
 
@@ -156,6 +158,7 @@ The kernel currently:
 - loads a GDT and IDT,
 - handles breakpoint, page fault, and double fault exceptions,
 - remaps the PIC and runs a 100Hz PIT timer interrupt,
+- drives PIT channel 2 and the PC speaker for era-specific boot chimes,
 - initializes a 1MiB bump heap from the bootloader memory map,
 - mounts a tiny ChronoFS disk so shell files and notes survive reboot,
 - prints a compact boot banner below the top bar,
