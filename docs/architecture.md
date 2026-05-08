@@ -108,6 +108,19 @@ handler increments an atomic tick counter, and then it sends an end-of-interrupt
 command back to the PIC. The handler does not print per tick, because serial
 and framebuffer output are not interrupt-safe yet.
 
+Chronosapian also uses PIT channel 2 for the PC speaker. Unlike channel 0,
+channel 2 does not interrupt the CPU in this kernel; it produces a square wave
+that can be routed to the speaker. A requested tone is converted into a PIT
+divisor with `round(1_193_182 / frequency_hz)`, then the low and high divisor
+bytes are written to channel 2 data port `0x42` after programming command port
+`0x43`.
+
+The final speaker gate is port `0x61`. Bit 0 enables the PIT channel 2 gate, and
+bit 1 connects the speaker output path. Setting both bits lets the channel 2
+waveform reach the speaker; clearing those two bits preserves the rest of the
+port state and silences the tone. Sound events are logged to serial, for example
+`[CHRONO] sound: beep 440hz 500ms`.
+
 ## Basic memory management
 
 Chronosapian reads the bootloader's memory map to learn which physical RAM ranges
