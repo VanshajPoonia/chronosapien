@@ -1,7 +1,5 @@
 //! Beginner-friendly educational exhibits for the ChronoOS shell.
 
-use crate::theme::Era;
-
 const USAGE: &str = "Usage: museum boot|kernel|memory|interrupts|keyboard|serial|era";
 const INNER_WIDTH: usize = 68;
 
@@ -11,17 +9,7 @@ struct Exhibit {
     lines: &'static [&'static str],
 }
 
-#[derive(Clone, Copy)]
-struct FrameStyle {
-    top_left: &'static str,
-    top_fill: &'static str,
-    top_right: &'static str,
-    side_left: &'static str,
-    side_right: &'static str,
-    bottom_left: &'static str,
-    bottom_fill: &'static str,
-    bottom_right: &'static str,
-}
+type FrameStyle = crate::theme::TextFrameProfile;
 
 pub fn run(command: &str) -> bool {
     let command = command.trim();
@@ -164,48 +152,7 @@ fn print_exhibit(exhibit: Exhibit) {
 }
 
 fn frame_style() -> FrameStyle {
-    match crate::theme::active_era() {
-        Era::Eighties => FrameStyle {
-            top_left: "+",
-            top_fill: "=",
-            top_right: "+",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "+",
-            bottom_fill: "=",
-            bottom_right: "+",
-        },
-        Era::Nineties => FrameStyle {
-            top_left: "+",
-            top_fill: "-",
-            top_right: "+",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "+",
-            bottom_fill: "-",
-            bottom_right: "+",
-        },
-        Era::TwoThousands => FrameStyle {
-            top_left: "[",
-            top_fill: "-",
-            top_right: "]",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "[",
-            bottom_fill: "-",
-            bottom_right: "]",
-        },
-        Era::Future => FrameStyle {
-            top_left: "",
-            top_fill: "-",
-            top_right: "",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "",
-            bottom_fill: "-",
-            bottom_right: "",
-        },
-    }
+    crate::theme::active_profile().text_frame
 }
 
 fn print_border(left: &str, fill: &str, right: &str) {
