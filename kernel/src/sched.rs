@@ -34,11 +34,13 @@
 //! After the last slot it wraps to slot 0. Every task gets exactly one turn
 //! before any task gets a second turn — simple, fair, no priorities.
 
-use core::cell::UnsafeCell;
+use crate::smp::{self, MAX_CORES};
+use crate::spinlock::SpinLock;
 
 pub const MAX_TASKS: usize = 8;
 const TASK_STACK_SIZE: usize = 16 * 1024; // 16 KiB per task
 const TASK_NAME_LEN: usize = 16;
+const NO_TASK: usize = usize::MAX;
 
 /// Lifecycle state of a scheduler slot.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -61,6 +63,7 @@ struct TaskInfo {
     name: [u8; TASK_NAME_LEN],
     name_len: usize,
     state: TaskState,
+    core_id: usize,
     /// Saved RSP. Written by `context_switch` each time the task yields, read
     /// back when the task is resumed.
     rsp: u64,
@@ -73,6 +76,7 @@ impl TaskInfo {
             name: [0; TASK_NAME_LEN],
             name_len: 0,
             state: TaskState::Empty,
+            core_id: 0,
             rsp: 0,
         }
     }
@@ -91,14 +95,10 @@ struct TaskStack {
     bytes: [u8; TASK_STACK_SIZE],
 }
 
-struct Global<T>(UnsafeCell<T>);
-// SAFETY: All accesses are serialised through `without_interrupts`. The kernel
-// is single-core and cooperative, so no two tasks run concurrently.
-unsafe impl<T> Sync for Global<T> {}
-
 struct Scheduler {
     tasks: [TaskInfo; MAX_TASKS],
-    current: usize,
+    current: [usize; MAX_CORES],
+    idle_rsp: [u64; MAX_CORES],
     count: usize,
 }
 
@@ -107,30 +107,32 @@ impl Scheduler {
         const EMPTY: TaskInfo = TaskInfo::empty();
         Self {
             tasks: [EMPTY; MAX_TASKS],
-            current: 0,
+            current: [NO_TASK; MAX_CORES],
+            idle_rsp: [0; MAX_CORES],
             count: 0,
         }
     }
 }
 
-static SCHED: Global<Scheduler> = Global(UnsafeCell::new(Scheduler::new()));
-static STACKS: Global<[TaskStack; MAX_TASKS]> =
-    Global(UnsafeCell::new([TaskStack { bytes: [0; TASK_STACK_SIZE] }; MAX_TASKS]));
+static SCHED: SpinLock<Scheduler> = SpinLock::new(Scheduler::new());
+static STACKS: SpinLock<[TaskStack; MAX_TASKS]> =
+    SpinLock::new([TaskStack { bytes: [0; TASK_STACK_SIZE] }; MAX_TASKS]);
 
 // ─── public API ──────────────────────────────────────────────────────────────
 
 /// Register the current execution context as task 0 ("shell") and mark it
 /// Running. Must be called exactly once, before any `spawn` or `yield_now`.
 pub fn init() {
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        let sched = unsafe { &mut *SCHED.0.get() };
-        let task = &mut sched.tasks[0];
-        task.id = 0;
-        set_task_name(task, "shell");
-        task.state = TaskState::Running;
-        sched.current = 0;
-        sched.count = 1;
-    });
+    let mut sched = SCHED.lock_irq();
+    let task = &mut sched.tasks[0];
+    task.id = 0;
+    task.core_id = 0;
+    set_task_name(task, "shell");
+    task.state = TaskState::Running;
+    sched.current[0] = 0;
+    sched.count = 1;
+    drop(sched);
+
     crate::serial_println!("[CHRONO] sched: initialized, task 0 = shell");
 }
 
@@ -138,29 +140,35 @@ pub fn init() {
 ///
 /// Returns the assigned task ID, or `None` if all 8 slots are occupied.
 pub fn spawn(name: &str, entry: fn() -> !) -> Option<u8> {
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        let sched = unsafe { &mut *SCHED.0.get() };
+    let mut sched = SCHED.lock_irq();
 
-        // Reuse Dead slots so killing and re-spawning works indefinitely.
-        let slot = (0..MAX_TASKS)
-            .find(|&i| matches!(sched.tasks[i].state, TaskState::Empty | TaskState::Dead))?;
+    // Reuse Dead slots so killing and re-spawning works indefinitely.
+    let slot = (0..MAX_TASKS)
+        .find(|&i| matches!(sched.tasks[i].state, TaskState::Empty | TaskState::Dead))?;
+    let core_id = least_loaded_core(&sched);
 
-        let task_rsp = unsafe {
-            let stacks = &mut *STACKS.0.get();
-            init_task_stack(&mut stacks[slot].bytes, entry)
-        };
+    let task_rsp = {
+        let mut stacks = STACKS.lock_irq();
+        unsafe { init_task_stack(&mut stacks[slot].bytes, entry) }
+    };
 
-        let task = &mut sched.tasks[slot];
-        *task = TaskInfo::empty();
-        task.id = slot as u8;
-        set_task_name(task, name);
-        task.state = TaskState::Ready;
-        task.rsp = task_rsp;
-        sched.count += 1;
+    let task = &mut sched.tasks[slot];
+    *task = TaskInfo::empty();
+    task.id = slot as u8;
+    task.core_id = core_id;
+    set_task_name(task, name);
+    task.state = TaskState::Ready;
+    task.rsp = task_rsp;
+    sched.count += 1;
 
-        crate::serial_println!("[CHRONO] sched: spawned task {} ({})", slot, name);
-        Some(slot as u8)
-    })
+    drop(sched);
+    crate::serial_println!(
+        "[CHRONO] sched: spawned task {} ({}) on core {}",
+        slot,
+        name,
+        core_id
+    );
+    Some(slot as u8)
 }
 
 /// Terminate the task with the given ID.
@@ -170,52 +178,71 @@ pub fn spawn(name: &str, entry: fn() -> !) -> Option<u8> {
 /// - `id` is the *currently running* task — a cooperative task must yield
 ///   to another task before it can be terminated.
 pub fn kill(id: u8) -> bool {
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        let sched = unsafe { &mut *SCHED.0.get() };
-        let idx = id as usize;
+    let mut sched = SCHED.lock_irq();
+    let idx = id as usize;
 
-        if idx >= MAX_TASKS {
-            return false;
-        }
+    if idx >= MAX_TASKS {
+        return false;
+    }
 
-        if matches!(sched.tasks[idx].state, TaskState::Empty | TaskState::Dead) {
-            return false;
-        }
+    if matches!(sched.tasks[idx].state, TaskState::Empty | TaskState::Dead) {
+        return false;
+    }
 
-        if idx == sched.current {
-            // Cannot terminate the currently running task in cooperative mode.
-            return false;
-        }
+    if sched.current.iter().any(|current| *current == idx) {
+        // Cannot terminate a task currently running on any core.
+        return false;
+    }
 
-        sched.tasks[idx].state = TaskState::Dead;
-        sched.count = sched.count.saturating_sub(1);
-        crate::serial_println!("[CHRONO] sched: killed task {}", id);
-        true
-    })
+    sched.tasks[idx].state = TaskState::Dead;
+    sched.count = sched.count.saturating_sub(1);
+    drop(sched);
+
+    crate::serial_println!("[CHRONO] sched: killed task {}", id);
+    true
 }
 
 /// Call `f(id, name, state)` for every non-empty, non-dead task slot.
 pub fn for_each_task(mut f: impl FnMut(u8, &str, TaskState)) {
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        let sched = unsafe { &*SCHED.0.get() };
-        for task in &sched.tasks {
-            match task.state {
-                TaskState::Empty | TaskState::Dead => {}
-                state => f(task.id, task.name_str(), state),
-            }
-        }
-    });
-}
-
-fn find_next_ready(sched: &Scheduler) -> usize {
-    let current = sched.current;
-    for offset in 1..=MAX_TASKS {
-        let idx = (current + offset) % MAX_TASKS;
-        if sched.tasks[idx].state == TaskState::Ready {
-            return idx;
+    let sched = SCHED.lock_irq();
+    for task in &sched.tasks {
+        match task.state {
+            TaskState::Empty | TaskState::Dead => {}
+            state => f(task.id, task.name_str(), state),
         }
     }
-    current
+}
+
+pub fn tasks_per_core() -> [usize; MAX_CORES] {
+    let sched = SCHED.lock_irq();
+    let mut counts = [0usize; MAX_CORES];
+    for task in &sched.tasks {
+        if !matches!(task.state, TaskState::Empty | TaskState::Dead)
+            && task.core_id < MAX_CORES
+        {
+            counts[task.core_id] += 1;
+        }
+    }
+    counts
+}
+
+fn find_next_ready(sched: &Scheduler, core_id: usize) -> Option<usize> {
+    for idx in 0..MAX_TASKS {
+        if sched.tasks[idx].state == TaskState::Ready && sched.tasks[idx].core_id == core_id {
+            return Some(idx);
+        }
+    }
+
+    for offset in 1..=MAX_TASKS {
+        let current = sched.current[core_id];
+        let base = if current == NO_TASK { 0 } else { current };
+        let idx = (base + offset) % MAX_TASKS;
+        if sched.tasks[idx].state == TaskState::Ready {
+            return Some(idx);
+        }
+    }
+
+    None
 }
 
 /// Voluntarily give up the CPU to the next Ready task.
@@ -224,41 +251,87 @@ fn find_next_ready(sched: &Scheduler) -> usize {
 /// other task is Ready the function returns immediately without switching.
 /// Every switch is logged to serial: `[CHRONO] sched: switch A -> B`.
 pub fn yield_now() {
-    // Plan the switch inside the interrupt-disabled window so the scheduler
-    // state is consistent. The assembly switch itself runs outside because it
-    // must not be inside a closure (it changes RSP mid-execution).
-    let switch = x86_64::instructions::interrupts::without_interrupts(|| {
-        let sched = unsafe { &mut *SCHED.0.get() };
-        let current = sched.current;
-        let next = find_next_ready(sched);
+    switch_from_current();
+}
 
-        if next == current {
-            return None;
+pub fn run_idle_loop() -> ! {
+    loop {
+        switch_from_current();
+        cpu_relax();
+    }
+}
+
+fn switch_from_current() {
+    let core_id = smp::current_core_id();
+    let (sched_ptr, restore_interrupts) = unsafe { SCHED.lock_irq_raw() };
+    let sched = unsafe { &mut *sched_ptr };
+    let current = sched.current[core_id];
+    let Some(next) = find_next_ready(sched, core_id) else {
+        unsafe {
+            SCHED.unlock_irq_raw(restore_interrupts);
         }
+        return;
+    };
 
+    if current == next {
+        unsafe {
+            SCHED.unlock_irq_raw(restore_interrupts);
+        }
+        return;
+    }
+
+    let curr_rsp = if current == NO_TASK {
+        &mut sched.idle_rsp[core_id] as *mut u64 as usize
+    } else {
+        sched.tasks[current].state = TaskState::Ready;
+        &mut sched.tasks[current].rsp as *mut u64 as usize
+    };
+    sched.tasks[next].state = TaskState::Running;
+    sched.tasks[next].core_id = core_id;
+    sched.current[core_id] = next;
+    let next_rsp = &sched.tasks[next].rsp as *const u64 as usize;
+    let lock = SCHED.raw_lock_byte() as usize;
+
+    if current != NO_TASK {
         crate::serial_println!(
-            "[CHRONO] sched: switch {} -> {}",
+            "[CHRONO] sched: core {} switch {} -> {}",
+            core_id,
             sched.tasks[current].name_str(),
             sched.tasks[next].name_str(),
         );
+    }
 
-        sched.tasks[current].state = TaskState::Ready;
-        sched.tasks[next].state = TaskState::Running;
-        sched.current = next;
-
-        // These pointers address fields inside the static SCHED array and
-        // remain valid after the closure exits.
-        let curr_rsp = &mut sched.tasks[current].rsp as *mut u64 as usize;
-        let next_rsp = &sched.tasks[next].rsp as *const u64 as usize;
-
-        Some((curr_rsp, next_rsp))
-    });
-
-    if let Some((curr, next)) = switch {
+    unsafe {
         // SAFETY: Both pointers come from the static SCHED array. The naked
         // function uses the System V AMD64 calling convention (RDI, RSI).
-        unsafe { context_switch(curr as *mut u64, next as *const u64) };
+        context_switch(
+            curr_rsp as *mut u64,
+            next_rsp as *const u64,
+            lock as *mut u8,
+            restore_interrupts as u64,
+        );
     }
+}
+
+fn least_loaded_core(sched: &Scheduler) -> usize {
+    let core_count = smp::core_count().min(MAX_CORES).max(1);
+    let mut counts = [0usize; MAX_CORES];
+    for task in &sched.tasks {
+        if !matches!(task.state, TaskState::Empty | TaskState::Dead)
+            && task.core_id < core_count
+        {
+            counts[task.core_id] += 1;
+        }
+    }
+
+    let mut best = 0usize;
+    for core_id in 1..core_count {
+        if counts[core_id] < counts[best] {
+            best = core_id;
+        }
+    }
+
+    best
 }
 
 // ─── internals ───────────────────────────────────────────────────────────────
@@ -310,7 +383,12 @@ unsafe fn init_task_stack(bytes: &mut [u8; TASK_STACK_SIZE], entry: fn() -> !) -
 /// the System V AMD64 ABI. The function is `#[naked]` so the compiler emits
 /// no prologue or epilogue — only our assembly.
 #[naked]
-unsafe extern "C" fn context_switch(current_rsp: *mut u64, next_rsp: *const u64) {
+unsafe extern "C" fn context_switch(
+    current_rsp: *mut u64,
+    next_rsp: *const u64,
+    sched_lock: *mut u8,
+    restore_interrupts: u64,
+) {
     core::arch::naked_asm!(
         // Save callee-saved registers onto the current (outgoing) stack.
         "push rbx",
@@ -321,6 +399,8 @@ unsafe extern "C" fn context_switch(current_rsp: *mut u64, next_rsp: *const u64)
         "push r15",
         // Persist the outgoing RSP (RDI holds current_rsp pointer).
         "mov [rdi], rsp",
+        // Release the scheduler lock only after the outgoing RSP is safe.
+        "mov byte ptr [rdx], 0",
         // Switch to the incoming stack (RSI holds next_rsp pointer).
         "mov rsp, [rsi]",
         // Restore the incoming task's callee-saved registers.
@@ -330,8 +410,18 @@ unsafe extern "C" fn context_switch(current_rsp: *mut u64, next_rsp: *const u64)
         "pop r12",
         "pop rbp",
         "pop rbx",
+        "test rcx, rcx",
+        "jz 2f",
+        "sti",
+        "2:",
         // Jump into the incoming task: on first run this is its entry function;
         // on subsequent runs this is the instruction after its last `ret`.
         "ret",
     )
+}
+
+fn cpu_relax() {
+    unsafe {
+        core::arch::asm!("pause", options(nomem, nostack, preserves_flags));
+    }
 }
