@@ -5,7 +5,7 @@ use core::fmt::{self, Write};
 
 use crate::framebuffer::{self, Color};
 use crate::mouse::MouseEvent;
-use crate::theme::Era;
+use crate::theme::{TitleFill, WindowBorderKind, WindowProfile};
 
 const MAX_WINDOWS: usize = 4;
 pub const WINDOW_CONTENT_CAPACITY: usize = 512;
@@ -348,21 +348,63 @@ fn with_manager<R>(action: impl FnOnce(&mut WindowManager) -> R) -> R {
 }
 
 fn draw_window(window: Window) {
-    let style = WindowStyle::active();
+    let style = crate::theme::active_profile().window;
     let title_y = window.y + 4;
     let body_y = window.y + TITLE_BAR_HEIGHT;
     let body_height = window.height.saturating_sub(TITLE_BAR_HEIGHT);
 
-    framebuffer::fill_rect(window.x, window.y, window.width, window.height, style.body_bg);
-
-    if style.title_fill {
-        framebuffer::fill_rect(
-            window.x + 1,
-            window.y + 1,
-            window.width.saturating_sub(2),
-            TITLE_BAR_HEIGHT.saturating_sub(1),
-            style.title_bg,
+    if style.corner_radius > 0 {
+        framebuffer::fill_rounded_rect(
+            window.x,
+            window.y,
+            window.width,
+            window.height,
+            style.corner_radius,
+            style.body_bg,
         );
+    } else {
+        framebuffer::fill_rect(window.x, window.y, window.width, window.height, style.body_bg);
+    }
+
+    match style.title_fill {
+        TitleFill::None => {}
+        TitleFill::Solid => {
+            framebuffer::fill_rect(
+                window.x + 1,
+                window.y + 1,
+                window.width.saturating_sub(2),
+                TITLE_BAR_HEIGHT.saturating_sub(1),
+                style.title_bg,
+            );
+        }
+        TitleFill::Gradient => {
+            framebuffer::fill_rect_vertical_gradient(
+                window.x + 1,
+                window.y + 1,
+                window.width.saturating_sub(2),
+                TITLE_BAR_HEIGHT.saturating_sub(1),
+                style.title_bg,
+                style.title_bg_end,
+            );
+        }
+        TitleFill::Frosted => {
+            framebuffer::fill_rect_alpha(
+                window.x + 1,
+                window.y + 1,
+                window.width.saturating_sub(2),
+                TITLE_BAR_HEIGHT.saturating_sub(1),
+                style.title_bg,
+                172,
+            );
+            framebuffer::fill_rect_alpha(
+                window.x + 1,
+                window.y + 1,
+                window.width.saturating_sub(2),
+                2,
+                style.highlight,
+                120,
+            );
+        }
     }
 
     draw_border(window, style);
@@ -371,12 +413,29 @@ fn draw_window(window: Window) {
     draw_content(window, style, body_y, body_height);
 }
 
-fn draw_border(window: Window, style: WindowStyle) {
+fn draw_border(window: Window, style: WindowProfile) {
     match style.border_kind {
-        BorderKind::Flat => {
-            framebuffer::stroke_rect(window.x, window.y, window.width, window.height, style.border);
+        WindowBorderKind::Flat => {
+            if style.corner_radius > 0 {
+                framebuffer::stroke_rounded_rect(
+                    window.x,
+                    window.y,
+                    window.width,
+                    window.height,
+                    style.corner_radius,
+                    style.border,
+                );
+            } else {
+                framebuffer::stroke_rect(
+                    window.x,
+                    window.y,
+                    window.width,
+                    window.height,
+                    style.border,
+                );
+            }
         }
-        BorderKind::ThreeD => {
+        WindowBorderKind::ThreeD => {
             framebuffer::stroke_rect(window.x, window.y, window.width, window.height, style.shadow);
             framebuffer::stroke_rect(
                 window.x + 1,
@@ -386,7 +445,7 @@ fn draw_border(window: Window, style: WindowStyle) {
                 style.highlight,
             );
         }
-        BorderKind::Future => {
+        WindowBorderKind::Minimal => {
             framebuffer::stroke_rect(window.x, window.y, window.width, window.height, style.border);
             framebuffer::fill_rect(
                 window.x + 1,
@@ -399,7 +458,7 @@ fn draw_border(window: Window, style: WindowStyle) {
     }
 }
 
-fn draw_title(window: Window, style: WindowStyle, title_y: usize) {
+fn draw_title(window: Window, style: WindowProfile, title_y: usize) {
     let max_chars = window.width.saturating_sub(40) / framebuffer::GLYPH_WIDTH;
 
     draw_text_clipped(
@@ -412,7 +471,7 @@ fn draw_title(window: Window, style: WindowStyle, title_y: usize) {
     );
 }
 
-fn draw_close_button(window: Window, style: WindowStyle) {
+fn draw_close_button(window: Window, style: WindowProfile) {
     let x = close_button_x(window);
     let y = window.y + 4;
 
@@ -420,7 +479,7 @@ fn draw_close_button(window: Window, style: WindowStyle) {
     framebuffer::draw_text_at(x + 1, y, "X", style.title_fg, style.title_bg);
 }
 
-fn draw_content(window: Window, style: WindowStyle, body_y: usize, body_height: usize) {
+fn draw_content(window: Window, style: WindowProfile, body_y: usize, body_height: usize) {
     let max_cols = window.width.saturating_sub(WINDOW_PADDING * 2) / framebuffer::GLYPH_WIDTH;
     let max_rows = body_height.saturating_sub(WINDOW_PADDING) / framebuffer::GLYPH_HEIGHT;
     let mut start = 0;
@@ -450,7 +509,7 @@ fn draw_content(window: Window, style: WindowStyle, body_y: usize, body_height: 
 
 fn draw_content_line(
     window: Window,
-    style: WindowStyle,
+    style: WindowProfile,
     body_y: usize,
     row: usize,
     bytes: &[u8],
@@ -502,77 +561,6 @@ fn clamp_usize(value: usize, min: usize, max: usize) -> usize {
     } else {
         value
     }
-}
-
-#[derive(Clone, Copy)]
-struct WindowStyle {
-    body_bg: Color,
-    body_fg: Color,
-    title_bg: Color,
-    title_fg: Color,
-    border: Color,
-    highlight: Color,
-    shadow: Color,
-    title_fill: bool,
-    border_kind: BorderKind,
-}
-
-impl WindowStyle {
-    fn active() -> Self {
-        match crate::theme::active_era() {
-            Era::Eighties => Self {
-                body_bg: Color::BLACK,
-                body_fg: Color::GREEN,
-                title_bg: Color::BLACK,
-                title_fg: Color::GREEN,
-                border: Color::GREEN,
-                highlight: Color::GREEN,
-                shadow: Color::GREEN,
-                title_fill: false,
-                border_kind: BorderKind::Flat,
-            },
-            Era::Nineties => Self {
-                body_bg: Color::LIGHT_GRAY,
-                body_fg: Color::BLACK,
-                title_bg: Color::GRAY,
-                title_fg: Color::BLACK,
-                border: Color::GRAY,
-                highlight: Color::WHITE,
-                shadow: Color::DARK,
-                title_fill: true,
-                border_kind: BorderKind::ThreeD,
-            },
-            Era::TwoThousands => Self {
-                body_bg: Color::LIGHT_GRAY,
-                body_fg: Color::BLACK,
-                title_bg: Color::WHITE,
-                title_fg: Color::BLACK,
-                border: Color::DARK,
-                highlight: Color::WHITE,
-                shadow: Color::DARK,
-                title_fill: true,
-                border_kind: BorderKind::Flat,
-            },
-            Era::Future => Self {
-                body_bg: Color::DARK,
-                body_fg: Color::WHITE,
-                title_bg: Color::DARK,
-                title_fg: Color::WHITE,
-                border: Color::WHITE,
-                highlight: Color::WHITE,
-                shadow: Color::DARKER,
-                title_fill: false,
-                border_kind: BorderKind::Future,
-            },
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-enum BorderKind {
-    Flat,
-    ThreeD,
-    Future,
 }
 
 struct ContentBuffer {
