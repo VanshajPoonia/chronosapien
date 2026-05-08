@@ -109,9 +109,12 @@ fn boot_with_context(context: boot::BootContext) -> ! {
     let era_name = STARTUP_ERA.name();
     serial_println!("[CHRONO] active era: {}", era_name);
     smp::start_aps();
-    sound::play_boot_chime(theme::active_era());
+    sound::play_boot_chime(profile);
     keyboard::init();
 
+    for line in profile.boot_lines {
+        println!("{}", line);
+    }
     println!("{}", profile.boot_welcome);
     println!("Era: {}", profile.name);
 

@@ -5,7 +5,7 @@
 //! the speaker.
 
 use crate::io::{inb, outb};
-use crate::theme::Era;
+use crate::theme::EraProfile;
 use crate::timer;
 
 pub const MIN_FREQUENCY_HZ: u32 = 20;
@@ -18,8 +18,6 @@ const PIT_CHANNEL_2_MODE_3: u8 = 0b1011_0110;
 
 const SPEAKER_PORT: u16 = 0x61;
 const SPEAKER_ENABLE_BITS: u8 = 0b0000_0011;
-
-const REST_MS: u64 = 35;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BeepError {
@@ -59,24 +57,11 @@ pub fn beep(frequency_hz: u32, duration_ms: u64) -> Result<(), BeepError> {
     Ok(())
 }
 
-pub fn play_boot_chime(era: Era) {
-    match era {
-        Era::Eighties => {
-            play_tone(880, 90);
-            rest();
-            play_tone(660, 90);
-            rest();
-            play_tone(440, 140);
-        }
-        Era::Future => {
-            play_tone(1760, 180);
-        }
-        Era::Nineties | Era::TwoThousands => {
-            play_tone(523, 80);
-            rest();
-            play_tone(659, 80);
-            rest();
-            play_tone(784, 120);
+pub fn play_boot_chime(profile: EraProfile) {
+    for tone in profile.boot_chime {
+        play_tone(tone.frequency_hz, tone.duration_ms);
+        if tone.rest_ms > 0 {
+            rest(tone.rest_ms);
         }
     }
 }
@@ -89,9 +74,9 @@ fn play_tone(frequency_hz: u32, duration_ms: u64) {
     let _ = beep(frequency_hz, duration_ms);
 }
 
-fn rest() {
+fn rest(duration_ms: u64) {
     silence();
-    timer::sleep_ms(REST_MS);
+    timer::sleep_ms(duration_ms);
 }
 
 fn silence() {
