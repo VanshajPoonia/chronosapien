@@ -5,9 +5,10 @@ mod font;
 use core::cell::UnsafeCell;
 use core::fmt;
 
-use crate::theme::EraProfile;
+use crate::theme::{EraProfile, FontEffect};
 
 const TOP_BAR_HEIGHT: usize = 16;
+const TASKBAR_HEIGHT: usize = 18;
 const TOP_BAR_TEXT_Y: usize = 4;
 const TEXT_START_Y: usize = TOP_BAR_HEIGHT;
 pub const TOP_BAR_RESERVED_HEIGHT: usize = TOP_BAR_HEIGHT;
@@ -74,6 +75,8 @@ impl Color {
     pub const BLACK: Self = Self::rgb(0, 0, 0);
     pub const WHITE: Self = Self::rgb(255, 255, 255);
     pub const GREEN: Self = Self::rgb(0, 255, 96);
+    pub const PHOSPHOR: Self = Self::rgb(40, 255, 104);
+    pub const PHOSPHOR_DIM: Self = Self::rgb(0, 108, 42);
     pub const BLUE: Self = Self::rgb(0, 58, 180);
     pub const GRAY: Self = Self::rgb(192, 192, 192);
     pub const LIGHT_GRAY: Self = Self::rgb(232, 232, 232);
@@ -83,6 +86,25 @@ impl Color {
 
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
+    }
+
+    pub const fn darken(self, amount: u8) -> Self {
+        Self::rgb(
+            self.red.saturating_sub(amount),
+            self.green.saturating_sub(amount),
+            self.blue.saturating_sub(amount),
+        )
+    }
+
+    pub const fn blend(self, over: Color, alpha: u8) -> Self {
+        let inverse = 255 - alpha as u16;
+        let alpha = alpha as u16;
+
+        Self::rgb(
+            ((self.red as u16 * inverse + over.red as u16 * alpha) / 255) as u8,
+            ((self.green as u16 * inverse + over.green as u16 * alpha) / 255) as u8,
+            ((self.blue as u16 * inverse + over.blue as u16 * alpha) / 255) as u8,
+        )
     }
 }
 
@@ -132,6 +154,9 @@ pub struct Writer {
     background: Color,
     top_bar_foreground: Color,
     top_bar_background: Color,
+    font_effect: FontEffect,
+    scanline_overlay: bool,
+    bottom_taskbar: bool,
     cells: [Cell; CELL_COUNT],
     mouse_cursor: MouseCursor,
     initialized: bool,
@@ -157,6 +182,9 @@ impl Writer {
             background: Color::BLACK,
             top_bar_foreground: Color::WHITE,
             top_bar_background: Color::BLUE,
+            font_effect: FontEffect::Terminal,
+            scanline_overlay: false,
+            bottom_taskbar: false,
             cells: [Cell::blank(Color::WHITE, Color::BLACK); CELL_COUNT],
             mouse_cursor: MouseCursor::new(),
             initialized: false,
@@ -181,18 +209,24 @@ impl Writer {
         }
 
         self.columns = (self.info.width / font::FONT_WIDTH).min(MAX_COLUMNS);
-        self.rows = ((self.info.height.saturating_sub(TEXT_START_Y)) / font::FONT_HEIGHT)
-            .min(MAX_ROWS);
         self.initialized = true;
         self.set_theme(profile);
         self.clear();
     }
 
     fn set_theme(&mut self, profile: EraProfile) {
+        crate::serial_println!("{}", profile.render_log);
         self.foreground = profile.fg;
         self.background = profile.bg;
         self.top_bar_foreground = profile.top_bar_fg;
         self.top_bar_background = profile.top_bar_bg;
+        self.font_effect = profile.font_effect;
+        self.scanline_overlay = profile.scanline_overlay;
+        self.bottom_taskbar = profile.bottom_taskbar;
+        let reserved_bottom = if self.bottom_taskbar { TASKBAR_HEIGHT } else { 0 };
+        self.rows = ((self.info.height.saturating_sub(TEXT_START_Y + reserved_bottom))
+            / font::FONT_HEIGHT)
+            .min(MAX_ROWS);
 
         for cell in self.cells.iter_mut() {
             cell.foreground = self.foreground;
@@ -213,6 +247,7 @@ impl Writer {
 
         self.column_position = 0;
         self.draw_top_bar();
+        self.draw_taskbar();
     }
 
     fn refresh_top_bar(&mut self) {
@@ -236,6 +271,7 @@ impl Writer {
         }
 
         self.draw_top_bar();
+        self.draw_taskbar();
     }
 
     fn write_byte(&mut self, byte: u8) {
@@ -264,6 +300,7 @@ impl Writer {
         }
 
         self.draw_top_bar();
+        self.draw_taskbar();
     }
 
     fn backspace(&mut self) {
@@ -309,7 +346,7 @@ impl Writer {
             0,
             TEXT_START_Y,
             self.info.width,
-            self.info.height.saturating_sub(TEXT_START_Y),
+            self.text_region_height(),
             self.background,
         );
 
@@ -374,6 +411,20 @@ impl Writer {
         );
     }
 
+    fn draw_taskbar(&mut self) {
+        if !self.bottom_taskbar || self.info.height < TASKBAR_HEIGHT {
+            return;
+        }
+
+        let y = self.info.height - TASKBAR_HEIGHT;
+        self.fill_rect(0, y, self.info.width, TASKBAR_HEIGHT, Color::rgb(214, 225, 236));
+        self.fill_rect(0, y, self.info.width, 1, Color::WHITE);
+        self.fill_rect(0, y + TASKBAR_HEIGHT - 1, self.info.width, 1, Color::GRAY);
+        self.fill_rect(8, y + 3, 58, TASKBAR_HEIGHT - 6, Color::WHITE);
+        self.stroke_rect(8, y + 3, 58, TASKBAR_HEIGHT - 6, Color::GRAY);
+        self.draw_text_at(15, y + 5, "chrono", Color::BLACK, Color::WHITE);
+    }
+
     fn draw_text_at(&mut self, mut x: usize, y: usize, text: &str, fg: Color, bg: Color) {
         for byte in text.bytes() {
             self.draw_glyph(x, y, byte, fg, bg);
@@ -413,7 +464,20 @@ impl Writer {
 
         for (row, bits) in glyph.iter().enumerate() {
             for col in 0..font::FONT_WIDTH {
-                let color = if bits & (0x80 >> col) != 0 { fg } else { bg };
+                let foreground_pixel = bits & (0x80 >> col) != 0;
+                let chunky_neighbor = self.font_effect == FontEffect::Chunky
+                    && col > 0
+                    && bits & (0x80 >> (col - 1)) != 0;
+                let color = if foreground_pixel || chunky_neighbor {
+                    fg
+                } else if self.font_effect == FontEffect::Smooth
+                    && glyph_neighbor_set(&glyph, row, col)
+                {
+                    bg.blend(fg, 78)
+                } else {
+                    bg
+                };
+
                 self.write_pixel(x + col, y + row, color);
             }
         }
@@ -453,12 +517,125 @@ impl Writer {
         );
     }
 
+    fn fill_rect_vertical_gradient(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        top: Color,
+        bottom: Color,
+    ) {
+        if height == 0 {
+            return;
+        }
+
+        for row in 0..height {
+            let alpha = if height <= 1 {
+                0
+            } else {
+                (row * 255 / (height - 1)) as u8
+            };
+            self.fill_rect(x, y + row, width, 1, top.blend(bottom, alpha));
+        }
+    }
+
+    fn fill_rect_alpha(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        color: Color,
+        alpha: u8,
+    ) {
+        let x_end = x.saturating_add(width).min(self.info.width);
+        let y_end = y.saturating_add(height).min(self.info.height);
+
+        for pixel_y in y..y_end {
+            for pixel_x in x..x_end {
+                let base = self.read_pixel(pixel_x, pixel_y);
+                self.write_pixel(pixel_x, pixel_y, base.blend(color, alpha));
+            }
+        }
+    }
+
+    fn fill_rounded_rect(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        radius: usize,
+        color: Color,
+    ) {
+        let x_end = x.saturating_add(width).min(self.info.width);
+        let y_end = y.saturating_add(height).min(self.info.height);
+
+        for pixel_y in y..y_end {
+            for pixel_x in x..x_end {
+                if rounded_rect_contains(pixel_x, pixel_y, x, y, width, height, radius) {
+                    self.write_pixel(pixel_x, pixel_y, color);
+                }
+            }
+        }
+    }
+
+    fn stroke_rounded_rect(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+        radius: usize,
+        color: Color,
+    ) {
+        if width == 0 || height == 0 {
+            return;
+        }
+
+        let inner_x = x.saturating_add(1);
+        let inner_y = y.saturating_add(1);
+        let inner_width = width.saturating_sub(2);
+        let inner_height = height.saturating_sub(2);
+        let inner_radius = radius.saturating_sub(1);
+
+        let x_end = x.saturating_add(width).min(self.info.width);
+        let y_end = y.saturating_add(height).min(self.info.height);
+
+        for pixel_y in y..y_end {
+            for pixel_x in x..x_end {
+                if rounded_rect_contains(pixel_x, pixel_y, x, y, width, height, radius)
+                    && !rounded_rect_contains(
+                        pixel_x,
+                        pixel_y,
+                        inner_x,
+                        inner_y,
+                        inner_width,
+                        inner_height,
+                        inner_radius,
+                    )
+                {
+                    self.write_pixel(pixel_x, pixel_y, color);
+                }
+            }
+        }
+    }
+
     fn screen_size(&self) -> Option<(usize, usize)> {
         if !self.initialized {
             return None;
         }
 
         Some((self.info.width, self.info.height))
+    }
+
+    fn text_region_height(&self) -> usize {
+        let reserved_bottom = if self.bottom_taskbar { TASKBAR_HEIGHT } else { 0 };
+
+        self.info
+            .height
+            .saturating_sub(TEXT_START_Y.saturating_add(reserved_bottom))
     }
 
     fn set_mouse_cursor_position(&mut self, x: usize, y: usize) {
@@ -602,6 +779,11 @@ impl Writer {
             return;
         }
 
+        let color = if self.scanline_overlay && y % 2 == 1 {
+            color.darken(36)
+        } else {
+            color
+        };
         let ptr = unsafe { self.buffer.add(offset) };
 
         match self.info.pixel_format {
@@ -632,6 +814,72 @@ impl Writer {
     fn cell_index(&self, row: usize, col: usize) -> usize {
         row * self.columns + col
     }
+}
+
+fn glyph_neighbor_set(glyph: &[u8; font::FONT_HEIGHT], row: usize, col: usize) -> bool {
+    let row_start = row.saturating_sub(1);
+    let row_end = (row + 1).min(font::FONT_HEIGHT - 1);
+    let col_start = col.saturating_sub(1);
+    let col_end = (col + 1).min(font::FONT_WIDTH - 1);
+
+    for near_row in row_start..=row_end {
+        for near_col in col_start..=col_end {
+            if near_row == row && near_col == col {
+                continue;
+            }
+
+            if glyph[near_row] & (0x80 >> near_col) != 0 {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn rounded_rect_contains(
+    pixel_x: usize,
+    pixel_y: usize,
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    radius: usize,
+) -> bool {
+    if radius == 0 || width <= radius * 2 || height <= radius * 2 {
+        return pixel_x >= x
+            && pixel_x < x.saturating_add(width)
+            && pixel_y >= y
+            && pixel_y < y.saturating_add(height);
+    }
+
+    let right = x + width - 1;
+    let bottom = y + height - 1;
+    let inner_left = x + radius;
+    let inner_right = right - radius;
+    let inner_top = y + radius;
+    let inner_bottom = bottom - radius;
+
+    if (pixel_x >= inner_left && pixel_x <= inner_right)
+        || (pixel_y >= inner_top && pixel_y <= inner_bottom)
+    {
+        return true;
+    }
+
+    let center_x = if pixel_x < inner_left {
+        inner_left
+    } else {
+        inner_right
+    };
+    let center_y = if pixel_y < inner_top {
+        inner_top
+    } else {
+        inner_bottom
+    };
+    let dx = pixel_x.abs_diff(center_x);
+    let dy = pixel_y.abs_diff(center_y);
+
+    dx * dx + dy * dy <= radius * radius
 }
 
 impl fmt::Write for Writer {
@@ -751,6 +999,71 @@ pub fn stroke_rect(x: usize, y: usize, width: usize, height: usize, color: Color
         unsafe {
             (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
                 writer.stroke_rect(x, y, width, height, color);
+            });
+        }
+    });
+}
+
+pub fn fill_rect_vertical_gradient(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    top: Color,
+    bottom: Color,
+) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.fill_rect_vertical_gradient(x, y, width, height, top, bottom);
+            });
+        }
+    });
+}
+
+pub fn fill_rect_alpha(x: usize, y: usize, width: usize, height: usize, color: Color, alpha: u8) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.fill_rect_alpha(x, y, width, height, color, alpha);
+            });
+        }
+    });
+}
+
+pub fn fill_rounded_rect(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    radius: usize,
+    color: Color,
+) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.fill_rounded_rect(x, y, width, height, radius, color);
+            });
+        }
+    });
+}
+
+pub fn stroke_rounded_rect(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    radius: usize,
+    color: Color,
+) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Same interrupt-exclusion model as `clear`.
+        unsafe {
+            (*WRITER.0.get()).with_mouse_cursor_hidden(|writer| {
+                writer.stroke_rounded_rect(x, y, width, height, radius, color);
             });
         }
     });
