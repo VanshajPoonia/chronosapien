@@ -1,0 +1,11 @@
+[package]
+name = "uefi-loader"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "uefi-loader"
+path = "src/main.rs"
+
+[dependencies]
+uefi = { version = "0.37.0", features = ["alloc", "global_allocator"] }

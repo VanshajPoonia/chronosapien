@@ -41,6 +41,23 @@ pub fn uptime_seconds() -> u64 {
     ticks() / PIT_HZ
 }
 
+pub fn sleep_ms(duration_ms: u64) {
+    if duration_ms == 0 {
+        return;
+    }
+
+    let ticks_to_wait = duration_ms.saturating_mul(PIT_HZ).saturating_add(999) / 1000;
+    let target = ticks().saturating_add(ticks_to_wait);
+
+    while ticks() < target {
+        // SAFETY: `pause` is a CPU hint for spin waits. Timer interrupts stay
+        // enabled by the caller, so the PIT tick counter can keep advancing.
+        unsafe {
+            core::arch::asm!("pause", options(nomem, nostack, preserves_flags));
+        }
+    }
+}
+
 unsafe fn outb(port: u16, value: u8) {
     // SAFETY: The caller must ensure that the selected port belongs to the PIT.
     core::arch::asm!(

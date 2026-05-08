@@ -18,6 +18,10 @@ The custom path is BIOS-only. It starts from sector 0, runs our 512-byte Stage 1
 boot sector, loads Stage 2 from disk, prepares a ChronoOS boot handoff, enters
 long mode, and jumps to `chrono_custom_entry`.
 
+This path still emits the v1 ChronoOS handoff. The kernel accepts it for BIOS
+compatibility and treats `rsdp_addr` as missing. The UEFI loader emits the v2
+handoff, which adds `rsdp_addr` for ACPI/MADT discovery after UEFI boot.
+
 ## Stage 1 Line By Line
 
 Stage 1 lives in `boot/stage1/stage1.asm`. BIOS loads it at physical address

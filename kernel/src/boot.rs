@@ -8,7 +8,8 @@ use core::cell::UnsafeCell;
 use crate::framebuffer::{Framebuffer, FramebufferInfo, PixelFormat};
 
 pub const CHRONO_BOOT_MAGIC: u64 = 0x5442_4f4e_4f52_4843;
-pub const CHRONO_BOOT_VERSION: u32 = 1;
+pub const CHRONO_BOOT_VERSION: u32 = 2;
+pub const CHRONO_BOOT_VERSION_BIOS_V1: u32 = 1;
 
 const MAX_BOOTLOADER_REGIONS: usize = 128;
 
@@ -17,6 +18,7 @@ pub struct BootContext {
     pub framebuffer: Framebuffer,
     pub memory_regions: &'static [MemoryRegion],
     pub physical_memory_offset: Option<u64>,
+    pub rsdp_addr: Option<u64>,
     pub kernel_addr: u64,
     pub kernel_len: u64,
 }
@@ -32,6 +34,26 @@ pub struct ChronoBootInfo {
     pub physical_memory_offset: u64,
     pub kernel_addr: u64,
     pub kernel_len: u64,
+    pub rsdp_addr: u64,
+}
+
+#[repr(C)]
+struct ChronoBootInfoHeader {
+    magic: u64,
+    version: u32,
+}
+
+#[repr(C)]
+struct ChronoBootInfoV1 {
+    magic: u64,
+    version: u32,
+    reserved: u32,
+    framebuffer: ChronoFramebufferInfo,
+    memory_regions: *const ChronoMemoryRegion,
+    memory_region_count: u64,
+    physical_memory_offset: u64,
+    kernel_addr: u64,
+    kernel_len: u64,
 }
 
 #[repr(C)]
@@ -113,44 +135,85 @@ pub fn context_from_bootloader(boot_info: &'static mut bootloader_api::BootInfo)
         framebuffer,
         memory_regions,
         physical_memory_offset: boot_info.physical_memory_offset.into_option(),
+        rsdp_addr: boot_info.rsdp_addr.into_option(),
         kernel_addr: boot_info.kernel_addr,
         kernel_len: boot_info.kernel_len,
     }
 }
 
 pub unsafe fn context_from_custom(info: *const ChronoBootInfo) -> BootContext {
-    let info = info.as_ref().expect("custom boot info pointer is null");
+    let header = (info as *const ChronoBootInfoHeader)
+        .as_ref()
+        .expect("custom boot info pointer is null");
 
-    if info.magic != CHRONO_BOOT_MAGIC || info.version != CHRONO_BOOT_VERSION {
+    if header.magic != CHRONO_BOOT_MAGIC
+        || (header.version != CHRONO_BOOT_VERSION
+            && header.version != CHRONO_BOOT_VERSION_BIOS_V1)
+    {
         crate::serial_println!(
             "[CHRONO] custom bootloader: bad handoff magic={:#x} version={}",
-            info.magic,
-            info.version
+            header.magic,
+            header.version
         );
         panic!("invalid custom boot handoff");
     }
 
+    let (
+        framebuffer_info,
+        memory_regions_ptr,
+        memory_region_count,
+        physical_memory_offset,
+        kernel_addr,
+        kernel_len,
+        rsdp_addr,
+    ) = if header.version == CHRONO_BOOT_VERSION {
+        let info = info.as_ref().expect("custom boot info pointer is null");
+        (
+            info.framebuffer,
+            info.memory_regions,
+            info.memory_region_count,
+            info.physical_memory_offset,
+            info.kernel_addr,
+            info.kernel_len,
+            Some(info.rsdp_addr).filter(|address| *address != 0),
+        )
+    } else {
+        let info = (info as *const ChronoBootInfoV1)
+            .as_ref()
+            .expect("custom boot info pointer is null");
+        (
+            info.framebuffer,
+            info.memory_regions,
+            info.memory_region_count,
+            info.physical_memory_offset,
+            info.kernel_addr,
+            info.kernel_len,
+            None,
+        )
+    };
+
     let memory_regions = core::slice::from_raw_parts(
-        info.memory_regions as *const MemoryRegion,
-        info.memory_region_count as usize,
+        memory_regions_ptr as *const MemoryRegion,
+        memory_region_count as usize,
     );
 
     BootContext {
         framebuffer: Framebuffer {
-            address: info.framebuffer.address as *mut u8,
+            address: framebuffer_info.address as *mut u8,
             info: FramebufferInfo {
-                byte_len: info.framebuffer.byte_len as usize,
-                width: info.framebuffer.width as usize,
-                height: info.framebuffer.height as usize,
-                stride: info.framebuffer.stride as usize,
-                bytes_per_pixel: info.framebuffer.bytes_per_pixel as usize,
-                pixel_format: pixel_format_from_u32(info.framebuffer.pixel_format),
+                byte_len: framebuffer_info.byte_len as usize,
+                width: framebuffer_info.width as usize,
+                height: framebuffer_info.height as usize,
+                stride: framebuffer_info.stride as usize,
+                bytes_per_pixel: framebuffer_info.bytes_per_pixel as usize,
+                pixel_format: pixel_format_from_u32(framebuffer_info.pixel_format),
             },
         },
         memory_regions,
-        physical_memory_offset: Some(info.physical_memory_offset),
-        kernel_addr: info.kernel_addr,
-        kernel_len: info.kernel_len,
+        physical_memory_offset: Some(physical_memory_offset),
+        rsdp_addr,
+        kernel_addr,
+        kernel_len,
     }
 }
 

@@ -3,8 +3,9 @@
 Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
 a `no_std` x86_64 kernel in QEMU, renders a framebuffer graphics console, logs
 to serial, runs a tiny era-themed shell, handles CPU exceptions and timer
-interrupts, and now has early memory management, an in-memory filesystem, and a
-few built-in apps.
+interrupts, plays PC speaker tones, and now has early memory management,
+persistent ATA-backed storage, networking, UEFI boot packaging, and a few
+built-in apps.
 
 ## Folder structure
 
@@ -32,7 +33,9 @@ chronosapien/
 |       |   |-- mod.rs
 |       |   |-- notes.rs
 |       |   `-- sysinfo.rs
+|       |-- ata.rs
 |       |-- console.rs
+|       |-- elf.rs
 |       |-- framebuffer/
 |       |   |-- font.rs
 |       |   `-- mod.rs
@@ -47,24 +50,47 @@ chronosapien/
 |       |-- panic.rs
 |       |-- pci.rs
 |       |-- pic.rs
+|       |-- process.rs
 |       |-- serial.rs
 |       |-- shell.rs
+|       |-- smp.rs
+|       |-- sound.rs
+|       |-- spinlock.rs
+|       |-- syscall.rs
 |       |-- theme.rs
 |       `-- timer.rs
+|-- uefi-loader/
+|   |-- Cargo.toml
+|   `-- src/
+|       `-- main.rs
 |-- scripts/
 |   |-- build.ps1
 |   |-- build-custom.ps1
+|   |-- build-uefi.ps1
+|   |-- build-user.ps1
 |   |-- debug-serial.ps1
 |   |-- run-custom.ps1
-|   `-- run.ps1
+|   |-- run-uefi.ps1
+|   |-- run.ps1
+|   `-- write-usb.ps1
 |-- docs/
 |   |-- architecture.md
 |   |-- boot-flow.md
 |   |-- custom-bootloader.md
+|   |-- elf.md
 |   |-- networking.md
+|   |-- ring3.md
+|   |-- storage.md
+|   |-- syscalls.md
+|   |-- uefi.md
 |   `-- roadmap.md
 |-- tools/
-|   `-- custom_image_builder.rs
+|   |-- chronofs_put.rs
+|   |-- custom_image_builder.rs
+|   `-- uefi_image_builder.rs
+|-- user/
+|   |-- hello.c
+|   `-- user.ld
 `-- .gitignore
 ```
 
@@ -78,10 +104,12 @@ chronosapien/
 - `.cargo/config.toml` sets the default kernel target and enables nightly artifact dependencies.
 - `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader_api` and `x86_64`.
 - `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
+- `kernel/src/ata.rs` reads and writes sectors through QEMU's ATA PIO IDE disk.
 - `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
+- `kernel/src/elf.rs` parses the static ELF64 subset used by `exec`.
 - `kernel/src/framebuffer/` draws text and the top bar into the boot framebuffer.
-- `kernel/src/fs.rs` stores a tiny heap-backed in-memory file list.
-- `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with a double-fault stack.
+- `kernel/src/fs.rs` mounts ChronoFS from disk, with a heap fallback if the disk is missing.
+- `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with double-fault and ring-transition stacks.
 - `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
 - `kernel/src/io.rs` provides shared x86 port I/O helpers for device drivers.
 - `kernel/src/keyboard.rs` polls the PS/2 keyboard and turns scancodes into simple key events.
@@ -91,21 +119,39 @@ chronosapien/
 - `kernel/src/panic.rs` handles panics in a `no_std` environment.
 - `kernel/src/pci.rs` scans PCI config space for supported devices.
 - `kernel/src/pic.rs` remaps the legacy PIC so hardware IRQs start at IDT vector 32.
+- `kernel/src/process.rs` builds a foreground user address space and enters ELF programs.
 - `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
 - `kernel/src/shell.rs` runs the line-based command shell.
+- `kernel/src/smp.rs` discovers CPU cores and starts APs for cooperative SMP.
+- `kernel/src/sound.rs` drives PIT channel 2 and the PC speaker gate for tones.
+- `kernel/src/spinlock.rs` provides a small atomic lock for SMP-safe globals.
+- `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
 - `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
 - `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
+- `uefi-loader/` builds the Rust `BOOTX64.EFI` application for UEFI firmware.
 - `scripts/build.ps1` builds the bootable disk image.
 - `scripts/build-custom.ps1` builds the optional custom sector-0 BIOS image.
+- `scripts/build-uefi.ps1` builds the UEFI loader and GPT/FAT32 ESP image.
+- `scripts/build-user.ps1` builds `hello.elf` and installs it into the ChronoFS data disk.
 - `scripts/run.ps1` runs the image in QEMU.
 - `scripts/run-custom.ps1` runs the custom BIOS image in QEMU.
+- `scripts/run-uefi.ps1` runs the UEFI image in QEMU with OVMF.
 - `scripts/debug-serial.ps1` runs QEMU with display disabled and serial output enabled.
+- `scripts/write-usb.ps1` is a guarded raw writer for the UEFI USB image.
 - `docs/roadmap.md` lists Milestone 1 and the next steps.
 - `docs/architecture.md` explains what code is ours and what is borrowed.
 - `docs/boot-flow.md` explains the startup path in plain language.
 - `docs/custom-bootloader.md` explains the custom bootloader path.
+- `docs/elf.md` explains ELF64 headers, `PT_LOAD`, process page tables, and testing.
 - `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
+- `docs/ring3.md` explains the opt-in user mode privilege demo.
+- `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
+- `docs/syscalls.md` explains the first SYSCALL/SYSRET ABI and ring 3 hello demo.
+- `docs/uefi.md` explains the UEFI loader, ESP image, GOP framebuffer, and real hardware notes.
+- `tools/chronofs_put.rs` injects binary files such as `hello.elf` into a ChronoFS data image.
 - `tools/custom_image_builder.rs` packages the custom boot image.
+- `tools/uefi_image_builder.rs` packages the UEFI GPT/FAT32 ESP image.
+- `user/hello.c` and `user/user.ld` build the first static user-space ELF.
 
 ## Dependencies
 
@@ -114,26 +160,32 @@ chronosapien/
 - `bootloader_api`
   The kernel-facing boot API. It provides the memory map, physical-memory
   offset, and framebuffer metadata.
+- `uefi`
+  The UEFI-loader crate dependency. It provides Boot Services wrappers, GOP
+  access, ESP file access, and the `ExitBootServices()` helper.
 - `x86_64`
   A `no_std` helper crate for descriptor tables, interrupt stack frames,
   control registers, and page-table types.
 
-Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, the
-bump heap, RTL8139 networking, and the tiny apps are implemented directly in
-this repo.
+Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, PC
+speaker tones, the bump heap, ATA PIO storage, RTL8139 networking, and the tiny
+apps are implemented directly in this repo.
 
 ## Current State
 
 The kernel currently:
 
 - boots through the borrowed `bootloader` crate,
+- can also boot through the Rust UEFI loader from a GPT/FAT32 ESP image,
 - initializes COM1 serial logging,
 - initializes a framebuffer graphics console with an era-colored top bar,
 - loads a GDT and IDT,
 - handles breakpoint, page fault, and double fault exceptions,
 - remaps the PIC and runs a 100Hz PIT timer interrupt,
+- discovers ACPI MADT CPU entries and starts APs in QEMU with `-smp 2`,
+- drives PIT channel 2 and the PC speaker for era-specific boot chimes,
 - initializes a 1MiB bump heap from the bootloader memory map,
-- keeps a tiny in-memory filesystem for shell files and notes,
+- mounts a tiny ChronoFS disk so shell files and notes survive reboot,
 - prints a compact boot banner below the top bar,
 - polls the PS/2 keyboard and runs a small command shell,
 - supports era switching,
@@ -154,6 +206,7 @@ winget install Rustlang.Rustup
 rustup toolchain install nightly
 rustup component add rust-src llvm-tools-preview --toolchain nightly
 rustup target add x86_64-unknown-none --toolchain nightly
+rustup target add x86_64-unknown-uefi --toolchain nightly
 ```
 
 Install QEMU:
@@ -193,6 +246,18 @@ Optional custom bootloader image:
 The custom path starts from our own sector-0 Stage 1 loader. The normal
 `chronosapien-bios.img` path remains the fallback.
 
+UEFI boot image:
+
+```powershell
+.\scripts\build-uefi.ps1
+.\scripts\run-uefi.ps1
+```
+
+The UEFI path creates `target\x86_64-unknown-none\debug\chronosapien-uefi.img`,
+a GPT disk with a FAT32 ESP containing `EFI\BOOT\BOOTX64.EFI` and
+`CHRONO\KERNEL.ELF`. For real hardware, disable Secure Boot unless signing is
+added and write the image with `.\scripts\write-usb.ps1`.
+
 Serial-only debug run:
 
 ```powershell
@@ -208,18 +273,19 @@ Optional direct commands:
 ```powershell
 $hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
 cargo build -p chronosapien --target $hostTarget
-qemu-system-x86_64 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img -serial stdio
+qemu-system-x86_64 -smp 2 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img,if=ide,index=0,media=disk -drive format=raw,file=target\x86_64-unknown-none\debug\chronofs-data.img,if=ide,index=1,media=disk -serial stdio
 ```
 
 ## Boot Flow in Plain Language
 
-QEMU emulates an x86_64 machine and boots a disk image. The borrowed
-`bootloader` crate performs the early machine setup we are intentionally
-skipping for now, sets up a 1024x768 framebuffer, then jumps into our Rust
-kernel entrypoint. Our code starts in `kernel/src/main.rs`, initializes serial
-and framebuffer output, loads descriptor tables, triggers one test breakpoint
-exception, initializes memory, starts the timer, prints the startup banner, and
-enters the shell.
+QEMU emulates an x86_64 machine and boots a disk image. The BIOS image uses the
+borrowed `bootloader` crate to perform early machine setup, set up a framebuffer,
+and jump into our Rust kernel entrypoint. The UEFI image uses our Rust
+`BOOTX64.EFI` loader to read the kernel from the ESP, configure GOP, exit Boot
+Services, and jump into the same kernel handoff. Our code starts in
+`kernel/src/main.rs`, initializes serial and framebuffer output, loads descriptor
+tables, triggers one test breakpoint exception, initializes memory, starts the
+timer, prints the startup banner, and enters the shell.
 
 The graphical console shows a top bar plus shell output:
 
@@ -244,8 +310,14 @@ With `-serial stdio`, the QEMU terminal shows:
 [CHRONO] interrupt: breakpoint at 0x...
 [CHRONO] breakpoint resolved
 [CHRONO] mem: heap initialized at 0x200000 size 1MB
+[CHRONO] smp: BSP online (core 0)
 [CHRONO] timer: PIT initialized at 100Hz
 [CHRONO] active era: 1984
+[CHRONO] smp: core 1 online
+[CHRONO] smp: 2 cores ready
+[CHRONO] sound: beep 880hz 90ms
+[CHRONO] sound: beep 660hz 90ms
+[CHRONO] sound: beep 440hz 140ms
 [CHRONO] keyboard initialized
 [CHRONO] boot complete
 ```
@@ -257,6 +329,7 @@ Shell commands and apps add serial lines like:
 [CHRONO] app: sysinfo launched
 [CHRONO] cmd: write hello.txt Hi there
 [CHRONO] fs: write hello.txt
+[CHRONO] disk: write sector 42
 ```
 
 ## Shell Commands
@@ -271,17 +344,22 @@ Built-ins:
 - `uptime` prints elapsed seconds from the PIT tick counter.
 - `clock` prints raw PIT ticks.
 - `mem` prints total memory, heap location, and used heap space.
+- `cores` prints online CPU cores and tasks assigned to each core.
+- `beep <hz>` plays a PC speaker tone for 500ms.
+- `ring3` enters the opt-in user mode demo and intentionally catches a privileged-instruction fault.
+- `syshello` enters ring 3 and prints through `sys_write`.
+- `exec <name>` loads a static ELF64 file from ChronoFS and runs it in user mode.
 - `net` prints RTL8139 MAC, static IP, gateway state, and TX/RX counts.
 - `net arp` sends an ARP request for QEMU's `10.0.2.2` gateway.
 - `net send [ip port text]` sends a UDP packet.
-- `ls` lists in-memory files.
+- `ls` lists files from the mounted ChronoFS disk, or the heap fallback.
 - `cat <name>` prints a file's contents.
-- `write <name> <content>` creates or overwrites a heap-backed file.
-- `rm <name>` deletes an in-memory file.
+- `write <name> <content>` creates or overwrites a persistent file.
+- `rm <name>` deletes a file.
 
 Tiny apps:
 
-- `notes <text>` stores one short note as `note.txt` in the in-memory filesystem.
+- `notes <text>` stores one short persistent note as `note.txt`.
 - `notes read` prints `note.txt`.
 - `calc <int> +|-|*|/ <int>` evaluates one integer operation.
 - `sysinfo` prints era-styled OS, era, uptime, and memory usage.
@@ -337,14 +415,21 @@ use the heap.
 ## Interrupts and timer in simple terms
 
 The GDT gives the CPU valid segment descriptors and a Task State Segment for the
-double-fault stack. The IDT tells the CPU which Rust handler to call for
-exceptions and interrupts. Chronosapian currently handles breakpoints, page faults,
-double faults, and timer IRQs.
+double-fault stack plus ring 3 to ring 0 stack transitions. The IDT tells the
+CPU which Rust handler to call for exceptions and interrupts. Chronosapian
+currently handles breakpoints, general protection faults, page faults, double
+faults, and timer IRQs.
 
 The PIT is programmed to fire IRQ0 about 100 times per second. The legacy PIC is
 remapped so IRQ0 reaches IDT vector 32 instead of colliding with CPU exception
 vectors 0 through 31. Each timer interrupt increments an atomic tick counter and
 sends an end-of-interrupt command back to the PIC.
+
+The same PIT chip also feeds the PC speaker through channel 2. For `beep 440`,
+Chronosapian calculates a channel 2 divisor from the PIT input clock:
+`round(1_193_182 / 440)`. It writes that divisor to port `0x42`, then uses port
+`0x61` to open the speaker gate. Bit 0 enables the channel 2 gate, bit 1
+connects the speaker output, and clearing those bits silences the tone.
 
 ## Memory management in simple terms
 
@@ -359,23 +444,34 @@ allocation moves a pointer forward, and freeing is a no-op. This is tiny and
 predictable, but replacing notes or allocating more objects consumes heap space
 until reboot.
 
-## In-memory filesystem in simple terms
+## Persistent filesystem in simple terms
 
-Chronosapian now has a tiny volatile filesystem. It does not talk to a disk yet:
-files live only in heap memory and disappear on reboot.
+Chronosapian now has a tiny disk-backed filesystem named ChronoFS. The run
+scripts attach a separate 16 MiB IDE data disk, so the boot image remains
+untouched and sector 0 of the data disk can hold filesystem metadata.
 
-The filesystem stores a heap-allocated `Vec<File>`, where each `File` contains a
-name `String` and a content `String`. That data structure preserves insertion
-order for `ls`, is easy to inspect while learning, and keeps the implementation
-small. Looking up, overwriting, or removing a file uses a linear search through
-the vector. That is acceptable for this milestone because the expected file
-count is tiny. Filenames are single shell tokens and can be up to 32 bytes long.
+The ATA driver uses PIO mode: the CPU waits for the disk, then copies one
+512-byte sector at a time through port `0x1F0`. ChronoFS uses LBA numbers, so
+the disk is just sector `0`, sector `1`, sector `2`, and so on.
+
+ChronoFS keeps a small heap cache for shell reads, but disk is the source of
+truth after mount. If the second disk is missing or broken, the kernel falls
+back to the old heap-only file list and logs that choice to serial.
+
+Current limits:
+
+- filenames are at most 32 bytes,
+- filenames cannot contain whitespace,
+- file contents are one shell line,
+- each file can use at most 64 KiB,
+- there are 64 file slots,
+- no journaling exists yet, so killing QEMU during a write can corrupt files.
 
 ## What to build next
 
 1. Add interrupt-driven keyboard input instead of polling.
 2. Replace the bump heap with an allocator that can reuse freed memory.
-3. Add persistent disk-backed storage.
+3. Add crash recovery or a journal for disk writes.
 4. Add more app-like shell programs after the kernel basics stay stable.
 
 ## What is ours and what is borrowed
@@ -387,13 +483,15 @@ Ours:
 - GDT, IDT, PIC, and PIT setup
 - Exception and timer handlers
 - Basic memory management and bump allocation
-- In-memory filesystem
+- ATA PIO storage and ChronoFS
+- UEFI loader and ESP image builder
 - Theme and era model
 - Shell commands and tiny built-in apps
 - Scripts and docs
 
 Borrowed:
 - The `bootloader` crate
+- The `uefi` crate
 - The `x86_64` crate for low-level CPU data structures
 - QEMU
 - Rust bare-metal toolchain support

@@ -1,7 +1,5 @@
 //! Retro terminal RPG quests derived from compiled ChronoOS capabilities.
 
-use crate::theme::Era;
-
 const QUEST_USAGE: &str = "Usage: quest list|status";
 const INNER_WIDTH: usize = 72;
 
@@ -44,17 +42,7 @@ impl QuestState {
     }
 }
 
-#[derive(Clone, Copy)]
-struct FrameStyle {
-    top_left: &'static str,
-    top_fill: &'static str,
-    top_right: &'static str,
-    side_left: &'static str,
-    side_right: &'static str,
-    bottom_left: &'static str,
-    bottom_fill: &'static str,
-    bottom_right: &'static str,
-}
+type FrameStyle = crate::theme::TextFrameProfile;
 
 const QUESTS: &[Quest] = &[
     Quest {
@@ -178,6 +166,14 @@ const QUESTS: &[Quest] = &[
         state: QuestState::Complete,
     },
     Quest {
+        title: "Stone Archive",
+        summary: "Persistent disk storage",
+        flavor: "Words settle into stone and survive the reboot storm.",
+        inventory: Some("Disk Storage"),
+        next_step: "",
+        state: QuestState::Complete,
+    },
+    Quest {
         title: "Swift Fingers",
         summary: "Interrupt-driven keyboard input",
         flavor: "",
@@ -191,14 +187,6 @@ const QUESTS: &[Quest] = &[
         flavor: "",
         inventory: None,
         next_step: "Upgrade the bump heap so freed memory can be reused.",
-        state: QuestState::Locked,
-    },
-    Quest {
-        title: "Stone Archive",
-        summary: "Persistent disk storage",
-        flavor: "",
-        inventory: None,
-        next_step: "Add disk-backed storage so files survive reboot.",
         state: QuestState::Locked,
     },
 ];
@@ -387,48 +375,7 @@ fn rank_for(completed: usize, total: usize) -> &'static str {
 }
 
 fn frame_style() -> FrameStyle {
-    match crate::theme::active_era() {
-        Era::Eighties => FrameStyle {
-            top_left: "+",
-            top_fill: "=",
-            top_right: "+",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "+",
-            bottom_fill: "=",
-            bottom_right: "+",
-        },
-        Era::Nineties => FrameStyle {
-            top_left: "+",
-            top_fill: "-",
-            top_right: "+",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "+",
-            bottom_fill: "-",
-            bottom_right: "+",
-        },
-        Era::TwoThousands => FrameStyle {
-            top_left: "[",
-            top_fill: "-",
-            top_right: "]",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "[",
-            bottom_fill: "-",
-            bottom_right: "]",
-        },
-        Era::Future => FrameStyle {
-            top_left: "",
-            top_fill: "-",
-            top_right: "",
-            side_left: "|",
-            side_right: "|",
-            bottom_left: "",
-            bottom_fill: "-",
-            bottom_right: "",
-        },
-    }
+    crate::theme::active_profile().text_frame
 }
 
 fn print_header(title: &str, style: FrameStyle) {

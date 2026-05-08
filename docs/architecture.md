@@ -10,6 +10,8 @@ Chronosapian is split into **our code** and **borrowed infrastructure** on purpo
 - The public console layer in `kernel/src/console.rs`
 - The polling keyboard reader in `kernel/src/keyboard.rs`
 - The framebuffer text renderer in `kernel/src/framebuffer/`
+- The ATA PIO disk driver and ChronoFS filesystem
+- The opt-in ring 3 privilege transition demo
 - The era model in `kernel/src/theme.rs`
 - The startup welcome message
 - The PowerShell helper scripts and documentation
@@ -49,15 +51,17 @@ overwriting it.
 
 Chronosapian loads its own Global Descriptor Table (GDT) during early boot. In
 x86_64 long mode, old-style segmentation is mostly disabled, but the CPU still
-needs a valid code segment. The GDT also contains the Task State Segment (TSS),
-which gives the CPU a dedicated stack to use for especially dangerous
-exceptions.
+needs valid code and data descriptors to move between kernel ring 0 and user
+ring 3. The GDT also contains the Task State Segment (TSS), which gives the CPU
+dedicated stacks to use for especially dangerous exceptions and for traps from
+ring 3 back into the kernel.
 
 The Interrupt Descriptor Table (IDT) is the CPU's exception and interrupt
 vector table. Chronosapian registers Rust handlers for breakpoint, page fault, and
-double fault entries, then loads the table with `lidt`. These handlers use
-Rust's `extern "x86-interrupt"` ABI so the compiler preserves the stack layout
-that the CPU expects.
+double fault entries, plus a general protection fault handler for the ring 3
+demo, then loads the table with `lidt`. These handlers use Rust's
+`extern "x86-interrupt"` ABI so the compiler preserves the stack layout that
+the CPU expects.
 
 A double fault happens when the CPU encounters a second exception while trying
 to deliver or handle an earlier one. If the normal stack is already corrupted,
@@ -65,6 +69,25 @@ handling the double fault on that same stack can immediately become a triple
 fault and reset the machine. Chronosapian assigns double faults a separate TSS
 Interrupt Stack Table entry so the handler has a clean stack to report the
 failure.
+
+The `ring3` shell command builds an `iretq` frame that enters a tiny
+user-accessible code page. The first user instruction is privileged, so the CPU
+raises a general protection fault instead of executing it. That proves the
+privilege boundary is active independently from the syscall demo.
+
+The `syshello` command uses the same ring 3 entry machinery but runs a tiny
+user program that executes `SYSCALL`. Chronosapian configures the x86_64 syscall
+MSRs during boot, switches from the user stack to a dedicated kernel syscall
+stack on entry, dispatches the request by the number in `rax`, and returns with
+`SYSRET` for normal calls. This gives user mode a controlled way to ask for
+kernel services without jumping directly into kernel functions.
+
+The `exec` command reads a static ELF64 file from ChronoFS, validates its
+program headers, creates a foreground process page table, maps each `PT_LOAD`
+segment into the ELF user window, and enters the file's entry point in ring 3.
+Kernel mappings remain supervisor-only in the process page table so syscalls and
+exceptions still work after CR3 changes, while user buffers are checked against
+the active process ranges.
 
 ## PIT timer and PIC remapping
 
@@ -85,6 +108,56 @@ handler increments an atomic tick counter, and then it sends an end-of-interrupt
 command back to the PIC. The handler does not print per tick, because serial
 and framebuffer output are not interrupt-safe yet.
 
+Chronosapian also uses PIT channel 2 for the PC speaker. Unlike channel 0,
+channel 2 does not interrupt the CPU in this kernel; it produces a square wave
+that can be routed to the speaker. A requested tone is converted into a PIT
+divisor with `round(1_193_182 / frequency_hz)`, then the low and high divisor
+bytes are written to channel 2 data port `0x42` after programming command port
+`0x43`.
+
+The final speaker gate is port `0x61`. Bit 0 enables the PIT channel 2 gate, and
+bit 1 connects the speaker output path. Setting both bits lets the channel 2
+waveform reach the speaker; clearing those two bits preserves the rest of the
+port state and silences the tone. Sound events are logged to serial, for example
+`[CHRONO] sound: beep 440hz 500ms`.
+
+## Symmetric multiprocessing
+
+Chronosapian's first SMP milestone starts with two QEMU CPUs using `-smp 2`.
+The bootstrap processor (BSP) is core 0: firmware starts it first, and it owns
+early boot, device setup, and the shell. Application processors (APs) are the
+other CPUs. They wait until the BSP discovers them in the ACPI MADT table and
+sends startup commands through the local APIC.
+
+ACPI's MADT lists the local APIC IDs for usable processors and the local APIC
+MMIO address. The BSP parses RSDP, XSDT or RSDT, and MADT directly from the
+physical-memory mapping passed by the bootloader. If those tables are missing,
+Chronosapian logs the fallback and continues as a single-core kernel.
+
+AP startup uses the classic INIT-SIPI-SIPI sequence. INIT resets the target AP,
+the first SIPI points it at a low-memory trampoline page, and the second SIPI is
+sent for compatibility with hardware that misses the first one. The trampoline
+switches the AP from real mode to protected mode to long mode, loads the shared
+kernel page table, then jumps into Rust. Each online core loads its own GDT,
+IDT, TSS, double-fault stack, and ring 0 stack before entering the cooperative
+scheduler.
+
+SMP also changes synchronization. Disabling interrupts only stops interrupts on
+the current CPU; it does not stop another CPU from editing the same global data.
+Chronosapian uses a small spinlock for shared kernel state such as serial output
+and scheduler tables. A spinlock is an atomic busy-wait lock: one core flips an
+atomic flag to take ownership, while other cores spin until the flag is released.
+
+Modern x86 systems, including QEMU's emulated machine, keep normal memory cache
+coherent across cores. That means all cores eventually see the same memory
+contents, but atomics and acquire/release ordering still matter: they define
+when updates protected by locks become visible to other cores.
+
+The v1 scheduler remains cooperative. Timer preemption, IOAPIC routing, x2APIC,
+CPU hotplug, and live task migration are intentionally left for later. Ready
+tasks are assigned to the least-loaded online core when spawned, APs run ready
+kernel tasks from the shared table, and the shell stays on core 0.
+
 ## Basic memory management
 
 Chronosapian reads the bootloader's memory map to learn which physical RAM ranges
@@ -102,6 +175,19 @@ The heap uses a bump allocator. A bump allocator keeps one pointer to the next
 free byte and moves it forward for each allocation. That makes it tiny and
 predictable, but freeing memory is a no-op, so used heap space never comes back
 until the kernel grows a more complete allocator.
+
+## Persistent storage
+
+Chronosapian attaches a separate QEMU IDE data disk for shell files. The kernel
+talks to that disk with ATA PIO on the primary IDE channel: commands and status
+go through ports `0x1F0..0x1F7`, and sector data is copied as 256 16-bit words
+per 512-byte sector.
+
+The disk format is ChronoFS. Sector 0 is a superblock with the magic number,
+layout, file count, and checksum. The next sectors hold a fixed file table and
+a free-sector bitmap. File data is stored in contiguous sector runs. This is
+easy to inspect, but it has no journal, so an interrupted write can leave
+metadata inconsistent.
 
 ## What still hides low-level behavior
 

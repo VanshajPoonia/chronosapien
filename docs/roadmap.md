@@ -22,7 +22,7 @@ Status:
 3. **memory management**
    Introduce paging concepts, frame allocation, and the first allocator pieces.
 4. **filesystem and persistence**
-   Grow the current in-memory file list into persistent storage.
+   Grow ChronoFS with repair tools, journaling, or reusable free-space policies.
 5. **theme switching**
    Make era selection interactive only after the text terminal is stable.
 6. **graphics shell**

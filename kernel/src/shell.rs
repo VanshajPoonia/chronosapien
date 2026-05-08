@@ -16,7 +16,6 @@ use crate::wm;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
-const CURSOR_BLINK_TICKS: usize = 80_000;
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 
@@ -84,7 +83,7 @@ pub fn run() -> ! {
                     idle_ticks += 1;
                 }
 
-                if idle_ticks >= CURSOR_BLINK_TICKS {
+                if idle_ticks >= theme::active_profile().cursor_blink_ticks {
                     toggle_cursor(&mut cursor_visible);
                     wm::redraw_if_open();
                     idle_ticks = 0;
@@ -187,9 +186,14 @@ fn execute_command(command: &str) {
         "uptime" => print_uptime(),
         "clock" => print_clock(),
         "mem" => print_memory(),
+        "cores" => print_cores(),
+        command if command == "beep" || command.starts_with("beep ") => beep(command),
+        "ring3" => crate::ring3::run_demo(),
+        "syshello" => crate::ring3::run_syshello(),
         "ls" => list_files(),
         command if command == "cat" || command.starts_with("cat ") => cat_file(command),
         command if command == "write" || command.starts_with("write ") => write_file(command),
+        command if command == "exec" || command.starts_with("exec ") => exec_file(command),
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         command if command == "open" || command.starts_with("open ") => open_window(command),
@@ -204,8 +208,10 @@ fn execute_command(command: &str) {
 }
 
 fn print_help() {
-    println!("Commands: help, clear, about, reboot, era, uptime, clock, mem");
-    println!("Files: ls, cat <name>, write <name> <content>, rm <name>");
+    println!(
+        "Commands: help, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
+    );
+    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
     println!("Tasks: tasks, kill <id>");
@@ -238,6 +244,46 @@ fn print_memory() {
         stats.heap_start
     );
     println!("Used: {} KB", stats.heap_used_bytes / 1024);
+}
+
+fn print_cores() {
+    let counts = crate::smp::tasks_per_core();
+    let core_count = crate::smp::core_count();
+
+    println!("Cores: {}", core_count);
+    for core_id in 0..core_count {
+        println!("core {}: {} task(s)", core_id, counts[core_id]);
+    }
+}
+
+fn beep(command: &str) {
+    let mut parts = command.split_ascii_whitespace();
+    let _command_name = parts.next();
+
+    let Some(frequency) = parts.next() else {
+        println!("Usage: beep <hz>");
+        return;
+    };
+
+    if parts.next().is_some() {
+        println!("Usage: beep <hz>");
+        return;
+    }
+
+    let frequency_hz: u32 = match frequency.parse() {
+        Ok(frequency_hz) => frequency_hz,
+        Err(_) => {
+            println!("Usage: beep <hz>");
+            return;
+        }
+    };
+
+    match crate::sound::beep(frequency_hz, 500) {
+        Ok(()) => {}
+        Err(crate::sound::BeepError::FrequencyOutOfRange) => {
+            println!("beep: frequency must be 20..20000 Hz");
+        }
+    }
 }
 
 fn list_files() {
@@ -288,6 +334,23 @@ fn remove_file(command: &str) {
 
     match fs::remove(name) {
         Ok(()) => {}
+        Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn exec_file(command: &str) {
+    let name = command.strip_prefix("exec").unwrap_or("").trim();
+
+    if name.is_empty() {
+        println!("Usage: exec <name>");
+        return;
+    }
+
+    match fs::read_bytes(name) {
+        Ok(bytes) => match crate::process::exec_elf(name, bytes) {
+            Ok(code) => println!("[process exited: {}]", code),
+            Err(error) => print_exec_error(name, error),
+        },
         Err(error) => print_fs_error(name, error),
     }
 }
@@ -386,6 +449,24 @@ fn print_fs_error(name: &str, error: FsError) {
         FsError::NotFound => println!("file not found: {}", name),
         FsError::EmptyName | FsError::InvalidName => println!("invalid filename"),
         FsError::NameTooLong => println!("filename too long"),
+        FsError::FileTooLarge => println!("file too large"),
+        FsError::NoSpace => println!("not enough disk space"),
+        FsError::Disk => println!("disk error"),
+    }
+}
+
+fn print_exec_error(name: &str, error: crate::process::ExecError) {
+    match error {
+        crate::process::ExecError::AlreadyRunning => println!("exec: process already running"),
+        crate::process::ExecError::BadElf(crate::elf::ElfError::BadMagic) => {
+            println!("exec: not an ELF file: {}", name)
+        }
+        crate::process::ExecError::BadElf(crate::elf::ElfError::Unsupported) => {
+            println!("exec: unsupported ELF: {}", name)
+        }
+        crate::process::ExecError::BadElf(_) => println!("exec: malformed ELF: {}", name),
+        crate::process::ExecError::OutOfMemory => println!("exec: out of memory"),
+        crate::process::ExecError::TooManyRanges => println!("exec: too many ELF segments"),
     }
 }
 
@@ -436,11 +517,15 @@ fn reboot() -> ! {
 }
 
 fn draw_cursor() {
-    print!("_");
+    let profile = theme::active_profile();
+
+    print!("{}", profile.cursor_glyph);
 }
 
 fn erase_cursor() {
-    console::backspace();
+    for _ in 0..theme::active_profile().cursor_glyph.len() {
+        console::backspace();
+    }
 }
 
 fn show_cursor(cursor_visible: &mut bool) {

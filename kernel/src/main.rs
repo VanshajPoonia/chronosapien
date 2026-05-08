@@ -10,8 +10,10 @@ extern crate alloc;
 use core::cell::UnsafeCell;
 
 mod apps;
+mod ata;
 mod boot;
 mod console;
+mod elf;
 mod framebuffer;
 mod fs;
 mod gdt;
@@ -25,10 +27,16 @@ mod net;
 mod panic;
 mod pci;
 mod pic;
+mod process;
 mod quest;
+mod ring3;
 mod sched;
 mod serial;
 mod shell;
+mod sound;
+mod spinlock;
+mod smp;
+mod syscall;
 mod theme;
 mod timer;
 mod wm;
@@ -84,24 +92,32 @@ fn boot_with_context(context: boot::BootContext) -> ! {
     console::init(boot_context.framebuffer, profile);
     serial_println!("[CHRONO] console initialized");
 
-    gdt::init();
-    interrupts::init();
+    gdt::init_bsp();
+    syscall::init();
+    interrupts::init_bsp();
     interrupts::trigger_test_breakpoint();
     memory::init(boot_context);
+    smp::init_bsp(boot_context);
+    fs::init();
     pic::init();
     timer::init();
     mouse::init();
     net::init();
+    sched::init();
     x86_64::instructions::interrupts::enable();
 
     let era_name = STARTUP_ERA.name();
     serial_println!("[CHRONO] active era: {}", era_name);
+    smp::start_aps();
+    sound::play_boot_chime(profile);
     keyboard::init();
 
+    for line in profile.boot_lines {
+        println!("{}", line);
+    }
     println!("{}", profile.boot_welcome);
     println!("Era: {}", profile.name);
 
-    sched::init();
     serial_println!("[CHRONO] boot complete");
 
     shell::run()
