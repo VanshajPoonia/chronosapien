@@ -18,6 +18,7 @@ if (-not (Test-Path $dataImage)) {
 }
 
 qemu-system-x86_64 `
+    -smp 2 `
     -drive "format=raw,file=$image,if=ide,index=0,media=disk" `
     -drive "format=raw,file=$dataImage,if=ide,index=1,media=disk" `
     -netdev "user,id=net0,hostfwd=udp::9000-:9000" `
