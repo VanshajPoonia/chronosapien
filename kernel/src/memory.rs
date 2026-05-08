@@ -19,6 +19,9 @@ use x86_64::{PhysAddr, VirtAddr};
 
 use crate::boot::{BootContext, MemoryRegion, MemoryRegionKind};
 
+pub const SMP_BOOT_DATA_PHYS: u64 = 0x7000;
+pub const SMP_TRAMPOLINE_PHYS: u64 = 0x8000;
+pub const SMP_TRAMPOLINE_SIZE: u64 = PAGE_SIZE;
 pub const HEAP_START: u64 = 0x200000;
 pub const HEAP_SIZE: u64 = 1024 * 1024;
 pub const USER_CODE_START: u64 = 0x400000;
@@ -194,6 +197,30 @@ pub fn copy_to_frame(frame: PhysFrame<Size4KiB>, offset: usize, bytes: &[u8]) ->
         unsafe {
             core::ptr::copy_nonoverlapping(bytes.as_ptr(), destination, bytes.len());
         }
+        true
+    })
+    .unwrap_or(false)
+}
+
+pub fn phys_to_mut(physical_address: u64) -> Option<*mut u8> {
+    with_memory_state(|state| {
+        (state.physical_memory_offset + physical_address).as_mut_ptr()
+    })
+}
+
+pub fn identity_map_physical_range(start: u64, end: u64) -> bool {
+    with_memory_state(|state| {
+        let mut mapper = unsafe { init_offset_page_table(state.physical_memory_offset) };
+        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+        let start_frame: PhysFrame<Size4KiB> =
+            PhysFrame::containing_address(PhysAddr::new(start));
+        let end_frame: PhysFrame<Size4KiB> =
+            PhysFrame::containing_address(PhysAddr::new(end.saturating_sub(1)));
+
+        for frame in PhysFrame::range_inclusive(start_frame, end_frame) {
+            identity_map_frame(&mut mapper, &mut state.frame_allocator, frame, flags);
+        }
+
         true
     })
     .unwrap_or(false)
@@ -423,6 +450,7 @@ impl BootInfoFrameAllocator {
             })
             .filter(|frame| !frame_is_heap_frame(*frame))
             .filter(|frame| !frame_is_user_demo_frame(*frame))
+            .filter(|frame| !frame_is_smp_boot_frame(*frame))
     }
 }
 
@@ -444,6 +472,12 @@ fn frame_is_user_demo_frame(frame: PhysFrame<Size4KiB>) -> bool {
     let start = frame.start_address().as_u64();
 
     start == USER_CODE_START || start == USER_STACK_START
+}
+
+fn frame_is_smp_boot_frame(frame: PhysFrame<Size4KiB>) -> bool {
+    let start = frame.start_address().as_u64();
+
+    start == SMP_BOOT_DATA_PHYS || start == SMP_TRAMPOLINE_PHYS
 }
 
 pub struct BumpAllocator {

@@ -17,6 +17,7 @@ pub struct BootContext {
     pub framebuffer: Framebuffer,
     pub memory_regions: &'static [MemoryRegion],
     pub physical_memory_offset: Option<u64>,
+    pub rsdp_addr: Option<u64>,
     pub kernel_addr: u64,
     pub kernel_len: u64,
 }
@@ -113,6 +114,7 @@ pub fn context_from_bootloader(boot_info: &'static mut bootloader_api::BootInfo)
         framebuffer,
         memory_regions,
         physical_memory_offset: boot_info.physical_memory_offset.into_option(),
+        rsdp_addr: boot_info.rsdp_addr.into_option(),
         kernel_addr: boot_info.kernel_addr,
         kernel_len: boot_info.kernel_len,
     }
@@ -149,6 +151,7 @@ pub unsafe fn context_from_custom(info: *const ChronoBootInfo) -> BootContext {
         },
         memory_regions,
         physical_memory_offset: Some(info.physical_memory_offset),
+        rsdp_addr: None,
         kernel_addr: info.kernel_addr,
         kernel_len: info.kernel_len,
     }
