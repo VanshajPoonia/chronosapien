@@ -116,3 +116,23 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Build sanity and the journal recovery scenarios listed above.
 - New risks introduced: None expected from commit slicing itself.
 - Next recommended step: After push, restore Cargo/toolchain access and run a build-only check.
+
+### 2026-05-26 — Add text-first demo command
+- Prompt/task: Add a safe `demo` shell command that guides users through the best current Time Capsule OS features without adding kernel subsystems.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `demo` to shell dispatch/help and implemented a text-only tour covering the current era, era commands, museum pages, filesystem commands, sysinfo, apps, windows/tasks, and user-space previews.
+- What was intentionally avoided: No era switching, file writes/deletes, `fsck repair`, app/window/task spawning, user-space execution, new low-level systems, terminal commands, QEMU/manual testing request, or project rename.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity once Cargo is available, then shell-level verification that `demo` prints the guide and `demo <anything>` prints usage.
+- New risks introduced: Minimal; the command only prints text and reads the current era and file list.
+- Next recommended step: Run a build-only check before adding more demo polish.
+
+### 2026-05-26 — Slice demo command progress into commits
+- Prompt/task: Slice the demo command progress into 3 commits and push to GitHub.
+- Files changed: `docs/AI_PROGRESS_LOG.md` plus the files changed by the demo command implementation.
+- What changed: Recorded the requested commit slicing and push task for the text-first demo work.
+- What was intentionally avoided: No additional demo or kernel behavior beyond the implementation already being committed.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity and the demo shell scenarios listed above.
+- New risks introduced: None expected from commit slicing itself.
+- Next recommended step: After push, restore Cargo/toolchain access and run a build-only check.
