@@ -180,6 +180,7 @@ fn execute_command(command: &str) {
     match command {
         "" => {}
         "help" => print_help(),
+        command if command == "demo" || command.starts_with("demo ") => run_demo(command),
         "clear" => console::clear(),
         "about" => print_about(),
         "reboot" => reboot(),
@@ -211,7 +212,7 @@ fn execute_command(command: &str) {
 
 fn print_help() {
     println!(
-        "Commands: help, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
+        "Commands: help, demo, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
     );
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>, fsck [repair], journal");
     println!("Apps: notes, calc, sysinfo");
