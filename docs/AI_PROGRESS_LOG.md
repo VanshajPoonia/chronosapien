@@ -106,3 +106,13 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Build sanity once Cargo is available, then mount recovery scenarios for missing/clean/intent/committed/corrupt journals and user rejection of the reserved journal filename.
 - New risks introduced: The journal consumes one hidden file slot and one data sector; recovery writes metadata during mount and must be compile/runtime validated.
 - Next recommended step: Run a build-only check before adding more ChronoFS behavior, then test journal recovery with controlled disk images.
+
+### 2026-05-26 — Slice journal progress into commits
+- Prompt/task: Slice the ChronoFS journal progress into 12 commits and push to GitHub.
+- Files changed: `docs/AI_PROGRESS_LOG.md` plus the files changed by the journal implementation.
+- What changed: Recorded the requested commit slicing and push task for the journal work.
+- What was intentionally avoided: No additional filesystem behavior beyond the journal implementation being committed.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity and the journal recovery scenarios listed above.
+- New risks introduced: None expected from commit slicing itself.
+- Next recommended step: After push, restore Cargo/toolchain access and run a build-only check.
