@@ -11,6 +11,7 @@ const STATUS_PORT: u16 = 0x64;
 const DATA_PORT: u16 = 0x60;
 const OUTPUT_BUFFER_FULL: u8 = 1 << 0;
 const AUXILIARY_OUTPUT: u8 = 1 << 5;
+const KEYBOARD_BUFFER_CAPACITY: usize = 64;
 
 #[derive(Clone, Copy, Debug)]
 pub enum KeyEvent {
@@ -22,18 +23,58 @@ pub enum KeyEvent {
 #[derive(Clone, Copy)]
 struct KeyboardState {
     shift_pressed: bool,
+    buffer: [Option<KeyEvent>; KEYBOARD_BUFFER_CAPACITY],
+    read_index: usize,
+    write_index: usize,
+    len: usize,
+    overflow_logged: bool,
+}
+
+impl KeyboardState {
+    const fn new() -> Self {
+        Self {
+            shift_pressed: false,
+            buffer: [None; KEYBOARD_BUFFER_CAPACITY],
+            read_index: 0,
+            write_index: 0,
+            len: 0,
+            overflow_logged: false,
+        }
+    }
+
+    fn push_event(&mut self, event: KeyEvent) -> bool {
+        if self.len >= KEYBOARD_BUFFER_CAPACITY {
+            return false;
+        }
+
+        self.buffer[self.write_index] = Some(event);
+        self.write_index = (self.write_index + 1) % KEYBOARD_BUFFER_CAPACITY;
+        self.len += 1;
+        self.overflow_logged = false;
+        true
+    }
+
+    fn pop_event(&mut self) -> Option<KeyEvent> {
+        if self.len == 0 {
+            return None;
+        }
+
+        let event = self.buffer[self.read_index];
+        self.buffer[self.read_index] = None;
+        self.read_index = (self.read_index + 1) % KEYBOARD_BUFFER_CAPACITY;
+        self.len -= 1;
+        event
+    }
 }
 
 struct GlobalKeyboard(UnsafeCell<KeyboardState>);
 
 unsafe impl Sync for GlobalKeyboard {}
 
-static KEYBOARD_STATE: GlobalKeyboard = GlobalKeyboard(UnsafeCell::new(KeyboardState {
-    shift_pressed: false,
-}));
+static KEYBOARD_STATE: GlobalKeyboard = GlobalKeyboard(UnsafeCell::new(KeyboardState::new()));
 
 pub fn init() {
-    crate::serial_println!("[CHRONO] keyboard initialized");
+    crate::serial_println!("[CHRONO] keyboard initialized (IRQ buffer ready)");
 }
 
 pub fn read_key() -> Option<KeyEvent> {
