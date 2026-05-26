@@ -362,8 +362,17 @@ impl DiskState {
         let superblock_file_count = read_superblock(&superblock)?;
         let bitmap = read_bitmap()?;
         let entries = read_file_table()?;
-        let files = read_files(&entries)?;
-        let file_count = files.len() as u32;
+        let mut disk = Self {
+            entries,
+            bitmap,
+            file_count: 0,
+        };
+        disk.file_count = count_used_entries(&disk.entries) as u32;
+        disk.recover_journal_on_mount();
+        disk.ensure_journal();
+        disk.file_count = count_used_entries(&disk.entries) as u32;
+        let files = read_files(&disk.entries)?;
+        let file_count = disk.file_count;
 
         if file_count != superblock_file_count {
             crate::serial_println!(
@@ -375,14 +384,7 @@ impl DiskState {
             crate::serial_println!("[CHRONO] fs: mounted ChronoFS files={}", file_count);
         }
 
-        Ok((
-            Self {
-                entries,
-                bitmap,
-                file_count,
-            },
-            files,
-        ))
+        Ok((disk, files))
     }
 
     fn write_file(
