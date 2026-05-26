@@ -453,13 +453,27 @@ impl DiskState {
         };
 
         let old_entry = self.entries[entry_index];
+        let new_entry = DiskEntry::empty();
+        let mut journal = JournalRecord::new(
+            JOURNAL_STATE_INTENT,
+            JOURNAL_OP_REMOVE,
+            entry_index,
+            name,
+            old_entry,
+            new_entry,
+        );
+        self.write_journal_record(&journal)?;
+
         self.mark_range(old_entry.start_sector, old_entry.sector_count, false);
-        self.entries[entry_index] = DiskEntry::empty();
+        self.entries[entry_index] = new_entry;
         self.file_count = self.file_count.saturating_sub(1);
 
         self.sync_bitmap()?;
         self.sync_entry_sector(entry_index)?;
         self.sync_superblock()?;
+        journal.state = JOURNAL_STATE_COMMITTED;
+        self.write_journal_record(&journal)?;
+        self.complete_journal(&journal)?;
 
         if let Some(index) = files.iter().position(|file| file.name == name) {
             files.remove(index);
