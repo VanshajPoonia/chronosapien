@@ -61,6 +61,8 @@ pub struct MemoryStats {
     pub heap_start: u64,
     pub heap_size_bytes: u64,
     pub heap_used_bytes: u64,
+    pub heap_free_bytes: u64,
+    pub heap_largest_free_block_bytes: u64,
 }
 
 pub fn init(boot_context: &'static BootContext) {
@@ -227,11 +229,16 @@ pub fn identity_map_physical_range(start: u64, end: u64) -> bool {
 }
 
 pub fn stats() -> MemoryStats {
+    let heap_used_bytes = ALLOCATOR.used() as u64;
+    let heap_free_bytes = HEAP_SIZE.saturating_sub(heap_used_bytes);
+
     MemoryStats {
         total_memory_bytes: TOTAL_MEMORY_BYTES.load(Ordering::Relaxed),
         heap_start: HEAP_START,
         heap_size_bytes: HEAP_SIZE,
-        heap_used_bytes: ALLOCATOR.used() as u64,
+        heap_used_bytes,
+        heap_free_bytes,
+        heap_largest_free_block_bytes: heap_free_bytes,
     }
 }
 
