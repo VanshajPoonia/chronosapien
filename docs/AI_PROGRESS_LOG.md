@@ -36,3 +36,13 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Future runs should verify build sanity, BIOS boot, framebuffer/serial/shell behavior, filesystem persistence, mouse/window behavior, timer/interrupts, ring 3/syscall/ELF behavior, networking, SMP, and UEFI/custom boot paths.
 - New risks introduced: None expected; this is documentation/process setup only.
 - Next recommended step: Run build sanity checks later in a dedicated verification task before changing OS features.
+
+### 2026-05-26 — Add IRQ1 keyboard buffering
+- Prompt/task: Implement interrupt-driven PS/2 keyboard input while preserving polling input as a fallback.
+- Files changed: `kernel/src/keyboard.rs`, `kernel/src/pic.rs`, `kernel/src/interrupts.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a fixed-size no-heap keyboard event ring buffer, shared scancode decoding between IRQ and polling paths, wired IRQ1 into the IDT/PIC setup, and kept `keyboard::read_key()` as the shell-facing API.
+- What was intentionally avoided: No terminal commands, build commands, QEMU runs, scripts, lockfile regeneration, unrelated refactors, new OS features, or project renaming.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity, BIOS boot, IRQ1 delivery, shell typing, shifted characters, Backspace, Enter, polling fallback behavior, timer IRQ0 regression, and mouse IRQ12 regression.
+- New risks introduced: IRQ keyboard buffering adds another interrupt/shared-state path; runtime testing must confirm the PIC mask and EOI behavior are correct.
+- Next recommended step: Run a dedicated build-and-boot verification pass later, starting with compile checks before QEMU testing.
