@@ -222,6 +222,72 @@ fn print_help() {
     println!("Quests: quest list, quest status, stats, inventory");
 }
 
+fn run_demo(command: &str) {
+    let rest = command.strip_prefix("demo").unwrap_or("").trim();
+    if !rest.is_empty() {
+        println!("Usage: demo");
+        return;
+    }
+
+    let profile = theme::active_profile();
+
+    println!("Time Capsule OS demo");
+    println!("This guide is text-only. It does not change system state.");
+    println!();
+
+    println!("[1] Current era");
+    println!("Active era: {}", profile.name);
+    println!("Prompt: {}", profile.screen_prompt);
+    println!();
+
+    println!("[2] Era switching preview");
+    println!("Try later: era 1984 | era 1995 | era 2007 | era 2040");
+    println!("The demo only previews these commands; it does not switch era.");
+    println!();
+
+    println!("[3] Museum mode preview");
+    println!("Explore: museum boot|kernel|memory|interrupts|keyboard|serial|era");
+    println!("These pages explain the OS pieces in small, readable steps.");
+    println!();
+
+    println!("[4] Filesystem preview");
+    println!("Read-only tour commands: ls, cat <name>, fsck, journal");
+    println!("Changing commands: write <name> <content>, rm <name>, fsck repair");
+    print_demo_files();
+    println!();
+
+    println!("[5] Sysinfo preview");
+    println!("Use sysinfo for a compact status view.");
+    println!("Use open sysinfo to see it in a small window.");
+    println!();
+
+    println!("[6] Apps preview");
+    println!("Apps: notes, calc, sysinfo");
+    println!("These are shell apps, not new kernel subsystems.");
+    println!();
+
+    println!("[7] Advanced preview");
+    println!("Windows: open notes, open sysinfo");
+    println!("Tasks: tasks, kill <id>");
+    println!("User-space demos: ring3, syshello, exec <name>");
+    println!("This guide does not spawn tasks, open windows, or execute programs.");
+}
+
+fn print_demo_files() {
+    let mut printed_header = false;
+    let has_files = fs::list(|name| {
+        if !printed_header {
+            println!("Current files:");
+            printed_header = true;
+        }
+        println!("- {}", name);
+    });
+
+    if !has_files {
+        println!("Current files: (none)");
+    }
+}
+
 fn print_about() {
     let profile = theme::active_profile();
 
