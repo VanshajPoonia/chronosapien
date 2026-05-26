@@ -56,3 +56,13 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Kernel compile sanity, boot to shell, `mem`/`sysinfo` stats, allocation reuse after repeated file/window/task operations, and regressions in ChronoFS, ELF loading, scheduler/window close, and apps.
 - New risks introduced: The allocator now has metadata and coalescing logic that must be validated under real allocation/deallocation patterns; double-free detection and corruption guards are intentionally not included.
 - Next recommended step: Run build-only checks later before any more kernel feature work, then boot and exercise heap-using shell commands.
+
+### 2026-05-26 — Slice progress into commits and push
+- Prompt/task: Split the current documentation/process, IRQ keyboard, and reusable heap progress into 20 commits and push the branch to GitHub.
+- Files changed: `docs/AI_PROGRESS_LOG.md` plus the files already changed by the work being committed.
+- What changed: Recorded the requested 20-commit slicing and GitHub push task after organizing the existing progress into a branch commit series.
+- What was intentionally avoided: No feature changes beyond recording the commit/push task.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity and the runtime checks already listed for IRQ keyboard input and the reusable heap allocator.
+- New risks introduced: None expected from this log entry; commit slicing itself should preserve existing file contents.
+- Next recommended step: After push, run a dedicated build verification pass before adding more OS behavior.
