@@ -11,6 +11,7 @@ pub fn run(args: &str) {
     let memory = crate::memory::stats();
     let uptime = crate::timer::uptime_seconds();
     let used_kb = memory.heap_used_bytes / 1024;
+    let free_kb = memory.heap_free_bytes / 1024;
 
     crate::println!("{}", style.header);
     if style.compact {
@@ -23,13 +24,15 @@ pub fn run(args: &str) {
             profile.name
         );
         crate::println!(
-            "{}{}{} {}{}{}",
+            "{}{}{} {}{}{} free{}{}",
             style.uptime_label,
             style.separator,
             uptime,
             style.mem_label,
             style.separator,
-            used_kb
+            used_kb,
+            style.separator,
+            free_kb
         );
     } else {
         crate::println!("{}{}Chronosapian", style.os_label, style.separator);
@@ -41,5 +44,6 @@ pub fn run(args: &str) {
             uptime
         );
         crate::println!("{}{}{} KB", style.mem_label, style.separator, used_kb);
+        crate::println!("FREE{}{} KB", style.separator, free_kb);
     }
 }
