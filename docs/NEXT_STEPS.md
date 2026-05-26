@@ -15,7 +15,7 @@
 
 - Interrupt-driven keyboard: code-present but unverified; IRQ1 buffering was added and the polling path should remain usable as a fallback.
 - Reusable heap allocator: code-present but unverified; current allocator uses a simple free list and needs build/runtime validation.
-- ChronoFS repair/journaling: missing; current filesystem has no crash recovery or repair path.
+- ChronoFS repair/journaling: code-present but unverified; `fsck` and a tiny one-record journal exist, but crash recovery needs build/runtime validation.
 - Graphics shell: partial; framebuffer console and small windows exist, but there is no full desktop/compositor.
 - Process model: partial; ring 3, syscalls, and static ELF execution exist, but there is no dynamic linker, argv/env, or general multiprocess model.
 - Scheduler: partial; cooperative task scheduling exists, but preemption and production-grade scheduling are not current goals.
