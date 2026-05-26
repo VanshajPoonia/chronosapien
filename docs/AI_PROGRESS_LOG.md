@@ -156,3 +156,93 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Build sanity is blocked in this shell because `cargo` is unavailable; shell checks for all `tour` forms are still needed.
 - New risks introduced: None expected from committing and pushing the existing scoped changes.
 - Next recommended step: Run a build-only check before extending the tour further.
+
+### 2026-05-26 — Add capsule timeline command
+- Prompt/task: Add a read-only `capsule` shell command family that shows completed, partial, and planned OS milestones using the current quest/museum style.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `capsule`, `capsule milestones`, `capsule current`, and `capsule next`; added `capsule` to help; implemented era-aware timeline text that separates `code-present`, `partial`, `planned`, and `runtime verification needed`.
+- What was intentionally avoided: No new kernel systems, roadmap file edits, era switching, file writes/deletes, fs repair, journal mutation, app/window/task spawning, user-space execution, terminal commands, manual testing request, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for `capsule`, `capsule milestones`, `capsule current`, `capsule next`, and an invalid form such as `capsule now`.
+- New risks introduced: Low; the command only prints text and reads the active era/profile.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify the capsule output in the OS shell.
+
+### 2026-05-26 — Add doctor subsystem health command
+- Prompt/task: Add a read-only `doctor` shell command that reports subsystem health without faking checks.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `doctor` to shell dispatch/help and implemented an era-aware health report for serial, framebuffer, timer, keyboard, mouse, filesystem, heap, network, SMP/core count, scheduler, and userspace/ELF support.
+- What was intentionally avoided: No new diagnostics framework, hardware probes, filesystem repairs, journal mutation, network tests, allocations for heap testing, task/app/window spawning, user-space execution, terminal commands, roadmap file edits, manual testing request, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for `doctor` and an invalid form such as `doctor now`.
+- New risks introduced: Low; the command only prints text and reads the active era/profile.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify the doctor output in the OS shell.
+
+### 2026-05-26 — Improve apps text launcher
+- Prompt/task: Improve the `apps` command into a text-based app launcher with era-specific styling.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added an era-styled `apps` launcher with entries for notes, calc, sysinfo, files, clock, museum, theme, and tasks; added `apps <name>` routing for existing simple app commands and text cards for files, museum, and theme command groups.
+- What was intentionally avoided: No full desktop, heavy GUI architecture, new kernel subsystem, file mutation from the launcher, automatic era switching, terminal commands, manual testing request, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for `apps`, every `apps <name>` entry, and an invalid form such as `apps paint`.
+- New risks introduced: Low to moderate; `apps <name>` delegates to existing shell commands for notes, calc, sysinfo, clock, and tasks, so those paths still need runtime confirmation.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify the launcher output in each era.
+
+### 2026-05-26 — Add travel year-to-era command
+- Prompt/task: Add a `travel <year>` command that maps years to existing Time Capsule OS era profiles and explains the mapping.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `travel <year>` to shell dispatch/help; mapped 1980s to `era 1984`, 1990s to `era 1995`, 2000s to `era 2007`, and 2010+ years to `era 2040`; prints the requested year, mapped era, explanation, and equivalent era command before delegating to the existing era command path.
+- What was intentionally avoided: No new theme system, new era profiles, GUI/desktop behavior, app behavior, file writes, terminal commands, manual testing request, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for `travel 1987`, `travel 1998`, `travel 2004`, `travel 2049`, malformed years, years before 1980, and extra arguments.
+- New risks introduced: Low; the only intentional state change is switching the active era through the existing `era` command path.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify travel mappings in the OS shell.
+
+### 2026-05-26 — Expand deep museum pages
+- Prompt/task: Expand museum mode into deeper pages for disk, filesystem, userspace, syscalls, ELF, networking, SMP, and scheduler.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added dispatch and discoverability for `museum disk`, `museum filesystem`, `museum userspace`, `museum syscalls`, `museum elf`, `museum networking`, `museum smp`, and `museum scheduler`; each page explains what the concept means, what Time Capsule OS currently does, what real operating systems do, and what is still missing.
+- What was intentionally avoided: No new kernel systems, probes, drivers, networking behavior, scheduler behavior, filesystem behavior, userspace execution behavior, terminal commands, manual testing request, roadmap file edits, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for each new `museum <topic>` page and museum topic discoverability text.
+- New risks introduced: Low; pages are text-only and read only the active era/profile for context.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify every new museum page in the OS shell.
+
+### 2026-05-26 — Add poster mode screenshot screens
+- Prompt/task: Add `poster` mode screens that create screenshot-friendly displays for build-in-public updates.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `poster`, `poster boot`, `poster system`, `poster roadmap`, and `poster eras`; added `poster` to help; implemented compact ASCII-only text cards for overview, boot flow, subsystem status, roadmap state, and era showcase.
+- What was intentionally avoided: No external assets, full graphics system, GUI/desktop architecture, file mutation, era switching, runtime checks, app/window/task spawning, userspace execution, terminal commands, manual testing request, roadmap file edits, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for `poster`, `poster boot`, `poster system`, `poster roadmap`, `poster eras`, and an invalid form such as `poster gallery`.
+- New risks introduced: Low; poster screens only print text and read the active era/profile.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify screenshots in the framebuffer/text UI.
+
+### 2026-05-26 — Improve notes into persistent text app
+- Prompt/task: Improve `notes` into a small persistent app with read/write/clear/save behavior and optional window mode if the existing window manager supports it.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `notes`, `notes read`, `notes write <text>`, `notes clear`, `notes save`, and `notes open`; the app stores notes in the existing ChronoFS-style file name `notes` by delegating to existing `cat`, `write`, and `rm` shell commands, and `notes open` delegates to the existing `open notes` path.
+- What was intentionally avoided: No complex editor, new storage subsystem, new window manager behavior, full desktop, terminal commands, manual testing request, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus shell checks for `notes`, `notes read`, `notes write hello`, `notes clear`, `notes save`, `notes open`, and invalid forms.
+- New risks introduced: Moderate; notes now delegates through existing shell commands, so persistence depends on current ChronoFS command behavior and window mode depends on the existing `open notes` support.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify note persistence across reads and clears in the OS shell.
+
+### 2026-05-26 — Add portfolio showcase case study
+- Prompt/task: Create `docs/showcase.md` explaining Time Capsule OS like a portfolio case study.
+- Files changed: `docs/showcase.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a showcase document with project concept, uniqueness, architecture overview, implemented systems, partial systems, product identity, screenshots/GIFs to capture later, resume bullet ideas, future roadmap, and build-in-public story.
+- What was intentionally avoided: No runtime success claims, screenshots, GIFs, generated assets, external links, code changes, roadmap priority changes, kernel behavior changes, project rename, terminal commands, or manual testing request.
+- Runtime verified: no.
+- If not verified, what still needs verification: Editorial review plus later build/runtime evidence before converting capture targets into actual screenshots or success claims.
+- New risks introduced: Low; this is documentation-only and uses conservative `code-present`, `partial`, `planned`, and `runtime verification needed` language.
+- Next recommended step: After runtime verification, capture the listed screenshots/GIFs and link them from the showcase.
+
+### 2026-05-26 — Slice recent progress into two commits
+- Prompt/task: Slice recent progress into 2 commits and push to GitHub.
+- Files changed: `kernel/src/shell.rs`, `docs/showcase.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Recorded the requested two-commit slicing and push for the recent shell education/app features and showcase documentation.
+- What was intentionally avoided: No additional OS behavior beyond the scoped changes already prepared.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity plus OS-shell checks for the recently added commands and docs review for `docs/showcase.md`.
+- New risks introduced: None expected from commit slicing itself.
+- Next recommended step: After push, run a build-only check once Cargo/toolchain access is available.
