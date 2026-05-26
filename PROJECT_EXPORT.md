@@ -21,7 +21,7 @@ We are building a small educational operating system that boots on emulated PC-c
 - Optional Rust UEFI loader that packages a GPT/FAT32 EFI System Partition image.
 - Framebuffer console with era-specific colors, prompt, boot text, top bar, cursor timing, boot chimes, text frames, sysinfo formatting, and window styling.
 - Tiny command shell with built-ins, apps, file commands, networking commands, museum/quest commands, windows, and task commands.
-- Early kernel subsystems: GDT, TSS, IDT, PIC, PIT, serial, PS/2 keyboard polling, PS/2 mouse IRQ handling, ATA PIO, PCI scanning, RTL8139 networking, paging, bump heap, SMP discovery/AP startup, and cooperative scheduling.
+- Early kernel subsystems: GDT, TSS, IDT, PIC, PIT, serial, PS/2 keyboard polling with IRQ1 buffering, PS/2 mouse IRQ handling, ATA PIO, PCI scanning, RTL8139 networking, paging, reusable free-list heap, SMP discovery/AP startup, and cooperative scheduling.
 - Small ring 3/user-mode path: fixed demo, SYSCALL/SYSRET services, and one foreground static ELF process loaded from ChronoFS.
 
 ## 3. Current Tech Stack
@@ -137,8 +137,8 @@ README's folder tree is stale. It does not list several current source files, in
 - `kernel/src/console.rs`: `print!` and `println!` macros over the framebuffer writer.
 - `kernel/src/serial.rs`: COM1 serial output guarded by a spinlock.
 - `kernel/src/gdt.rs`, `interrupts.rs`, `pic.rs`, `timer.rs`: descriptor tables, exception/IRQ handlers, PIC remap, PIT timer.
-- `kernel/src/memory.rs`: boot memory map handling, paging helpers, fixed user pages, first heap, bump allocator, user address-space support.
-- `kernel/src/keyboard.rs`: polling PS/2 keyboard decoder.
+- `kernel/src/memory.rs`: boot memory map handling, paging helpers, fixed user pages, reusable free-list heap allocator, user address-space support.
+- `kernel/src/keyboard.rs`: PS/2 keyboard decoder with IRQ1 buffering and polling fallback.
 - `kernel/src/mouse.rs`: interrupt-driven PS/2 mouse packet handling and event publication.
 - `kernel/src/shell.rs`: command loop and command dispatch.
 - `kernel/src/theme.rs`: era profiles for prompts, colors, boot text, sounds, windows, text frames, and sysinfo.
@@ -172,9 +172,9 @@ These are code-present but not runtime-verified in this shell:
 - Era profiles for 1984, 1995, 2007, and 2040.
 - PC speaker boot chimes and `beep <hz>`.
 - GDT/TSS setup with double-fault and ring 0 stacks.
-- IDT handlers for breakpoint, general protection fault, page fault, double fault, timer IRQ, and mouse IRQ.
+- IDT handlers for breakpoint, general protection fault, page fault, double fault, timer IRQ, keyboard IRQ, and mouse IRQ.
 - Legacy PIC remap and PIT 100 Hz tick counter.
-- PS/2 keyboard polling and ASCII decoding.
+- PS/2 keyboard IRQ1 buffering with polling fallback and ASCII decoding.
 - PS/2 mouse initialization, IRQ12 packet decoding, click/move event publication.
 - Shell commands for help/about/clear/reboot/era/uptime/clock/mem/cores/beep/ring3/syshello/files/exec/windows/tasks/network/museum/quests/apps.
 - Built-in apps: one-line persistent notes, integer calculator, era-styled sysinfo.
@@ -182,7 +182,7 @@ These are code-present but not runtime-verified in this shell:
 - Cooperative scheduler with fixed task slots and task stacks; `tasks` and `kill <id>` shell commands.
 - SMP discovery and AP startup using ACPI MADT and INIT-SIPI-SIPI, with fallback to one core if discovery/setup fails.
 - Spinlock primitive for shared kernel state.
-- Bump heap allocator with 1 MiB heap at `0x200000`.
+- Reusable free-list heap allocator with 1 MiB heap at `0x200000`, block splitting, free reinsertion, and adjacent-block coalescing.
 - ATA PIO read/write of the primary slave IDE disk.
 - ChronoFS disk format with superblock, file table, bitmap, contiguous file sectors, and heap fallback if disk mount fails.
 - File shell commands: `ls`, `cat <name>`, `write <name> <content>`, `rm <name>`, `exec <name>`.
@@ -196,9 +196,9 @@ These are code-present but not runtime-verified in this shell:
 ## 7. Features Partially Implemented Or Limited
 
 - Runtime behavior is not verified in this environment because Rust/QEMU/PowerShell tools are unavailable on `PATH`.
-- Keyboard input is still polling. The planned interrupt-driven keyboard path is not implemented.
+- Keyboard input has code-present IRQ1 buffering plus a polling fallback, but runtime IRQ delivery and typing behavior are not verified.
 - Mouse input is interrupt-driven in code, but the README still says mouse support is not part of the milestone.
-- Heap allocator is bump-only; `dealloc` is a no-op and freed memory is not reused.
+- Heap allocation uses a code-present reusable free list, but allocation reuse and coalescing are not runtime-verified.
 - ChronoFS has no journal or repair tool. Interrupted writes/removes can corrupt metadata.
 - ChronoFS stores fixed-size metadata and contiguous file extents only. Current documented limits include 64 file slots, 32-byte filenames, no whitespace in filenames, one shell-line content via shell, and 64 KiB max file size.
 - Networking is ARP/UDP only, uses static IPv4, and has no DHCP, TCP, DNS, checksum-complete UDP stack, or real-hardware support.
@@ -213,8 +213,6 @@ These are code-present but not runtime-verified in this shell:
 
 Based on code/docs/quest data:
 
-- Interrupt-driven keyboard input.
-- Reusable heap allocator.
 - ChronoFS journaling, crash recovery, repair tooling, or reusable free-space policy improvements.
 - Richer graphics shell beyond the current tiny window manager.
 - Broader real-hardware support, especially USB HID, USB storage, USB serial, and non-QEMU networking.
@@ -359,16 +357,16 @@ Recommended next engineering sequence:
 4. Boot QEMU BIOS path and verify baseline shell, serial logs, framebuffer, keyboard, timer, filesystem mount/fallback, and clean shutdown/reboot behavior.
 5. Verify newer risky surfaces one at a time: SMP, mouse/window manager, scheduler tasks, ChronoFS persistence, RTL8139 ARP/UDP, `syshello`, and `exec hello.elf`.
 6. Update README/docs to match the current source tree and shell commands.
-7. Implement interrupt-driven keyboard input after the current state is build-verified.
-8. Replace the bump allocator or add ChronoFS repair/journaling next, depending on whether memory pressure or storage corruption risk is more urgent.
+7. Verify IRQ1 keyboard buffering, including shifted characters, Backspace, Enter, and the polling fallback.
+8. Verify reusable heap allocation with repeated open/close, file, app, and task workflows before adding more kernel behavior.
 
 ## 14. Recommended Next 5 Codex Prompts
 
 1. "Run the build checks for Chronosapian, fix only compile errors, and do not refactor unrelated code."
 2. "Update README/docs to match the current source tree and implemented shell commands."
-3. "Add interrupt-driven keyboard input while preserving the existing polling shell behavior as fallback."
-4. "Design and implement ChronoFS journaling or a repair tool for interrupted writes."
-5. "Replace the bump allocator with a small reusable heap allocator and document allocation limits."
+3. "Verify IRQ1 keyboard input in QEMU while preserving the existing polling fallback."
+4. "Exercise reusable heap allocation paths and document any allocator limits or failures."
+5. "Design and implement ChronoFS journaling or a repair tool for interrupted writes."
 
 ## 15. Risks, Confusing Areas, And Cleanup Needs
 
@@ -383,4 +381,3 @@ Recommended next engineering sequence:
 - ATA path assumes QEMU primary slave IDE disk. UEFI and real hardware may not provide that, so ChronoFS may fall back to heap.
 - Networking assumes RTL8139 on PCI bus 0 and QEMU user-mode network defaults.
 - No automated tests are present. Current verification is script/manual/QEMU based.
-
