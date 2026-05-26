@@ -8,8 +8,9 @@
 use alloc::alloc::{alloc, Layout};
 use core::alloc::{GlobalAlloc, Layout as CoreLayout};
 use core::cell::UnsafeCell;
+use core::mem::{align_of, size_of};
 use core::ptr::null_mut;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use x86_64::registers::control::{Cr3, Cr3Flags};
 use x86_64::structures::paging::mapper::MapToError;
 use x86_64::structures::paging::{
@@ -485,6 +486,27 @@ fn frame_is_smp_boot_frame(frame: PhysFrame<Size4KiB>) -> bool {
     let start = frame.start_address().as_u64();
 
     start == SMP_BOOT_DATA_PHYS || start == SMP_TRAMPOLINE_PHYS
+}
+
+#[repr(C)]
+struct FreeBlock {
+    size: usize,
+    next: *mut FreeBlock,
+}
+
+// Each allocation stores this tiny header immediately before the pointer handed
+// to Rust. `dealloc` uses it to recover the original heap block, including any
+// padding inserted to satisfy alignment.
+#[repr(C)]
+struct AllocHeader {
+    block_start: usize,
+    block_size: usize,
+}
+
+struct Allocation {
+    payload_start: usize,
+    header_start: usize,
+    block_size: usize,
 }
 
 pub struct BumpAllocator {
