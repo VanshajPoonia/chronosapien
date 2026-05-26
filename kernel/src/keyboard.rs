@@ -78,13 +78,18 @@ pub fn init() {
 }
 
 pub fn read_key() -> Option<KeyEvent> {
-    let scancode = read_polled_scancode()?;
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Keyboard state is shared by the IRQ1 handler and shell. With
+        // interrupts disabled on this CPU, the shell can pop buffered IRQ input
+        // or perform the fallback polling read without racing the IRQ handler.
+        let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
 
-    // SAFETY: This early kernel is still single-core and non-preemptive, so
-    // keeping a tiny mutable keyboard state in an `UnsafeCell` is safe here.
-    let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
-
-    process_scancode(state, scancode)
+        if let Some(event) = state.pop_event() {
+            Some(event)
+        } else {
+            read_polled_scancode().and_then(|scancode| process_scancode(state, scancode))
+        }
+    })
 }
 
 fn read_polled_scancode() -> Option<u8> {
