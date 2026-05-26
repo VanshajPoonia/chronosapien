@@ -78,6 +78,16 @@ pub fn init() {
 }
 
 pub fn read_key() -> Option<KeyEvent> {
+    let scancode = read_polled_scancode()?;
+
+    // SAFETY: This early kernel is still single-core and non-preemptive, so
+    // keeping a tiny mutable keyboard state in an `UnsafeCell` is safe here.
+    let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
+
+    process_scancode(state, scancode)
+}
+
+fn read_polled_scancode() -> Option<u8> {
     // SAFETY: Port `0x64` is the PS/2 controller status port on the standard
     // PC-compatible machine that QEMU emulates. We read it first to check
     // whether a keyboard byte is waiting before touching the data port.
@@ -90,13 +100,12 @@ pub fn read_key() -> Option<KeyEvent> {
     }
 
     // SAFETY: Port `0x60` is the PS/2 controller data port. Reading it is only
-    // correct after the status register says the output buffer is full.
-    let scancode = unsafe { inb(DATA_PORT) };
+    // correct after the status register says the output buffer is full and the
+    // byte is not marked as auxiliary mouse data.
+    Some(unsafe { inb(DATA_PORT) })
+}
 
-    // SAFETY: This early kernel is still single-core and non-preemptive, so
-    // keeping a tiny mutable keyboard state in an `UnsafeCell` is safe here.
-    let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
-
+fn process_scancode(state: &mut KeyboardState, scancode: u8) -> Option<KeyEvent> {
     match scancode {
         0x2A | 0x36 => {
             state.shift_pressed = true;
