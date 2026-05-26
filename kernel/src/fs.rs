@@ -409,30 +409,27 @@ impl DiskState {
         };
 
         let old_entry = self.entries[entry_index];
-        let same_location = old_entry.used && old_entry.sector_count >= sector_count;
-        let start_sector = if same_location {
-            old_entry.start_sector
-        } else {
-            self.find_free_run(sector_count).ok_or(FsError::NoSpace)?
-        };
+        let start_sector = self.find_free_run(sector_count).ok_or(FsError::NoSpace)?;
+        let mut new_entry = DiskEntry::empty();
+        new_entry.set(name, content.len(), start_sector, sector_count);
 
         write_content(start_sector, sector_count, content)?;
+        let mut journal = JournalRecord::new(
+            JOURNAL_STATE_INTENT,
+            JOURNAL_OP_WRITE,
+            entry_index,
+            name,
+            old_entry,
+            new_entry,
+        );
+        self.write_journal_record(&journal)?;
 
-        if same_location && old_entry.sector_count > sector_count {
-            self.mark_range(
-                old_entry.start_sector + sector_count,
-                old_entry.sector_count - sector_count,
-                false,
-            );
-        }
-        if !same_location && old_entry.used {
+        if old_entry.used {
             self.mark_range(old_entry.start_sector, old_entry.sector_count, false);
         }
-        if !same_location {
-            self.mark_range(start_sector, sector_count, true);
-        }
+        self.mark_range(start_sector, sector_count, true);
 
-        self.entries[entry_index].set(name, content.len(), start_sector, sector_count);
+        self.entries[entry_index] = new_entry;
 
         if existing_index.is_none() {
             self.file_count += 1;
@@ -441,6 +438,9 @@ impl DiskState {
         self.sync_bitmap()?;
         self.sync_entry_sector(entry_index)?;
         self.sync_superblock()?;
+        journal.state = JOURNAL_STATE_COMMITTED;
+        self.write_journal_record(&journal)?;
+        self.complete_journal(&journal)?;
         upsert_cache(files, name, content);
 
         crate::serial_println!("[CHRONO] fs: write {}", name);
