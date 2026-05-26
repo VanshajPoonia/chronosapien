@@ -136,3 +136,23 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Build sanity and the demo shell scenarios listed above.
 - New risks introduced: None expected from commit slicing itself.
 - Next recommended step: After push, restore Cargo/toolchain access and run a build-only check.
+
+### 2026-05-26 — Add inside-OS tour command
+- Prompt/task: Add a read-only `tour` shell command family that explains Time Capsule OS from inside the OS.
+- Files changed: `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `tour`, `tour boot`, `tour memory`, `tour files`, `tour apps`, `tour userspace`, and `tour future`; added `tour` to help; implemented beginner-friendly, era-aware text sections that explain code-present boot, memory, ChronoFS, app/window, user-space, and future-roadmap concepts.
+- What was intentionally avoided: No new kernel subsystems, era switching, file writes/deletes, `fsck repair`, app/window spawning, task spawning, user-space execution, terminal commands, manual QEMU testing request, or runtime-verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity is blocked in this shell because `cargo` is unavailable; shell checks for every `tour` form and an invalid form such as `tour now` are still needed.
+- New risks introduced: Low; the command only prints text, reads the active era, and optionally lists current files through the existing read-only path.
+- Next recommended step: Run a build-only check once terminal/toolchain use is allowed, then verify the shell output in the OS.
+
+### 2026-05-26 — Push tour command to GitHub
+- Prompt/task: Push the tour command work to GitHub.
+- Files changed: `docs/AI_PROGRESS_LOG.md` plus the tour command implementation files.
+- What changed: Recorded the push request for the inside-OS tour command work.
+- What was intentionally avoided: No additional OS behavior beyond the tour command changes already prepared.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity is blocked in this shell because `cargo` is unavailable; shell checks for all `tour` forms are still needed.
+- New risks introduced: None expected from committing and pushing the existing scoped changes.
+- Next recommended step: Run a build-only check before extending the tour further.

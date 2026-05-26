@@ -181,6 +181,7 @@ fn execute_command(command: &str) {
         "" => {}
         "help" => print_help(),
         command if command == "demo" || command.starts_with("demo ") => run_demo(command),
+        command if command == "tour" || command.starts_with("tour ") => run_tour(command),
         "clear" => console::clear(),
         "about" => print_about(),
         "reboot" => reboot(),
@@ -212,7 +213,7 @@ fn execute_command(command: &str) {
 
 fn print_help() {
     println!(
-        "Commands: help, demo, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
+        "Commands: help, demo, tour, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
     );
     println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>, fsck [repair], journal");
     println!("Apps: notes, calc, sysinfo");
@@ -287,6 +288,169 @@ fn print_demo_files() {
     if !has_files {
         println!("Current files: (none)");
     }
+}
+
+fn run_tour(command: &str) {
+    let topic = command.strip_prefix("tour").unwrap_or("").trim();
+
+    match topic {
+        "" => tour_overview(),
+        "boot" => tour_boot(),
+        "memory" => tour_memory(),
+        "files" => tour_files(),
+        "apps" => tour_apps(),
+        "userspace" => tour_userspace(),
+        "future" => tour_future(),
+        _ => print_tour_usage(),
+    }
+}
+
+fn print_tour_usage() {
+    println!("Usage: tour [boot|memory|files|apps|userspace|future]");
+}
+
+fn tour_overview() {
+    let profile = theme::active_profile();
+
+    println!("Time Capsule OS tour");
+    println!("Active era: {}", profile.name);
+    println!("Prompt style: {}", profile.screen_prompt);
+    println!();
+    println!("This tour explains what is already code-present inside the OS.");
+    println!("It only reads state and prints text; it does not change files, eras, tasks, or apps.");
+    println!();
+    println!("Tour topics:");
+    println!("- tour boot       : how the OS starts");
+    println!("- tour memory     : how memory is organized");
+    println!("- tour files      : how ChronoFS stores small files");
+    println!("- tour apps       : shell apps and windows");
+    println!("- tour userspace  : ring 3 and user programs");
+    println!("- tour future     : ideas that are not finished systems yet");
+}
+
+fn tour_boot() {
+    let profile = theme::active_profile();
+
+    println!("Tour: boot");
+    println!("Era lens: {}", profile.name);
+    println!();
+    println!("Time Capsule OS begins with the bootloader placing the kernel in memory.");
+    println!("The kernel sets up the CPU basics, interrupts, memory services, and device input.");
+    println!("After that, the shell becomes the friendly front desk for exploring the system.");
+    println!();
+    println!("Related commands:");
+    println!("- museum boot");
+    println!("- museum kernel");
+    println!("- museum interrupts");
+    println!("- sysinfo");
+}
+
+fn tour_memory() {
+    let profile = theme::active_profile();
+
+    println!("Tour: memory");
+    println!("Era lens: {}", profile.name);
+    println!();
+    println!("Memory is the workspace the kernel uses while the machine is running.");
+    println!("Time Capsule OS has code-present pieces for tracking memory, using a heap,");
+    println!("and explaining frames/pages in beginner-friendly museum pages.");
+    println!();
+    println!("Useful commands:");
+    println!("- mem");
+    println!("- museum memory");
+    println!("- sysinfo");
+}
+
+fn tour_files() {
+    let profile = theme::active_profile();
+
+    println!("Tour: files");
+    println!("Era lens: {}", profile.name);
+    println!();
+    println!("ChronoFS is the small educational filesystem for Time Capsule OS.");
+    println!("It stores named files, tracks file extents, checks consistency with fsck,");
+    println!("and keeps a tiny journal for safer write/remove metadata operations.");
+    println!();
+    println!("Read-only commands:");
+    println!("- ls");
+    println!("- cat <name>");
+    println!("- fsck");
+    println!("- journal");
+    println!();
+    println!("Changing commands:");
+    println!("- write <name> <content>");
+    println!("- rm <name>");
+    println!("- fsck repair");
+    print_tour_files();
+}
+
+fn print_tour_files() {
+    let mut printed_header = false;
+    let has_files = fs::list(|name| {
+        if !printed_header {
+            println!();
+            println!("Current files:");
+            printed_header = true;
+        }
+        println!("- {}", name);
+    });
+
+    if !has_files {
+        println!();
+        println!("Current files: (none)");
+    }
+}
+
+fn tour_apps() {
+    let profile = theme::active_profile();
+
+    println!("Tour: apps");
+    println!("Era lens: {}", profile.name);
+    println!();
+    println!("Time Capsule OS has small shell apps and window previews that help show");
+    println!("what an operating system can do without hiding the learning steps.");
+    println!();
+    println!("Code-present app commands:");
+    println!("- notes");
+    println!("- calc");
+    println!("- sysinfo");
+    println!("- open notes");
+    println!("- open sysinfo");
+    println!();
+    println!("This tour does not open apps or windows; it only points to them.");
+}
+
+fn tour_userspace() {
+    let profile = theme::active_profile();
+
+    println!("Tour: userspace");
+    println!("Era lens: {}", profile.name);
+    println!();
+    println!("User-space is where programs run with fewer privileges than the kernel.");
+    println!("Time Capsule OS has code-present demos for entering ring 3, making a simple");
+    println!("syscall-style hello, and executing a stored program by name.");
+    println!();
+    println!("Related commands:");
+    println!("- ring3");
+    println!("- syshello");
+    println!("- exec <name>");
+    println!();
+    println!("This tour does not execute user programs.");
+}
+
+fn tour_future() {
+    let profile = theme::active_profile();
+
+    println!("Tour: future");
+    println!("Era lens: {}", profile.name);
+    println!();
+    println!("These are roadmap-style ideas, not runtime-verified promises:");
+    println!("- richer guided lessons");
+    println!("- stronger filesystem recovery");
+    println!("- clearer user-space examples");
+    println!("- more museum pages that explain each subsystem");
+    println!();
+    println!("Time Capsule OS should keep growing in small, understandable steps.");
 }
 
 fn print_about() {
