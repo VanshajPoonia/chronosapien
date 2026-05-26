@@ -196,6 +196,7 @@ fn execute_command(command: &str) {
         command if command == "exec" || command.starts_with("exec ") => exec_file(command),
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "fsck" || command.starts_with("fsck ") => run_fsck(command),
+        command if command == "journal" || command.starts_with("journal ") => run_journal(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         command if command == "open" || command.starts_with("open ") => open_window(command),
         "tasks" => list_tasks(),
@@ -212,7 +213,7 @@ fn print_help() {
     println!(
         "Commands: help, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
     );
-    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>, fsck [repair]");
+    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>, fsck [repair], journal");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
     println!("Tasks: tasks, kill <id>");
@@ -393,6 +394,24 @@ fn run_fsck(command: &str) {
     for finding in report.findings {
         println!("- {}", finding);
     }
+}
+
+fn run_journal(command: &str) {
+    let mode = command.strip_prefix("journal").unwrap_or("").trim();
+    if !mode.is_empty() {
+        println!("Usage: journal");
+        return;
+    }
+
+    let status = fs::journal_status();
+    println!("ChronoFS journal: {}", status.state);
+    println!("Available: {}", if status.available { "yes" } else { "no" });
+    println!("Clean: {}", if status.clean { "yes" } else { "no" });
+    println!("Operation: {}", status.operation);
+    if !status.target.is_empty() {
+        println!("Target: {}", status.target);
+    }
+    println!("{}", status.message);
 }
 
 fn open_window(command: &str) {
