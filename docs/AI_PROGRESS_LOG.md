@@ -66,3 +66,13 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Build sanity and the runtime checks already listed for IRQ keyboard input and the reusable heap allocator.
 - New risks introduced: None expected from this log entry; commit slicing itself should preserve existing file contents.
 - Next recommended step: After push, run a dedicated build verification pass before adding more OS behavior.
+
+### 2026-05-26 — Move active work to main
+- Prompt/task: Set `main` as the main branch and push future work to `main`.
+- Files changed: `docs/AI_PROGRESS_LOG.md`, `docs/NEXT_STEPS.md`.
+- What changed: Fast-forwarded local `main` to include the previously pushed progress branch, recorded `main` as the active integration branch, and prepared the repository so future pushes land on `origin/main`.
+- What was intentionally avoided: No branch deletion, force push, GitHub default-branch API change, feature work, broad refactor, or project rename.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build/runtime verification remains the same: compile checks, QEMU boot, IRQ keyboard behavior, and reusable heap behavior.
+- New risks introduced: Future direct pushes to `main` reduce branch isolation, so build checks should run before risky kernel changes.
+- Next recommended step: Push `main`, then run build sanity checks before additional OS behavior changes.

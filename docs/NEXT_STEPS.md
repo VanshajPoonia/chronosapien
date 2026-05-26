@@ -6,6 +6,11 @@
 2. Align documentation with current source reality: README, roadmap, architecture notes, and command lists should distinguish code-present from runtime-verified.
 3. Run staged manual verification of existing systems before adding new OS features.
 
+## Repository Workflow
+
+- Active integration branch: `main`.
+- Push future completed work to `origin/main` unless a task explicitly asks for a separate branch or pull request.
+
 ## Technical Gaps
 
 - Interrupt-driven keyboard: code-present but unverified; IRQ1 buffering was added and the polling path should remain usable as a fallback.
