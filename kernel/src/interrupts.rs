@@ -10,10 +10,12 @@ use x86_64::structures::idt::{
     InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
 };
 
-use crate::{gdt, mouse, pic, ring3, timer};
+use crate::{gdt, keyboard, mouse, pic, ring3, timer};
 use crate::smp::MAX_CORES;
 
 const TIMER_INTERRUPT_VECTOR: usize = pic::MASTER_PIC_OFFSET as usize;
+const KEYBOARD_INTERRUPT_VECTOR: usize =
+    pic::MASTER_PIC_OFFSET as usize + pic::KEYBOARD_IRQ as usize;
 const MOUSE_INTERRUPT_VECTOR: usize = pic::SLAVE_PIC_OFFSET as usize + 4;
 
 static mut IDT: [InterruptDescriptorTable; MAX_CORES] =
@@ -44,6 +46,7 @@ fn init_core(core_id: usize) {
             .set_handler_fn(double_fault_handler)
             .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         IDT[core_id][TIMER_INTERRUPT_VECTOR].set_handler_fn(timer_interrupt_handler);
+        IDT[core_id][KEYBOARD_INTERRUPT_VECTOR].set_handler_fn(keyboard_interrupt_handler);
         IDT[core_id][MOUSE_INTERRUPT_VECTOR].set_handler_fn(mouse_interrupt_handler);
         IDT[core_id].load();
     }
@@ -129,6 +132,11 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
     timer::handle_tick();
     crate::smp::eoi();
     pic::end_of_interrupt(pic::TIMER_IRQ);
+}
+
+extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    keyboard::handle_interrupt();
+    pic::end_of_interrupt(pic::KEYBOARD_IRQ);
 }
 
 extern "x86-interrupt" fn mouse_interrupt_handler(_stack_frame: InterruptStackFrame) {
