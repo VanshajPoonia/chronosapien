@@ -195,6 +195,7 @@ fn execute_command(command: &str) {
         command if command == "write" || command.starts_with("write ") => write_file(command),
         command if command == "exec" || command.starts_with("exec ") => exec_file(command),
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
+        command if command == "fsck" || command.starts_with("fsck ") => run_fsck(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
         command if command == "open" || command.starts_with("open ") => open_window(command),
         "tasks" => list_tasks(),
@@ -211,7 +212,7 @@ fn print_help() {
     println!(
         "Commands: help, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
     );
-    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>");
+    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>, fsck [repair]");
     println!("Apps: notes, calc, sysinfo");
     println!("Windows: open notes, open sysinfo");
     println!("Tasks: tasks, kill <id>");
@@ -357,6 +358,40 @@ fn exec_file(command: &str) {
             Err(error) => print_exec_error(name, error),
         },
         Err(error) => print_fs_error(name, error),
+    }
+}
+
+fn run_fsck(command: &str) {
+    let mode = command.strip_prefix("fsck").unwrap_or("").trim();
+    let repair = match mode {
+        "" => false,
+        "repair" => true,
+        _ => {
+            println!("Usage: fsck [repair]");
+            return;
+        }
+    };
+
+    let report = fs::check(repair);
+
+    println!("ChronoFS check: {}", report.status_label());
+    println!(
+        "Entries: checked={} live={} invalid={}",
+        report.checked_entries, report.live_entries, report.invalid_entries
+    );
+    println!(
+        "Bitmap mismatches: {} | duplicate sectors: {} | repaired: {}",
+        report.bitmap_mismatches, report.duplicate_sectors, report.repaired_items
+    );
+    println!("Warnings: {} | errors: {}", report.warnings, report.errors);
+
+    if report.findings.is_empty() {
+        println!("No problems found.");
+        return;
+    }
+
+    for finding in report.findings {
+        println!("- {}", finding);
     }
 }
 

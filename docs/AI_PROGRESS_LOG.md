@@ -86,3 +86,13 @@ Each future entry should use this format:
 - If not verified, what still needs verification: Build/runtime verification remains pending for the OS itself.
 - New risks introduced: None expected; this is repository synchronization tracking only.
 - Next recommended step: Keep future completed work on `main` and run build sanity before risky kernel edits.
+
+### 2026-05-26 — Add ChronoFS checker and safe repair command
+- Prompt/task: Add a conservative ChronoFS consistency checker with a read-only `fsck` shell command and optional `fsck repair` mode.
+- Files changed: `kernel/src/fs.rs`, `kernel/src/shell.rs`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a structured ChronoFS check report, superblock/table/name/extent/bitmap/duplicate-sector checks, read-only shell reporting, and repair for safe bitmap mismatches plus stale metadata in unused file table slots.
+- What was intentionally avoided: No on-disk format change, journaling, ChronoFS rewrite, unrelated features, force repair of ambiguous damage, or QEMU/manual testing requirement.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity once Cargo is available, then later boot-level verification of `fsck` and `fsck repair` against clean and intentionally corrupted ChronoFS images.
+- New risks introduced: The checker reads raw disk metadata and repair mode writes bitmap/table metadata; it refuses unsafe cases, but it still needs compile and runtime validation.
+- Next recommended step: Restore Cargo/toolchain access and run a build-only check before further filesystem work.

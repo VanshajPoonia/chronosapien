@@ -1,5 +1,6 @@
 //! Tiny filesystem facade backed by ChronoFS when the ATA data disk is present.
 
+use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::UnsafeCell;
@@ -57,6 +58,75 @@ pub enum FsError {
     FileTooLarge,
     NoSpace,
     Disk,
+}
+
+pub struct FsckReport {
+    pub disk_available: bool,
+    pub repaired: bool,
+    pub checked_entries: usize,
+    pub live_entries: usize,
+    pub warnings: usize,
+    pub errors: usize,
+    pub bitmap_mismatches: usize,
+    pub duplicate_sectors: usize,
+    pub invalid_entries: usize,
+    pub repaired_items: usize,
+    pub findings: Vec<String>,
+}
+
+impl FsckReport {
+    fn new() -> Self {
+        Self {
+            disk_available: true,
+            repaired: false,
+            checked_entries: 0,
+            live_entries: 0,
+            warnings: 0,
+            errors: 0,
+            bitmap_mismatches: 0,
+            duplicate_sectors: 0,
+            invalid_entries: 0,
+            repaired_items: 0,
+            findings: Vec::new(),
+        }
+    }
+
+    fn unavailable() -> Self {
+        let mut report = Self::new();
+        report.disk_available = false;
+        report.add_warning(String::from(
+            "persistent ChronoFS disk is unavailable; heap fallback cannot be checked",
+        ));
+        report
+    }
+
+    pub fn status_label(&self) -> &'static str {
+        if !self.disk_available {
+            "unavailable"
+        } else if self.repaired {
+            "repaired"
+        } else if self.errors > 0 {
+            "errors"
+        } else if self.warnings > 0 {
+            "warnings"
+        } else {
+            "clean"
+        }
+    }
+
+    fn add_info(&mut self, finding: String) {
+        self.findings.push(finding);
+    }
+
+    fn add_warning(&mut self, finding: String) {
+        self.warnings += 1;
+        self.findings.push(finding);
+    }
+
+    fn add_error(&mut self, finding: String) {
+        self.errors += 1;
+        self.findings.push(finding);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -389,6 +459,324 @@ pub fn remove(name: &str) -> Result<(), FsError> {
     files.remove(index);
     crate::serial_println!("[CHRONO] fs: rm {}", name);
     Ok(())
+}
+
+pub fn check(repair: bool) -> FsckReport {
+    let state = unsafe { &mut *FS.0.get() };
+    let Some(disk) = state.disk.as_mut() else {
+        return FsckReport::unavailable();
+    };
+
+    check_disk(disk, repair)
+}
+
+fn check_disk(disk: &mut DiskState, repair: bool) -> FsckReport {
+    let mut report = FsckReport::new();
+    let mut superblock = [0u8; SECTOR_SIZE];
+
+    if ata::read_sector(0, &mut superblock).is_err() {
+        report.add_error(String::from("could not read ChronoFS superblock"));
+        return report;
+    }
+
+    let Some(superblock_file_count) = check_superblock(&superblock, &mut report) else {
+        if repair {
+            report.add_info(String::from(
+                "repair refused: superblock is not trusted enough to repair safely",
+            ));
+        }
+        return report;
+    };
+
+    let mut entries = match read_file_table() {
+        Ok(entries) => entries,
+        Err(_) => {
+            report.add_error(String::from("could not read ChronoFS file table"));
+            return report;
+        }
+    };
+    let mut bitmap = match read_bitmap() {
+        Ok(bitmap) => bitmap,
+        Err(_) => {
+            report.add_error(String::from("could not read ChronoFS allocation bitmap"));
+            return report;
+        }
+    };
+
+    let mut owners = alloc::vec![u16::MAX; TOTAL_SECTORS as usize];
+    let mut duplicate_seen = alloc::vec![false; TOTAL_SECTORS as usize];
+    let mut names: Vec<(String, usize)> = Vec::new();
+    let mut stale_empty_slots: Vec<usize> = Vec::new();
+    let mut live_entries = 0usize;
+
+    for (index, entry) in entries.iter().enumerate() {
+        report.checked_entries += 1;
+
+        if !entry.used {
+            if entry_has_stale_metadata(entry) {
+                report.invalid_entries += 1;
+                report.add_warning(format!(
+                    "entry {} is empty but still contains stale metadata",
+                    index
+                ));
+                stale_empty_slots.push(index);
+            }
+            continue;
+        }
+
+        live_entries += 1;
+        report.live_entries += 1;
+
+        let Some(name) = check_entry_name(index, entry, &mut report) else {
+            continue;
+        };
+
+        if let Some((_, previous_index)) = names
+            .iter()
+            .find(|(existing_name, _)| existing_name.as_str() == name)
+        {
+            report.invalid_entries += 1;
+            report.add_error(format!(
+                "entries {} and {} both use filename '{}'",
+                previous_index,
+                index,
+                name
+            ));
+        } else {
+            names.push((String::from(name), index));
+        }
+
+        if !check_entry_extent(index, entry, &mut report) {
+            continue;
+        }
+
+        for sector in entry.start_sector..entry.start_sector + entry.sector_count {
+            let owner = &mut owners[sector as usize];
+            if *owner == u16::MAX {
+                *owner = index as u16;
+            } else if !duplicate_seen[sector as usize] {
+                duplicate_seen[sector as usize] = true;
+                report.duplicate_sectors += 1;
+                report.add_error(format!(
+                    "sector {} is claimed by more than one file entry",
+                    sector
+                ));
+            }
+        }
+    }
+
+    if superblock_file_count as usize != live_entries {
+        report.add_warning(format!(
+            "superblock file count is {}, but file table has {} live entries",
+            superblock_file_count, live_entries
+        ));
+    }
+
+    let mut missing_reserved = 0usize;
+    let mut missing_owned = 0usize;
+    let mut leaked_free = 0usize;
+
+    for sector in 0..TOTAL_SECTORS {
+        let expected = sector < DATA_START || owners[sector as usize] != u16::MAX;
+        let actual = bitmap_get(&bitmap, sector);
+
+        if actual == expected {
+            continue;
+        }
+
+        report.bitmap_mismatches += 1;
+        if sector < DATA_START {
+            missing_reserved += 1;
+        } else if expected {
+            missing_owned += 1;
+        } else {
+            leaked_free += 1;
+        }
+    }
+
+    if missing_reserved > 0 {
+        report.add_warning(format!(
+            "{} metadata sector bitmap bit(s) are clear but should be reserved",
+            missing_reserved
+        ));
+    }
+    if missing_owned > 0 {
+        report.add_warning(format!(
+            "{} file-owned sector bitmap bit(s) are clear",
+            missing_owned
+        ));
+    }
+    if leaked_free > 0 {
+        report.add_warning(format!(
+            "{} free data sector bitmap bit(s) are still marked used",
+            leaked_free
+        ));
+    }
+
+    if !repair {
+        return report;
+    }
+
+    if report.errors > 0 {
+        report.add_info(String::from(
+            "repair refused: unsafe errors require manual investigation first",
+        ));
+        return report;
+    }
+
+    for index in stale_empty_slots {
+        entries[index] = DiskEntry::empty();
+        disk.entries[index] = DiskEntry::empty();
+        match disk.sync_entry_sector(index) {
+            Ok(()) => {
+                report.repaired = true;
+                report.repaired_items += 1;
+                report.add_info(format!("repaired entry {} by clearing stale metadata", index));
+            }
+            Err(_) => {
+                report.add_error(format!("could not write repaired file table entry {}", index));
+                return report;
+            }
+        }
+    }
+
+    if report.bitmap_mismatches > 0 {
+        for sector in 0..TOTAL_SECTORS {
+            let expected = sector < DATA_START || owners[sector as usize] != u16::MAX;
+            bitmap_set(&mut bitmap, sector, expected);
+        }
+
+        disk.bitmap = bitmap;
+        match disk.sync_bitmap() {
+            Ok(()) => {
+                report.repaired = true;
+                report.repaired_items += report.bitmap_mismatches;
+                report.add_info(format!(
+                    "repaired {} allocation bitmap bit(s)",
+                    report.bitmap_mismatches
+                ));
+            }
+            Err(_) => {
+                report.add_error(String::from("could not write repaired allocation bitmap"));
+            }
+        }
+    }
+
+    report
+}
+
+fn check_superblock(sector: &[u8; SECTOR_SIZE], report: &mut FsckReport) -> Option<u32> {
+    let mut valid = true;
+
+    if sector[..8] != MAGIC[..] {
+        report.add_error(String::from("superblock magic does not match ChronoFS"));
+        valid = false;
+    }
+    if read_u16(sector, 8) != VERSION {
+        report.add_error(String::from("superblock version is unsupported"));
+        valid = false;
+    }
+    if read_u16(sector, 10) != SECTOR_SIZE as u16 {
+        report.add_error(String::from("superblock sector size does not match kernel"));
+        valid = false;
+    }
+    if read_u32(sector, 12) != TOTAL_SECTORS
+        || read_u32(sector, 20) != FILE_TABLE_START
+        || read_u32(sector, 24) != FILE_TABLE_SECTORS
+        || read_u32(sector, 28) != BITMAP_START
+        || read_u32(sector, 32) != BITMAP_SECTORS
+        || read_u32(sector, 36) != DATA_START
+        || read_u32(sector, 40) != MAX_FILES as u32
+        || read_u32(sector, 44) != MAX_FILE_BYTES as u32
+    {
+        report.add_error(String::from("superblock geometry does not match ChronoFS layout"));
+        valid = false;
+    }
+
+    let expected = read_u32(sector, 508);
+    if checksum(&sector[..508]) != expected {
+        report.add_error(String::from("superblock checksum is invalid"));
+        valid = false;
+    }
+
+    let file_count = read_u32(sector, 16);
+    if file_count > MAX_FILES as u32 {
+        report.add_error(String::from("superblock file count exceeds file table capacity"));
+        valid = false;
+    }
+
+    if valid {
+        Some(file_count)
+    } else {
+        None
+    }
+}
+
+fn check_entry_name<'a>(
+    index: usize,
+    entry: &'a DiskEntry,
+    report: &mut FsckReport,
+) -> Option<&'a str> {
+    if entry.name_len == 0 || entry.name_len as usize > MAX_FILENAME_LEN {
+        report.invalid_entries += 1;
+        report.add_error(format!("entry {} has an invalid filename length", index));
+        return None;
+    }
+
+    let name_bytes = &entry.name[..entry.name_len as usize];
+    let Ok(name) = core::str::from_utf8(name_bytes) else {
+        report.invalid_entries += 1;
+        report.add_error(format!("entry {} filename is not valid UTF-8", index));
+        return None;
+    };
+
+    if name.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        report.invalid_entries += 1;
+        report.add_error(format!("entry {} filename contains whitespace", index));
+        return None;
+    }
+
+    Some(name)
+}
+
+fn check_entry_extent(index: usize, entry: &DiskEntry, report: &mut FsckReport) -> bool {
+    let expected_sectors = sectors_for(entry.size as usize);
+    let Some(end_sector) = entry.start_sector.checked_add(entry.sector_count) else {
+        report.invalid_entries += 1;
+        report.add_error(format!("entry {} file extent overflows sector numbers", index));
+        return false;
+    };
+
+    if entry.size as usize > MAX_FILE_BYTES {
+        report.invalid_entries += 1;
+        report.add_error(format!("entry {} is larger than the ChronoFS file limit", index));
+        return false;
+    }
+
+    if entry.sector_count != expected_sectors {
+        report.invalid_entries += 1;
+        report.add_error(format!(
+            "entry {} has {} sector(s) but size requires {}",
+            index, entry.sector_count, expected_sectors
+        ));
+        return false;
+    }
+
+    if entry.start_sector < DATA_START || end_sector > TOTAL_SECTORS {
+        report.invalid_entries += 1;
+        report.add_error(format!("entry {} file extent is outside the data area", index));
+        return false;
+    }
+
+    true
+}
+
+fn entry_has_stale_metadata(entry: &DiskEntry) -> bool {
+    entry.name_len != 0
+        || entry.size != 0
+        || entry.start_sector != 0
+        || entry.sector_count != 0
+        || entry.name.iter().any(|byte| *byte != 0)
 }
 
 fn validate_name(name: &str) -> Result<(), FsError> {
