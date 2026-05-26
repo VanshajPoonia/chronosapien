@@ -6,6 +6,7 @@
 pub const MASTER_PIC_OFFSET: u8 = 32;
 pub const SLAVE_PIC_OFFSET: u8 = 40;
 pub const TIMER_IRQ: u8 = 0;
+pub const KEYBOARD_IRQ: u8 = 1;
 pub const MOUSE_IRQ: u8 = 12;
 
 const PIC_EOI: u8 = 0x20;
