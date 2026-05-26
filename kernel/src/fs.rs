@@ -22,6 +22,19 @@ const BITMAP_SECTORS: u32 = 8;
 const DATA_START: u32 = BITMAP_START + BITMAP_SECTORS;
 const BITMAP_BYTES: usize = BITMAP_SECTORS as usize * SECTOR_SIZE;
 const ENTRIES_PER_SECTOR: usize = SECTOR_SIZE / FILE_ENTRY_SIZE;
+const JOURNAL_NAME: &str = "__chronofs_journal";
+const JOURNAL_MAGIC: [u8; 8] = *b"CHRJNL1\0";
+const JOURNAL_VERSION: u16 = 1;
+const JOURNAL_STATE_EMPTY: u8 = 0;
+const JOURNAL_STATE_INTENT: u8 = 1;
+const JOURNAL_STATE_COMMITTED: u8 = 2;
+const JOURNAL_OP_NONE: u8 = 0;
+const JOURNAL_OP_WRITE: u8 = 1;
+const JOURNAL_OP_REMOVE: u8 = 2;
+const JOURNAL_NAME_OFFSET: usize = 16;
+const JOURNAL_OLD_ENTRY_OFFSET: usize = 48;
+const JOURNAL_NEW_ENTRY_OFFSET: usize = JOURNAL_OLD_ENTRY_OFFSET + FILE_ENTRY_SIZE;
+const JOURNAL_CHECKSUM_OFFSET: usize = 508;
 
 #[derive(Clone)]
 struct File {
@@ -171,6 +184,115 @@ impl DiskEntry {
         self.size = size as u32;
         self.start_sector = start_sector;
         self.sector_count = sector_count;
+    }
+}
+
+#[derive(Clone, Copy)]
+struct JournalRecord {
+    state: u8,
+    operation: u8,
+    entry_index: u8,
+    name_len: u8,
+    name: [u8; MAX_FILENAME_LEN],
+    old_entry: DiskEntry,
+    new_entry: DiskEntry,
+}
+
+impl JournalRecord {
+    const fn empty() -> Self {
+        Self {
+            state: JOURNAL_STATE_EMPTY,
+            operation: JOURNAL_OP_NONE,
+            entry_index: 0,
+            name_len: 0,
+            name: [0; MAX_FILENAME_LEN],
+            old_entry: DiskEntry::empty(),
+            new_entry: DiskEntry::empty(),
+        }
+    }
+
+    fn new(
+        state: u8,
+        operation: u8,
+        entry_index: usize,
+        name: &str,
+        old_entry: DiskEntry,
+        new_entry: DiskEntry,
+    ) -> Self {
+        let mut record = Self::empty();
+        record.state = state;
+        record.operation = operation;
+        record.entry_index = entry_index as u8;
+        record.name_len = name.len() as u8;
+        record.name[..name.len()].copy_from_slice(name.as_bytes());
+        record.old_entry = old_entry;
+        record.new_entry = new_entry;
+        record
+    }
+
+    fn from_sector(sector: &[u8; SECTOR_SIZE]) -> Result<Self, FsError> {
+        if sector[..8] != JOURNAL_MAGIC[..] {
+            return Err(FsError::Disk);
+        }
+        if read_u16(sector, 8) != JOURNAL_VERSION {
+            return Err(FsError::Disk);
+        }
+        if checksum(&sector[..JOURNAL_CHECKSUM_OFFSET]) != read_u32(sector, JOURNAL_CHECKSUM_OFFSET)
+        {
+            return Err(FsError::Disk);
+        }
+
+        let name_len = sector[12];
+        if name_len as usize > MAX_FILENAME_LEN {
+            return Err(FsError::Disk);
+        }
+
+        let mut name = [0u8; MAX_FILENAME_LEN];
+        name.copy_from_slice(&sector[JOURNAL_NAME_OFFSET..JOURNAL_NAME_OFFSET + MAX_FILENAME_LEN]);
+
+        Ok(Self {
+            state: sector[10],
+            operation: sector[11],
+            entry_index: sector[13],
+            name_len,
+            name,
+            old_entry: read_entry(
+                &sector[JOURNAL_OLD_ENTRY_OFFSET..JOURNAL_OLD_ENTRY_OFFSET + FILE_ENTRY_SIZE],
+            ),
+            new_entry: read_entry(
+                &sector[JOURNAL_NEW_ENTRY_OFFSET..JOURNAL_NEW_ENTRY_OFFSET + FILE_ENTRY_SIZE],
+            ),
+        })
+    }
+
+    fn write_to_sector(&self, sector: &mut [u8; SECTOR_SIZE]) {
+        sector.fill(0);
+        sector[..8].copy_from_slice(&JOURNAL_MAGIC);
+        write_u16(sector, 8, JOURNAL_VERSION);
+        sector[10] = self.state;
+        sector[11] = self.operation;
+        sector[12] = self.name_len;
+        sector[13] = self.entry_index;
+        sector[JOURNAL_NAME_OFFSET..JOURNAL_NAME_OFFSET + MAX_FILENAME_LEN]
+            .copy_from_slice(&self.name);
+        write_entry(
+            &self.old_entry,
+            &mut sector[JOURNAL_OLD_ENTRY_OFFSET..JOURNAL_OLD_ENTRY_OFFSET + FILE_ENTRY_SIZE],
+        );
+        write_entry(
+            &self.new_entry,
+            &mut sector[JOURNAL_NEW_ENTRY_OFFSET..JOURNAL_NEW_ENTRY_OFFSET + FILE_ENTRY_SIZE],
+        );
+        let sum = checksum(&sector[..JOURNAL_CHECKSUM_OFFSET]);
+        write_u32(sector, JOURNAL_CHECKSUM_OFFSET, sum);
+    }
+
+    fn target_name(&self) -> Option<&str> {
+        if self.name_len == 0 || self.name_len as usize > MAX_FILENAME_LEN {
+            return None;
+        }
+
+        core::str::from_utf8(&self.name[..self.name_len as usize]).ok()
     }
 }
 
