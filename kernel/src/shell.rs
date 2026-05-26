@@ -244,6 +244,11 @@ fn print_memory() {
         stats.heap_start
     );
     println!("Used: {} KB", stats.heap_used_bytes / 1024);
+    println!("Free: {} KB", stats.heap_free_bytes / 1024);
+    println!(
+        "Largest free block: {} KB",
+        stats.heap_largest_free_block_bytes / 1024
+    );
 }
 
 fn print_cores() {

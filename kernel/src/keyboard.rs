@@ -11,6 +11,7 @@ const STATUS_PORT: u16 = 0x64;
 const DATA_PORT: u16 = 0x60;
 const OUTPUT_BUFFER_FULL: u8 = 1 << 0;
 const AUXILIARY_OUTPUT: u8 = 1 << 5;
+const KEYBOARD_BUFFER_CAPACITY: usize = 64;
 
 #[derive(Clone, Copy, Debug)]
 pub enum KeyEvent {
@@ -22,21 +23,95 @@ pub enum KeyEvent {
 #[derive(Clone, Copy)]
 struct KeyboardState {
     shift_pressed: bool,
+    buffer: [Option<KeyEvent>; KEYBOARD_BUFFER_CAPACITY],
+    read_index: usize,
+    write_index: usize,
+    len: usize,
+    overflow_logged: bool,
+}
+
+impl KeyboardState {
+    const fn new() -> Self {
+        Self {
+            shift_pressed: false,
+            buffer: [None; KEYBOARD_BUFFER_CAPACITY],
+            read_index: 0,
+            write_index: 0,
+            len: 0,
+            overflow_logged: false,
+        }
+    }
+
+    fn push_event(&mut self, event: KeyEvent) -> bool {
+        if self.len >= KEYBOARD_BUFFER_CAPACITY {
+            return false;
+        }
+
+        self.buffer[self.write_index] = Some(event);
+        self.write_index = (self.write_index + 1) % KEYBOARD_BUFFER_CAPACITY;
+        self.len += 1;
+        self.overflow_logged = false;
+        true
+    }
+
+    fn pop_event(&mut self) -> Option<KeyEvent> {
+        if self.len == 0 {
+            return None;
+        }
+
+        let event = self.buffer[self.read_index];
+        self.buffer[self.read_index] = None;
+        self.read_index = (self.read_index + 1) % KEYBOARD_BUFFER_CAPACITY;
+        self.len -= 1;
+        event
+    }
 }
 
 struct GlobalKeyboard(UnsafeCell<KeyboardState>);
 
 unsafe impl Sync for GlobalKeyboard {}
 
-static KEYBOARD_STATE: GlobalKeyboard = GlobalKeyboard(UnsafeCell::new(KeyboardState {
-    shift_pressed: false,
-}));
+static KEYBOARD_STATE: GlobalKeyboard = GlobalKeyboard(UnsafeCell::new(KeyboardState::new()));
 
 pub fn init() {
-    crate::serial_println!("[CHRONO] keyboard initialized");
+    crate::serial_println!("[CHRONO] keyboard initialized (IRQ buffer ready)");
 }
 
 pub fn read_key() -> Option<KeyEvent> {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        // SAFETY: Keyboard state is shared by the IRQ1 handler and shell. With
+        // interrupts disabled on this CPU, the shell can pop buffered IRQ input
+        // or perform the fallback polling read without racing the IRQ handler.
+        let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
+
+        if let Some(event) = state.pop_event() {
+            Some(event)
+        } else {
+            read_polled_scancode().and_then(|scancode| process_scancode(state, scancode))
+        }
+    })
+}
+
+pub fn handle_interrupt() {
+    // SAFETY: IRQ1 is raised by the PS/2 controller when a keyboard byte is
+    // waiting. Reading port `0x60` consumes that byte from the controller.
+    let scancode = unsafe { inb(DATA_PORT) };
+
+    // SAFETY: The interrupt handler runs with interrupts disabled. It is the
+    // only producer for this queue, while the shell consumer disables
+    // interrupts before touching the same state.
+    let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
+    let Some(event) = process_scancode(state, scancode) else {
+        return;
+    };
+
+    if !state.push_event(event) && !state.overflow_logged {
+        state.overflow_logged = true;
+        crate::serial_println!("[CHRONO] keyboard: buffer full");
+    }
+}
+
+fn read_polled_scancode() -> Option<u8> {
     // SAFETY: Port `0x64` is the PS/2 controller status port on the standard
     // PC-compatible machine that QEMU emulates. We read it first to check
     // whether a keyboard byte is waiting before touching the data port.
@@ -49,13 +124,12 @@ pub fn read_key() -> Option<KeyEvent> {
     }
 
     // SAFETY: Port `0x60` is the PS/2 controller data port. Reading it is only
-    // correct after the status register says the output buffer is full.
-    let scancode = unsafe { inb(DATA_PORT) };
+    // correct after the status register says the output buffer is full and the
+    // byte is not marked as auxiliary mouse data.
+    Some(unsafe { inb(DATA_PORT) })
+}
 
-    // SAFETY: This early kernel is still single-core and non-preemptive, so
-    // keeping a tiny mutable keyboard state in an `UnsafeCell` is safe here.
-    let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
-
+fn process_scancode(state: &mut KeyboardState, scancode: u8) -> Option<KeyEvent> {
     match scancode {
         0x2A | 0x36 => {
             state.shift_pressed = true;

@@ -8,8 +8,9 @@
 use alloc::alloc::{alloc, Layout};
 use core::alloc::{GlobalAlloc, Layout as CoreLayout};
 use core::cell::UnsafeCell;
+use core::mem::{align_of, size_of};
 use core::ptr::null_mut;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use x86_64::registers::control::{Cr3, Cr3Flags};
 use x86_64::structures::paging::mapper::MapToError;
 use x86_64::structures::paging::{
@@ -36,7 +37,7 @@ pub const USER_ELF_PML4_INDEX: usize = 1;
 pub const PAGE_SIZE: u64 = 4096;
 
 #[global_allocator]
-static ALLOCATOR: BumpAllocator = BumpAllocator::new();
+static ALLOCATOR: FreeListAllocator = FreeListAllocator::new();
 
 static TOTAL_MEMORY_BYTES: AtomicU64 = AtomicU64::new(0);
 static MEMORY: GlobalMemory = GlobalMemory(UnsafeCell::new(None));
@@ -61,6 +62,8 @@ pub struct MemoryStats {
     pub heap_start: u64,
     pub heap_size_bytes: u64,
     pub heap_used_bytes: u64,
+    pub heap_free_bytes: u64,
+    pub heap_largest_free_block_bytes: u64,
 }
 
 pub fn init(boot_context: &'static BootContext) {
@@ -227,11 +230,15 @@ pub fn identity_map_physical_range(start: u64, end: u64) -> bool {
 }
 
 pub fn stats() -> MemoryStats {
+    let heap_free_bytes = ALLOCATOR.free_bytes() as u64;
+
     MemoryStats {
         total_memory_bytes: TOTAL_MEMORY_BYTES.load(Ordering::Relaxed),
         heap_start: HEAP_START,
         heap_size_bytes: HEAP_SIZE,
-        heap_used_bytes: ALLOCATOR.used() as u64,
+        heap_used_bytes: HEAP_SIZE.saturating_sub(heap_free_bytes),
+        heap_free_bytes,
+        heap_largest_free_block_bytes: ALLOCATOR.largest_free_block() as u64,
     }
 }
 
@@ -480,68 +487,269 @@ fn frame_is_smp_boot_frame(frame: PhysFrame<Size4KiB>) -> bool {
     start == SMP_BOOT_DATA_PHYS || start == SMP_TRAMPOLINE_PHYS
 }
 
-pub struct BumpAllocator {
-    heap_start: AtomicUsize,
-    heap_end: AtomicUsize,
-    next: AtomicUsize,
+#[repr(C)]
+struct FreeBlock {
+    size: usize,
+    next: *mut FreeBlock,
 }
 
-impl BumpAllocator {
+// Each allocation stores this tiny header immediately before the pointer handed
+// to Rust. `dealloc` uses it to recover the original heap block, including any
+// padding inserted to satisfy alignment.
+#[repr(C)]
+struct AllocHeader {
+    block_start: usize,
+    block_size: usize,
+}
+
+struct Allocation {
+    payload_start: usize,
+    header_start: usize,
+    block_size: usize,
+}
+
+pub struct FreeListAllocator {
+    locked: AtomicBool,
+    heap_start: AtomicUsize,
+    heap_end: AtomicUsize,
+    // The head node is not a real free block. It is a permanent list anchor so
+    // insert/remove code does not need special cases for the first heap block.
+    free_list: UnsafeCell<FreeBlock>,
+}
+
+unsafe impl Sync for FreeListAllocator {}
+
+impl FreeListAllocator {
     pub const fn new() -> Self {
         Self {
+            locked: AtomicBool::new(false),
             heap_start: AtomicUsize::new(0),
             heap_end: AtomicUsize::new(0),
-            next: AtomicUsize::new(0),
+            free_list: UnsafeCell::new(FreeBlock {
+                size: 0,
+                next: null_mut(),
+            }),
         }
     }
 
     pub fn init(&self, heap_start: usize, heap_size: usize) {
+        let heap_end = heap_start + heap_size;
+        let heap_start = align_up(heap_start, align_of::<FreeBlock>());
+        let heap_size = heap_end.saturating_sub(heap_start);
+
+        self.lock();
+        unsafe {
+            // At boot the whole heap is one large free block. Later allocations
+            // split this block and frees stitch adjacent blocks back together.
+            let head = self.free_list.get();
+            (*head).size = 0;
+            (*head).next = null_mut();
+
+            if heap_size >= size_of::<FreeBlock>() {
+                let first = heap_start as *mut FreeBlock;
+                first.write(FreeBlock {
+                    size: heap_size,
+                    next: null_mut(),
+                });
+                (*head).next = first;
+            }
+        }
         self.heap_start.store(heap_start, Ordering::SeqCst);
-        self.heap_end.store(heap_start + heap_size, Ordering::SeqCst);
-        self.next.store(heap_start, Ordering::SeqCst);
+        self.heap_end.store(heap_end, Ordering::SeqCst);
+        self.unlock();
     }
 
-    pub fn used(&self) -> usize {
-        let heap_start = self.heap_start.load(Ordering::SeqCst);
-        let next = self.next.load(Ordering::SeqCst);
+    pub fn free_bytes(&self) -> usize {
+        self.lock();
+        let total = unsafe {
+            let mut total = 0usize;
+            let mut current = (*self.free_list.get()).next;
+            while !current.is_null() {
+                total = total.saturating_add((*current).size);
+                current = (*current).next;
+            }
+            total
+        };
+        self.unlock();
+        total
+    }
 
-        next.saturating_sub(heap_start)
+    pub fn largest_free_block(&self) -> usize {
+        self.lock();
+        let largest = unsafe {
+            let mut largest = 0usize;
+            let mut current = (*self.free_list.get()).next;
+            while !current.is_null() {
+                largest = largest.max((*current).size);
+                current = (*current).next;
+            }
+            largest
+        };
+        self.unlock();
+        largest
+    }
+
+    fn lock(&self) {
+        while self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            while self.locked.load(Ordering::Relaxed) {
+                core::hint::spin_loop();
+            }
+        }
+    }
+
+    fn unlock(&self) {
+        self.locked.store(false, Ordering::Release);
     }
 }
 
-unsafe impl GlobalAlloc for BumpAllocator {
+unsafe impl GlobalAlloc for FreeListAllocator {
     unsafe fn alloc(&self, layout: CoreLayout) -> *mut u8 {
-        let heap_end = self.heap_end.load(Ordering::SeqCst);
-
-        if heap_end == 0 {
+        if layout.size() == 0 || self.heap_end.load(Ordering::SeqCst) == 0 {
             return null_mut();
         }
 
-        let mut current = self.next.load(Ordering::SeqCst);
-
-        loop {
-            let allocation_start = align_up(current, layout.align());
-            let Some(allocation_end) = allocation_start.checked_add(layout.size()) else {
-                return null_mut();
-            };
-
-            if allocation_end > heap_end {
-                return null_mut();
-            }
-
-            match self.next.compare_exchange(
-                current,
-                allocation_end,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => return allocation_start as *mut u8,
-                Err(next_current) => current = next_current,
-            }
-        }
+        self.lock();
+        let pointer = self.allocate_locked(layout);
+        self.unlock();
+        pointer
     }
 
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: CoreLayout) {}
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: CoreLayout) {
+        if ptr.is_null() || self.heap_end.load(Ordering::SeqCst) == 0 {
+            return;
+        }
+
+        let header_start = (ptr as usize).saturating_sub(size_of::<AllocHeader>());
+        let header = &*(header_start as *const AllocHeader);
+        let block_start = header.block_start;
+        let block_size = header.block_size;
+        let heap_start = self.heap_start.load(Ordering::SeqCst);
+        let heap_end = self.heap_end.load(Ordering::SeqCst);
+
+        if block_start < heap_start
+            || block_size < size_of::<FreeBlock>()
+            || block_start.saturating_add(block_size) > heap_end
+        {
+            return;
+        }
+
+        self.lock();
+        self.insert_free_block(block_start, block_size);
+        self.unlock();
+    }
+}
+
+impl FreeListAllocator {
+    unsafe fn allocate_locked(&self, layout: CoreLayout) -> *mut u8 {
+        let mut previous = self.free_list.get();
+        let mut current = (*previous).next;
+
+        while !current.is_null() {
+            let block_start = current as usize;
+            let block_size = (*current).size;
+
+            if let Some(mut allocation) = allocation_from_block(block_start, block_size, layout) {
+                let remaining = block_size - allocation.block_size;
+
+                // First-fit allocation: take the first block that works. If a
+                // useful tail remains, leave that tail on the free list.
+                if remaining >= size_of::<FreeBlock>() {
+                    let tail = (block_start + allocation.block_size) as *mut FreeBlock;
+                    tail.write(FreeBlock {
+                        size: remaining,
+                        next: (*current).next,
+                    });
+                    (*previous).next = tail;
+                } else {
+                    allocation.block_size = block_size;
+                    (*previous).next = (*current).next;
+                }
+
+                let header = allocation.header_start as *mut AllocHeader;
+                header.write(AllocHeader {
+                    block_start,
+                    block_size: allocation.block_size,
+                });
+
+                return allocation.payload_start as *mut u8;
+            }
+
+            previous = current;
+            current = (*current).next;
+        }
+
+        null_mut()
+    }
+
+    unsafe fn insert_free_block(&self, block_start: usize, block_size: usize) {
+        let head = self.free_list.get();
+        let mut previous = head;
+        let mut current = (*previous).next;
+
+        // Keep the list sorted by address. That makes coalescing simple: two
+        // blocks are neighbors if one's end address equals the next start.
+        while !current.is_null() && (current as usize) < block_start {
+            previous = current;
+            current = (*current).next;
+        }
+
+        let block = block_start as *mut FreeBlock;
+        block.write(FreeBlock {
+            size: block_size,
+            next: current,
+        });
+        (*previous).next = block;
+        self.coalesce_around(previous, block);
+    }
+
+    unsafe fn coalesce_around(&self, previous: *mut FreeBlock, block: *mut FreeBlock) {
+        merge_with_next(block);
+
+        let head = self.free_list.get();
+        if previous != head && (previous as usize).saturating_add((*previous).size) == block as usize
+        {
+            (*previous).size = (*previous).size.saturating_add((*block).size);
+            (*previous).next = (*block).next;
+            merge_with_next(previous);
+        }
+    }
+}
+
+fn allocation_from_block(
+    block_start: usize,
+    block_size: usize,
+    layout: CoreLayout,
+) -> Option<Allocation> {
+    let block_end = block_start.checked_add(block_size)?;
+    let required_align = layout.align().max(align_of::<AllocHeader>());
+    let payload_start = align_up(block_start.checked_add(size_of::<AllocHeader>())?, required_align);
+    let header_start = payload_start.checked_sub(size_of::<AllocHeader>())?;
+    let payload_end = payload_start.checked_add(layout.size())?;
+    let block_end_after_alloc = align_up(payload_end, align_of::<FreeBlock>());
+
+    if header_start < block_start || block_end_after_alloc > block_end {
+        return None;
+    }
+
+    Some(Allocation {
+        payload_start,
+        header_start,
+        block_size: block_end_after_alloc - block_start,
+    })
+}
+
+unsafe fn merge_with_next(block: *mut FreeBlock) {
+    while !(*block).next.is_null()
+        && (block as usize).saturating_add((*block).size) == (*block).next as usize
+    {
+        let next = (*block).next;
+        (*block).size = (*block).size.saturating_add((*next).size);
+        (*block).next = (*next).next;
+    }
 }
 
 fn align_up(address: usize, alignment: usize) -> usize {
