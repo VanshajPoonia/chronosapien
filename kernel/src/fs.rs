@@ -551,6 +551,166 @@ impl DiskState {
 
         ata::write_sector(FILE_TABLE_START + sector_index as u32, &sector).map_err(|_| FsError::Disk)
     }
+
+    fn ensure_journal(&mut self) {
+        if self.journal_entry().is_some() {
+            return;
+        }
+
+        let Some(entry_index) = self.entries.iter().position(|entry| !entry.used) else {
+            crate::serial_println!("[CHRONO] fs: journal unavailable; no free file slot");
+            return;
+        };
+        let Some(start_sector) = self.find_free_run(1) else {
+            crate::serial_println!("[CHRONO] fs: journal unavailable; no free data sector");
+            return;
+        };
+
+        let mut entry = DiskEntry::empty();
+        entry.set(JOURNAL_NAME, SECTOR_SIZE, start_sector, 1);
+        self.entries[entry_index] = entry;
+        self.mark_range(start_sector, 1, true);
+        self.file_count += 1;
+
+        if self.write_journal_record(&JournalRecord::empty()).is_err()
+            || self.sync_bitmap().is_err()
+            || self.sync_entry_sector(entry_index).is_err()
+            || self.sync_superblock().is_err()
+        {
+            crate::serial_println!("[CHRONO] fs: journal creation failed; run fsck");
+            return;
+        }
+
+        crate::serial_println!("[CHRONO] fs: journal created");
+    }
+
+    fn recover_journal_on_mount(&mut self) {
+        let Some(_) = self.journal_entry() else {
+            crate::serial_println!("[CHRONO] fs: journal missing; creating");
+            return;
+        };
+
+        let record = match self.read_journal_record() {
+            Ok(record) => record,
+            Err(_) => {
+                crate::serial_println!(
+                    "[CHRONO] fs: journal invalid; recovery refused, run fsck"
+                );
+                return;
+            }
+        };
+
+        match record.state {
+            JOURNAL_STATE_EMPTY => {
+                crate::serial_println!("[CHRONO] fs: journal clean");
+            }
+            JOURNAL_STATE_INTENT => {
+                crate::serial_println!(
+                    "[CHRONO] fs: journal rollback for {} {}",
+                    journal_operation_label(record.operation),
+                    record.target_name().unwrap_or("?")
+                );
+                self.apply_journal_recovery(record, record.old_entry);
+            }
+            JOURNAL_STATE_COMMITTED => {
+                crate::serial_println!(
+                    "[CHRONO] fs: journal roll-forward for {} {}",
+                    journal_operation_label(record.operation),
+                    record.target_name().unwrap_or("?")
+                );
+                self.apply_journal_recovery(record, record.new_entry);
+            }
+            _ => {
+                crate::serial_println!(
+                    "[CHRONO] fs: journal state unsupported; recovery refused, run fsck"
+                );
+            }
+        }
+    }
+
+    fn apply_journal_recovery(&mut self, record: JournalRecord, target_entry: DiskEntry) {
+        let entry_index = record.entry_index as usize;
+        if !journal_record_is_safe(record, target_entry) || entry_index >= MAX_FILES {
+            crate::serial_println!("[CHRONO] fs: journal recovery refused; unsafe record");
+            return;
+        }
+        if self
+            .journal_entry()
+            .map(|(journal_index, _)| journal_index == entry_index)
+            .unwrap_or(false)
+        {
+            crate::serial_println!("[CHRONO] fs: journal recovery refused; unsafe record");
+            return;
+        }
+
+        let old_entry = self.entries[entry_index];
+        self.entries[entry_index] = target_entry;
+        let Some(bitmap) = rebuild_bitmap_from_entries(&self.entries) else {
+            self.entries[entry_index] = old_entry;
+            crate::serial_println!(
+                "[CHRONO] fs: journal recovery refused; metadata still conflicts"
+            );
+            return;
+        };
+
+        self.bitmap = bitmap;
+        self.file_count = count_used_entries(&self.entries) as u32;
+
+        if self.sync_entry_sector(entry_index).is_err()
+            || self.sync_bitmap().is_err()
+            || self.sync_superblock().is_err()
+            || self.complete_journal(&record).is_err()
+        {
+            crate::serial_println!("[CHRONO] fs: journal recovery write failed; run fsck");
+            return;
+        }
+
+        crate::serial_println!("[CHRONO] fs: journal recovery complete");
+    }
+
+    fn journal_entry(&self) -> Option<(usize, DiskEntry)> {
+        self.entries
+            .iter()
+            .enumerate()
+            .find(|(_, entry)| entry.matches(JOURNAL_NAME))
+            .map(|(index, entry)| (index, *entry))
+    }
+
+    fn read_journal_record(&self) -> Result<JournalRecord, FsError> {
+        let Some((_, entry)) = self.journal_entry() else {
+            return Err(FsError::Disk);
+        };
+        if !journal_entry_extent_is_valid(&entry) {
+            return Err(FsError::Disk);
+        }
+
+        let mut sector = [0u8; SECTOR_SIZE];
+        ata::read_sector(entry.start_sector, &mut sector).map_err(|_| FsError::Disk)?;
+        JournalRecord::from_sector(&sector)
+    }
+
+    fn write_journal_record(&self, record: &JournalRecord) -> Result<(), FsError> {
+        let Some((_, entry)) = self.journal_entry() else {
+            return Err(FsError::Disk);
+        };
+        if !journal_entry_extent_is_valid(&entry) {
+            return Err(FsError::Disk);
+        }
+
+        let mut sector = [0u8; SECTOR_SIZE];
+        record.write_to_sector(&mut sector);
+        ata::write_sector(entry.start_sector, &sector).map_err(|_| FsError::Disk)
+    }
+
+    fn clear_journal(&self) -> Result<(), FsError> {
+        self.write_journal_record(&JournalRecord::empty())
+    }
+
+    fn complete_journal(&self, record: &JournalRecord) -> Result<(), FsError> {
+        let mut clean_record = *record;
+        clean_record.state = JOURNAL_STATE_EMPTY;
+        self.write_journal_record(&clean_record)
+    }
 }
 
 /// Mounts ChronoFS from the ATA data disk, or keeps the heap fallback if it fails.
