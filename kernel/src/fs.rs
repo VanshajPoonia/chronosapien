@@ -142,6 +142,49 @@ impl FsckReport {
     }
 }
 
+pub struct JournalStatus {
+    pub available: bool,
+    pub clean: bool,
+    pub state: &'static str,
+    pub operation: &'static str,
+    pub target: String,
+    pub message: String,
+}
+
+impl JournalStatus {
+    fn unavailable(message: &str) -> Self {
+        Self {
+            available: false,
+            clean: false,
+            state: "unavailable",
+            operation: "none",
+            target: String::new(),
+            message: String::from(message),
+        }
+    }
+
+    fn from_record(record: JournalRecord) -> Self {
+        let target = String::from(record.target_name().unwrap_or(""));
+        let state = journal_state_label(record.state);
+        let operation = journal_operation_label(record.operation);
+        let clean = record.state == JOURNAL_STATE_EMPTY;
+        let message = if clean {
+            String::from("journal is clean")
+        } else {
+            String::from("journal has an operation record")
+        };
+
+        Self {
+            available: true,
+            clean,
+            state,
+            operation,
+            target,
+            message,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct DiskEntry {
     used: bool,
