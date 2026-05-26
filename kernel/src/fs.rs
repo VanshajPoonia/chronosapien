@@ -1266,6 +1266,10 @@ fn validate_name(name: &str) -> Result<(), FsError> {
         return Err(FsError::InvalidName);
     }
 
+    if name == JOURNAL_NAME {
+        return Err(FsError::InvalidName);
+    }
+
     Ok(())
 }
 
@@ -1388,6 +1392,9 @@ fn read_files(entries: &[DiskEntry; MAX_FILES]) -> Result<Vec<File>, FsError> {
         let Some(name) = entry.name_str() else {
             continue;
         };
+        if name == JOURNAL_NAME {
+            continue;
+        }
         if entry.size as usize > MAX_FILE_BYTES || entry.start_sector < DATA_START {
             continue;
         }
