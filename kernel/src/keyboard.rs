@@ -92,6 +92,25 @@ pub fn read_key() -> Option<KeyEvent> {
     })
 }
 
+pub fn handle_interrupt() {
+    // SAFETY: IRQ1 is raised by the PS/2 controller when a keyboard byte is
+    // waiting. Reading port `0x60` consumes that byte from the controller.
+    let scancode = unsafe { inb(DATA_PORT) };
+
+    // SAFETY: The interrupt handler runs with interrupts disabled. It is the
+    // only producer for this queue, while the shell consumer disables
+    // interrupts before touching the same state.
+    let state = unsafe { &mut *KEYBOARD_STATE.0.get() };
+    let Some(event) = process_scancode(state, scancode) else {
+        return;
+    };
+
+    if !state.push_event(event) && !state.overflow_logged {
+        state.overflow_logged = true;
+        crate::serial_println!("[CHRONO] keyboard: buffer full");
+    }
+}
+
 fn read_polled_scancode() -> Option<u8> {
     // SAFETY: Port `0x64` is the PS/2 controller status port on the standard
     // PC-compatible machine that QEMU emulates. We read it first to check
