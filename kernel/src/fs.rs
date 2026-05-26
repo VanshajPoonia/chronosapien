@@ -811,6 +811,25 @@ pub fn check(repair: bool) -> FsckReport {
     check_disk(disk, repair)
 }
 
+pub fn journal_status() -> JournalStatus {
+    let state: &'static FsState = unsafe { &*FS.0.get() };
+    let Some(disk) = state.disk.as_ref() else {
+        return JournalStatus::unavailable("persistent ChronoFS disk is unavailable");
+    };
+
+    match disk.read_journal_record() {
+        Ok(record) => JournalStatus::from_record(record),
+        Err(_) => JournalStatus {
+            available: true,
+            clean: false,
+            state: "invalid",
+            operation: "unknown",
+            target: String::new(),
+            message: String::from("journal record is missing, corrupt, or has a bad checksum"),
+        },
+    }
+}
+
 fn check_disk(disk: &mut DiskState, repair: bool) -> FsckReport {
     let mut report = FsckReport::new();
     let mut superblock = [0u8; SECTOR_SIZE];
