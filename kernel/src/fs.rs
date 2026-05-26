@@ -1139,6 +1139,120 @@ fn entry_has_stale_metadata(entry: &DiskEntry) -> bool {
         || entry.name.iter().any(|byte| *byte != 0)
 }
 
+fn journal_state_label(state: u8) -> &'static str {
+    match state {
+        JOURNAL_STATE_EMPTY => "empty",
+        JOURNAL_STATE_INTENT => "intent",
+        JOURNAL_STATE_COMMITTED => "committed",
+        _ => "unknown",
+    }
+}
+
+fn journal_operation_label(operation: u8) -> &'static str {
+    match operation {
+        JOURNAL_OP_WRITE => "write",
+        JOURNAL_OP_REMOVE => "remove",
+        _ => "none",
+    }
+}
+
+fn journal_entry_extent_is_valid(entry: &DiskEntry) -> bool {
+    let Some(end_sector) = entry.start_sector.checked_add(1) else {
+        return false;
+    };
+
+    entry.used
+        && entry.size as usize == SECTOR_SIZE
+        && entry.sector_count == 1
+        && entry.start_sector >= DATA_START
+        && end_sector <= TOTAL_SECTORS
+}
+
+fn journal_record_is_safe(record: JournalRecord, target_entry: DiskEntry) -> bool {
+    if record.entry_index as usize >= MAX_FILES {
+        return false;
+    }
+    if record.operation != JOURNAL_OP_WRITE && record.operation != JOURNAL_OP_REMOVE {
+        return false;
+    }
+    let Some(name) = record.target_name() else {
+        return false;
+    };
+    if name == JOURNAL_NAME || name.bytes().any(|byte| byte.is_ascii_whitespace()) {
+        return false;
+    }
+
+    journal_snapshot_is_safe(record.old_entry, name)
+        && journal_snapshot_is_safe(record.new_entry, name)
+        && journal_snapshot_is_safe(target_entry, name)
+}
+
+fn journal_snapshot_is_safe(entry: DiskEntry, name: &str) -> bool {
+    if !entry.used {
+        return !entry_has_stale_metadata(&entry);
+    }
+
+    if entry.name_str() != Some(name) {
+        return false;
+    }
+    if entry.size as usize > MAX_FILE_BYTES {
+        return false;
+    }
+    let Some(end_sector) = entry.start_sector.checked_add(entry.sector_count) else {
+        return false;
+    };
+
+    entry.sector_count == sectors_for(entry.size as usize)
+        && entry.start_sector >= DATA_START
+        && end_sector <= TOTAL_SECTORS
+}
+
+fn rebuild_bitmap_from_entries(entries: &[DiskEntry; MAX_FILES]) -> Option<Vec<u8>> {
+    let mut bitmap = alloc::vec![0u8; BITMAP_BYTES];
+    let mut names: Vec<String> = Vec::new();
+    for sector in 0..DATA_START {
+        bitmap_set(&mut bitmap, sector, true);
+    }
+
+    for entry in entries {
+        if !entry.used {
+            continue;
+        }
+        let name = entry.name_str()?;
+        if names
+            .iter()
+            .any(|existing_name| existing_name.as_str() == name)
+        {
+            return None;
+        }
+        names.push(String::from(name));
+
+        if entry.size as usize > MAX_FILE_BYTES {
+            return None;
+        }
+        let end_sector = entry.start_sector.checked_add(entry.sector_count)?;
+        if entry.sector_count != sectors_for(entry.size as usize)
+            || entry.start_sector < DATA_START
+            || end_sector > TOTAL_SECTORS
+        {
+            return None;
+        }
+
+        for sector in entry.start_sector..end_sector {
+            if bitmap_get(&bitmap, sector) {
+                return None;
+            }
+            bitmap_set(&mut bitmap, sector, true);
+        }
+    }
+
+    Some(bitmap)
+}
+
+fn count_used_entries(entries: &[DiskEntry; MAX_FILES]) -> usize {
+    entries.iter().filter(|entry| entry.used).count()
+}
+
 fn validate_name(name: &str) -> Result<(), FsError> {
     if name.is_empty() {
         return Err(FsError::EmptyName);
