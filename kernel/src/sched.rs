@@ -52,6 +52,7 @@ pub enum TaskState {
     /// Task is waiting for its next turn on the CPU.
     Ready,
     /// Task is waiting for an external event (reserved for future use).
+    #[allow(dead_code)]
     Blocked,
     /// Task has been terminated; the slot will be reused on the next spawn.
     Dead,
@@ -382,7 +383,7 @@ unsafe fn init_task_stack(bytes: &mut [u8; TASK_STACK_SIZE], entry: fn() -> !) -
 /// `extern "C"` maps arguments to RDI (current_rsp) and RSI (next_rsp) via
 /// the System V AMD64 ABI. The function is `#[naked]` so the compiler emits
 /// no prologue or epilogue — only our assembly.
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn context_switch(
     current_rsp: *mut u64,
     next_rsp: *const u64,

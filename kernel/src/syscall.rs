@@ -31,6 +31,7 @@ const SYSCALL_STACK_SIZE: usize = 4096 * 4;
 
 #[repr(align(16))]
 struct SyscallStack {
+    #[allow(dead_code)]
     bytes: [u8; SYSCALL_STACK_SIZE],
 }
 
@@ -52,7 +53,7 @@ pub fn init() {
 
     unsafe {
         wrmsr(IA32_STAR, star);
-        wrmsr(IA32_LSTAR, syscall_entry as usize as u64);
+        wrmsr(IA32_LSTAR, syscall_entry as *const () as usize as u64);
         wrmsr(IA32_FMASK, RFLAGS_INTERRUPT_ENABLE);
         wrmsr(IA32_EFER, rdmsr(IA32_EFER) | EFER_SYSCALL_ENABLE);
     }
@@ -60,7 +61,7 @@ pub fn init() {
     crate::serial_println!("[CHRONO] syscall: SYSCALL/SYSRET initialized");
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn syscall_entry() -> ! {
     core::arch::naked_asm!(
         "mov r10, rsp",
