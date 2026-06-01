@@ -30,6 +30,7 @@ pub fn init_ap(core_id: usize) {
     init_core(core_id);
 }
 
+#[allow(dead_code)]
 pub fn init() {
     init_bsp();
 }

@@ -21,7 +21,9 @@ pub struct Device {
     pub bus: u8,
     pub device: u8,
     pub function: u8,
+    #[allow(dead_code)]
     pub vendor_id: u16,
+    #[allow(dead_code)]
     pub device_id: u16,
 }
 

@@ -183,6 +183,7 @@ pub fn map_user_frame(
     .flatten()
 }
 
+#[allow(dead_code)]
 pub fn zero_frame(frame: PhysFrame<Size4KiB>) {
     let _ = with_memory_state(|state| zero_frame_with_offset(state.physical_memory_offset, frame));
 }

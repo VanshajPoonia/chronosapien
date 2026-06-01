@@ -702,6 +702,7 @@ impl DiskState {
         ata::write_sector(entry.start_sector, &sector).map_err(|_| FsError::Disk)
     }
 
+    #[allow(dead_code)]
     fn clear_journal(&self) -> Result<(), FsError> {
         self.write_journal_record(&JournalRecord::empty())
     }

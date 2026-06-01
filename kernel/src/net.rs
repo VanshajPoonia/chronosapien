@@ -76,6 +76,7 @@ impl NetState {
 
 #[derive(Clone, Copy)]
 pub struct Snapshot {
+    #[allow(dead_code)]
     pub initialized: bool,
     pub mac: Option<[u8; 6]>,
     pub ip: [u8; 4],
