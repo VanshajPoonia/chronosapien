@@ -1,262 +1,221 @@
-# Chronosapian
+# ChronoOS
 
-Chronosapian is a beginner-friendly hobby operating system project in Rust. It boots
-a `no_std` x86_64 kernel in QEMU, renders a framebuffer graphics console, logs
-to serial, runs a tiny era-themed shell, handles CPU exceptions and timer
-interrupts, plays PC speaker tones, and now has early memory management,
-persistent ATA-backed storage, networking, UEFI boot packaging, and a few
-built-in apps.
+ChronoOS is a beginner-friendly Rust `no_std` x86_64 educational hobby
+operating system. It is an OS learning project with a product-minded shell:
+eras, museum pages, quests, small apps, ChronoFS, guided tours, and
+screenshot-friendly status screens.
 
-## Folder structure
+The repository/package name may remain `chronosapien` for now. Generated image
+names such as `chronosapien-bios.img` and `chronosapien-uefi.img` are legacy
+internal names and should not be renamed casually.
+
+ChronoOS is not a Linux replacement. It is a small, readable teaching OS.
+
+## Portfolio Snapshot
+
+ChronoOS exists to make low-level systems work understandable and memorable. It
+combines a real Rust `no_std` x86_64 kernel with an indie educational product
+layer: era themes, a museum-style shell, quests, small apps, ChronoFS, posters,
+and guided demo commands.
+
+What makes it different:
+
+- It treats the shell as both a debugger and a product surface.
+- It explains operating-system concepts from inside the OS itself.
+- It keeps beginner-friendly docs beside source-truth status labels.
+- It separates implemented-in-code work from runtime-verified evidence.
+
+Implemented in code includes BIOS/UEFI/custom boot paths, framebuffer and serial
+output paths, shell commands, era themes, keyboard and mouse paths, small
+windows, ChronoFS, `fsck`, a tiny journal, apps, museum/quest/product commands,
+a cooperative scheduler, SMP work, ARP/UDP networking, Ring 3 demos, syscalls,
+and static ELF execution.
+
+Verified so far is intentionally narrower: single-core BIOS serial-only QEMU
+reached `[CHRONO] boot complete`, and boot-time serial logging was observed
+through that point. Visual framebuffer output, shell interaction, apps,
+filesystem workflows, userspace, networking, mouse/windows, UEFI, custom BIOS,
+SMP/AP, and hardware still need dedicated verification.
+
+Roadmap/design-only work includes TCP, DHCP, DNS, USB, a dynamic linker, package
+manager, full desktop compositor, and production-grade preemptive scheduler.
+
+What this project teaches:
+
+- how a small OS boots and hands off to a Rust kernel,
+- how serial/framebuffer output, interrupts, timers, input, memory, and storage
+  fit together,
+- how to keep ambitious systems work honest with verification boundaries,
+- how technical depth and product storytelling can reinforce each other.
+
+Portfolio/demo docs:
+
+- `docs/CURRENT_STATUS.md`: current source-truth audit.
+- `docs/demo-script.md`: 2-minute, 5-minute, and 10-minute demo paths.
+- `docs/screenshots.md`: screenshot and GIF capture checklist.
+- `docs/release-checklist.md`: release gate checklist.
+- `docs/showcase.md`: portfolio case-study narrative.
+
+## Status Labels
+
+- implemented in code: present in the source tree.
+- partially implemented: useful teaching version, not a complete production system.
+- needs runtime verification: must be proven in QEMU or hardware before success is claimed.
+- verified in QEMU: actual QEMU evidence is recorded in this repo.
+- verified on hardware: actual hardware evidence is recorded in this repo.
+- roadmap/design-only: intentionally not implemented yet.
+
+No runtime success is claimed by this README unless the repo contains matching
+verification evidence.
+
+For the current post-Phase-4 source-truth audit, see
+`docs/CURRENT_STATUS.md`. The older `docs/status-audit.md` remains the
+Phase 2-specific risk audit.
+
+## Current State
+
+Verified in QEMU, with important limits:
+
+- Single-core BIOS serial-only boot reached `[CHRONO] boot complete`.
+- Boot-time serial logging was observed through that point.
+- The run used `-display none`, so framebuffer output, visible shell prompt,
+  keyboard input, shell commands, apps, storage workflows, windows, and graphics
+  were not verified by that evidence.
+
+Implemented in code, needs broader or first runtime verification:
+
+- BIOS boot path through the `bootloader` crate, beyond the limited single-core
+  serial-only smoke.
+- Optional custom BIOS bootloader path.
+- Optional UEFI loader path.
+- Framebuffer console and top bar.
+- Serial logging outside the recorded boot-time smoke.
+- Era themes and an era-aware shell.
+- IRQ1 PS/2 keyboard buffering with polling fallback.
+- PS/2 mouse input and small draggable windows.
+- GDT, IDT, PIC, PIT timer, exceptions, and PC speaker tones.
+- Boot memory map handling, page mapping helpers, and a 1 MiB free-list heap.
+- ATA PIO storage and ChronoFS.
+- ChronoFS `fsck`, conservative `fsck repair`, and a tiny one-record journal.
+- Built-in apps and product commands.
+- Museum pages, quests, stats, and inventory.
+- Cooperative scheduler and early SMP work.
+- RTL8139 ARP/UDP networking.
+- Ring 3 demo, syscall layer, and static ELF execution.
+
+Partially implemented:
+
+- Graphics shell and windows.
+- App platform.
+- Process/userspace model.
+- Scheduler/SMP behavior.
+- ChronoFS recovery.
+- Networking.
+- Real hardware support.
+
+Roadmap/design-only:
+
+- TCP, DHCP, DNS, sockets.
+- USB HID, USB storage, USB serial.
+- Dynamic linker.
+- Package manager.
+- Full desktop compositor or GUI toolkit.
+- Production-grade preemptive scheduler.
+
+## Known Limitations
+
+- ChronoOS is not a Linux replacement.
+- ChronoOS is not production-ready.
+- Runtime verification is incomplete; many systems are implemented in code but
+  still need visible QEMU or hardware evidence.
+- Networking is limited to static IPv4 ARP/UDP code paths unless future
+  verification and implementation expand it.
+- USB, TCP, DHCP, DNS, dynamic linking, package management, a full compositor,
+  and a preemptive scheduler are long-term roadmap/design-only items unless a
+  future audit records implementation and proof.
+
+## Folder Structure
 
 ```text
 chronosapien/
 |-- Cargo.toml
 |-- build.rs
 |-- boot/
-|   |-- stage1/
-|   |   `-- stage1.asm
-|   `-- stage2/
-|       |-- stage2_long.asm
-|       |-- stage2_pm.rs
-|       `-- stage2_real.asm
-|-- rust-toolchain.toml
-|-- src/
-|   `-- main.rs
-|-- .cargo/
-|   `-- config.toml
 |-- kernel/
-|   |-- Cargo.toml
 |   `-- src/
 |       |-- apps/
-|       |   |-- calc.rs
-|       |   |-- mod.rs
-|       |   |-- notes.rs
-|       |   `-- sysinfo.rs
+|       |-- framebuffer/
 |       |-- ata.rs
+|       |-- boot.rs
 |       |-- console.rs
 |       |-- elf.rs
-|       |-- framebuffer/
-|       |   |-- font.rs
-|       |   `-- mod.rs
 |       |-- fs.rs
 |       |-- gdt.rs
 |       |-- interrupts.rs
-|       |-- io.rs
 |       |-- keyboard.rs
-|       |-- main.rs
 |       |-- memory.rs
+|       |-- mouse.rs
 |       |-- net.rs
-|       |-- panic.rs
-|       |-- pci.rs
-|       |-- pic.rs
 |       |-- process.rs
-|       |-- serial.rs
+|       |-- sched.rs
 |       |-- shell.rs
 |       |-- smp.rs
-|       |-- sound.rs
-|       |-- spinlock.rs
 |       |-- syscall.rs
 |       |-- theme.rs
-|       `-- timer.rs
+|       |-- timer.rs
+|       `-- wm.rs
 |-- uefi-loader/
-|   |-- Cargo.toml
-|   `-- src/
-|       `-- main.rs
 |-- scripts/
-|   |-- build.ps1
-|   |-- build-custom.ps1
-|   |-- build-uefi.ps1
-|   |-- build-user.ps1
-|   |-- debug-serial.ps1
-|   |-- run-custom.ps1
-|   |-- run-uefi.ps1
-|   |-- run.ps1
-|   `-- write-usb.ps1
 |-- docs/
-|   |-- architecture.md
-|   |-- boot-flow.md
-|   |-- custom-bootloader.md
-|   |-- elf.md
-|   |-- networking.md
-|   |-- ring3.md
-|   |-- storage.md
-|   |-- syscalls.md
-|   |-- uefi.md
-|   `-- roadmap.md
 |-- tools/
-|   |-- chronofs_put.rs
-|   |-- custom_image_builder.rs
-|   `-- uefi_image_builder.rs
-|-- user/
-|   |-- hello.c
-|   `-- user.ld
-`-- .gitignore
+`-- user/
 ```
 
-## What each file is for
+## Key Files
 
-- `Cargo.toml` sets up the Rust workspace.
-- `build.rs` uses the bootloader 0.11 BIOS image builder to create the bootable image.
-- `boot/` contains the optional custom BIOS bootloader stages.
-- `src/main.rs` is a small host-side helper that reports the generated image path.
-- `rust-toolchain.toml` pins the nightly toolchain and required components.
-- `.cargo/config.toml` sets the default kernel target and enables nightly artifact dependencies.
-- `kernel/Cargo.toml` defines the kernel crate and its dependencies on `bootloader_api` and `x86_64`.
-- `kernel/src/apps/` contains tiny built-in apps for notes, integer math, and system info.
-- `kernel/src/ata.rs` reads and writes sectors through QEMU's ATA PIO IDE disk.
-- `kernel/src/console.rs` is the beginner-friendly text output layer with `print!` and `println!`.
-- `kernel/src/elf.rs` parses the static ELF64 subset used by `exec`.
-- `kernel/src/framebuffer/` draws text and the top bar into the boot framebuffer.
-- `kernel/src/fs.rs` mounts ChronoFS from disk, with a heap fallback if the disk is missing.
-- `kernel/src/gdt.rs` loads the Global Descriptor Table and a TSS with double-fault and ring-transition stacks.
-- `kernel/src/interrupts.rs` loads the Interrupt Descriptor Table and handles exceptions plus IRQ0.
-- `kernel/src/io.rs` provides shared x86 port I/O helpers for device drivers.
-- `kernel/src/keyboard.rs` polls the PS/2 keyboard and turns scancodes into simple key events.
-- `kernel/src/main.rs` is the kernel entrypoint and first boot flow.
-- `kernel/src/memory.rs` reads the bootloader memory map, identity maps early pages, and provides a bump heap.
-- `kernel/src/net.rs` drives QEMU RTL8139 networking with ARP and UDP.
-- `kernel/src/panic.rs` handles panics in a `no_std` environment.
-- `kernel/src/pci.rs` scans PCI config space for supported devices.
-- `kernel/src/pic.rs` remaps the legacy PIC so hardware IRQs start at IDT vector 32.
-- `kernel/src/process.rs` builds a foreground user address space and enters ELF programs.
-- `kernel/src/serial.rs` writes debug text to QEMU's emulated COM1 port.
-- `kernel/src/shell.rs` runs the line-based command shell.
-- `kernel/src/smp.rs` discovers CPU cores and starts APs for cooperative SMP.
-- `kernel/src/sound.rs` drives PIT channel 2 and the PC speaker gate for tones.
-- `kernel/src/spinlock.rs` provides a small atomic lock for SMP-safe globals.
-- `kernel/src/syscall.rs` configures SYSCALL/SYSRET and dispatches the first ring 3 kernel services.
-- `kernel/src/theme.rs` defines era profiles for prompts and framebuffer colors.
-- `kernel/src/timer.rs` configures the PIT at 100Hz and tracks ticks.
-- `uefi-loader/` builds the Rust `BOOTX64.EFI` application for UEFI firmware.
-- `scripts/build.ps1` builds the bootable disk image.
-- `scripts/build-custom.ps1` builds the optional custom sector-0 BIOS image.
-- `scripts/build-uefi.ps1` builds the UEFI loader and GPT/FAT32 ESP image.
-- `scripts/build-user.ps1` builds `hello.elf` and installs it into the ChronoFS data disk.
-- `scripts/run.ps1` runs the image in QEMU.
-- `scripts/run-custom.ps1` runs the custom BIOS image in QEMU.
-- `scripts/run-uefi.ps1` runs the UEFI image in QEMU with OVMF.
-- `scripts/debug-serial.ps1` runs QEMU with display disabled and serial output enabled.
-- `scripts/write-usb.ps1` is a guarded raw writer for the UEFI USB image.
-- `docs/roadmap.md` lists Milestone 1 and the next steps.
-- `docs/architecture.md` explains what code is ours and what is borrowed.
-- `docs/boot-flow.md` explains the startup path in plain language.
-- `docs/custom-bootloader.md` explains the custom bootloader path.
-- `docs/elf.md` explains ELF64 headers, `PT_LOAD`, process page tables, and testing.
-- `docs/networking.md` explains Ethernet, ARP, IPv4, UDP, and QEMU testing.
-- `docs/ring3.md` explains the opt-in user mode privilege demo.
-- `docs/storage.md` explains ATA PIO, LBA addressing, ChronoFS, and persistence testing.
-- `docs/syscalls.md` explains the first SYSCALL/SYSRET ABI and ring 3 hello demo.
-- `docs/uefi.md` explains the UEFI loader, ESP image, GOP framebuffer, and real hardware notes.
-- `tools/chronofs_put.rs` injects binary files such as `hello.elf` into a ChronoFS data image.
-- `tools/custom_image_builder.rs` packages the custom boot image.
-- `tools/uefi_image_builder.rs` packages the UEFI GPT/FAT32 ESP image.
-- `user/hello.c` and `user/user.ld` build the first static user-space ELF.
+- `kernel/src/main.rs`: kernel entrypoint and startup sequence.
+- `kernel/src/shell.rs`: line-based shell and most product/demo commands.
+- `kernel/src/memory.rs`: memory map handling, page helpers, and free-list heap.
+- `kernel/src/fs.rs`: ChronoFS, `fsck`, repair, and journal code.
+- `kernel/src/keyboard.rs`: IRQ keyboard buffer plus polling fallback.
+- `kernel/src/mouse.rs` and `kernel/src/wm.rs`: PS/2 mouse and small windows.
+- `kernel/src/net.rs`: RTL8139, ARP, static IPv4, and UDP.
+- `kernel/src/process.rs`, `kernel/src/syscall.rs`, `kernel/src/elf.rs`: userspace teaching paths.
+- `docs/CURRENT_STATUS.md`: post-Phase-4 current-state source of truth.
+- `docs/manual-testing.md`: staged verification checklist.
+- `docs/status-audit.md`: Phase 2 status and risk audit.
+- `docs/shell-commands.md`: current shell command reference.
 
-## Dependencies
+## Build And Run Commands
 
-- `bootloader`
-  Host-side disk image builder. It wraps the kernel ELF in a bootable BIOS image.
-- `bootloader_api`
-  The kernel-facing boot API. It provides the memory map, physical-memory
-  offset, and framebuffer metadata.
-- `uefi`
-  The UEFI-loader crate dependency. It provides Boot Services wrappers, GOP
-  access, ESP file access, and the `ExitBootServices()` helper.
-- `x86_64`
-  A `no_std` helper crate for descriptor tables, interrupt stack frames,
-  control registers, and page-table types.
+Install Rust nightly, QEMU, and NASM if using the custom BIOS path.
 
-Framebuffer text output, serial output, keyboard polling, PIC/PIT setup, PC
-speaker tones, the bump heap, ATA PIO storage, RTL8139 networking, and the tiny
-apps are implemented directly in this repo.
-
-## Current State
-
-The kernel currently:
-
-- boots through the borrowed `bootloader` crate,
-- can also boot through the Rust UEFI loader from a GPT/FAT32 ESP image,
-- initializes COM1 serial logging,
-- initializes a framebuffer graphics console with an era-colored top bar,
-- loads a GDT and IDT,
-- handles breakpoint, page fault, and double fault exceptions,
-- remaps the PIC and runs a 100Hz PIT timer interrupt,
-- discovers ACPI MADT CPU entries and starts APs in QEMU with `-smp 2`,
-- drives PIT channel 2 and the PC speaker for era-specific boot chimes,
-- initializes a 1MiB bump heap from the bootloader memory map,
-- mounts a tiny ChronoFS disk so shell files and notes survive reboot,
-- prints a compact boot banner below the top bar,
-- polls the PS/2 keyboard and runs a small command shell,
-- supports era switching,
-- includes built-in `notes`, `calc`, and `sysinfo` apps,
-- detects QEMU's RTL8139 NIC and can send ARP plus UDP packets,
-- logs the boot sequence to the QEMU terminal,
-- keeps the implementation intentionally small and readable.
-
-That small scope is deliberate. It gives us real kernel pieces while keeping the
-code approachable enough to learn from.
-
-## Exact setup commands
-
-Install Rust and the required components:
-
-```powershell
-winget install Rustlang.Rustup
-rustup toolchain install nightly
-rustup component add rust-src llvm-tools-preview --toolchain nightly
-rustup target add x86_64-unknown-none --toolchain nightly
-rustup target add x86_64-unknown-uefi --toolchain nightly
-```
-
-Install QEMU:
-
-```powershell
-winget install qemu
-```
-
-Install NASM if you want to build the optional custom bootloader path:
-
-```powershell
-winget install NASM.NASM
-```
-
-## Exact build and run commands
-
-Build:
+Build the normal BIOS image:
 
 ```powershell
 cargo build -p kernel
 .\scripts\build.ps1
 ```
 
-Run:
+Run the normal BIOS image:
 
 ```powershell
 .\scripts\run.ps1
 ```
 
-Optional custom bootloader image:
+Optional custom BIOS image:
 
 ```powershell
 .\scripts\build-custom.ps1
 .\scripts\run-custom.ps1
 ```
 
-The custom path starts from our own sector-0 Stage 1 loader. The normal
-`chronosapien-bios.img` path remains the fallback.
-
-UEFI boot image:
+Optional UEFI image:
 
 ```powershell
 .\scripts\build-uefi.ps1
 .\scripts\run-uefi.ps1
 ```
-
-The UEFI path creates `target\x86_64-unknown-none\debug\chronosapien-uefi.img`,
-a GPT disk with a FAT32 ESP containing `EFI\BOOT\BOOTX64.EFI` and
-`CHRONO\KERNEL.ELF`. For real hardware, disable Secure Boot unless signing is
-added and write the image with `.\scripts\write-usb.ps1`.
 
 Serial-only debug run:
 
@@ -264,236 +223,63 @@ Serial-only debug run:
 .\scripts\debug-serial.ps1
 ```
 
-Graphics mode still requires the bootloader to provide a framebuffer. If a host
-QEMU setup refuses to create one with `-display none`, use `.\scripts\run.ps1`
-for graphical testing and keep serial output enabled there.
+Use `docs/manual-testing.md` to record what was actually observed. Do not mark
+anything runtime-verified from commands alone.
 
-Optional direct commands:
+## Shell Surface
 
-```powershell
-$hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
-cargo build -p chronosapien --target $hostTarget
-qemu-system-x86_64 -smp 2 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img,if=ide,index=0,media=disk -drive format=raw,file=target\x86_64-unknown-none\debug\chronofs-data.img,if=ide,index=1,media=disk -serial stdio
-```
+See `docs/shell-commands.md` for the command reference generated from the
+current source shape.
 
-## Boot Flow in Plain Language
+Highlights:
 
-QEMU emulates an x86_64 machine and boots a disk image. The BIOS image uses the
-borrowed `bootloader` crate to perform early machine setup, set up a framebuffer,
-and jump into our Rust kernel entrypoint. The UEFI image uses our Rust
-`BOOTX64.EFI` loader to read the kernel from the ESP, configure GOP, exit Boot
-Services, and jump into the same kernel handoff. Our code starts in
-`kernel/src/main.rs`, initializes serial and framebuffer output, loads descriptor
-tables, triggers one test breakpoint exception, initializes memory, starts the
-timer, prints the startup banner, and enters the shell.
+- Core: `help`, `clear`, `about`, `reboot`, `uptime`, `clock`, `mem`, `cores`, `beep <hz>`.
+- Era/product: `era`, `travel <year>`, `demo`, `tour`, `capsule`, `doctor`, `poster`.
+- Filesystem: `ls`, `cat`, `write`, `rm`, `fsck`, `fsck repair`, `journal`.
+- Apps: `apps`, `notes`, `calc`, `sysinfo`.
+- Windows/tasks: `open notes`, `open sysinfo`, `tasks`, `kill <id>`.
+- Userspace: `ring3`, `syshello`, `exec <name>`.
+- Networking: `net`, `net arp`, `net send`.
+- Museum/quest: `museum ...`, `quest list`, `quest status`, `stats`, `inventory`.
 
-The graphical console shows a top bar plus shell output:
+## Storage In Plain Language
 
-```text
-Chronosapian | Era: 1984 | Uptime: 0s
+ChronoOS uses a small educational filesystem named ChronoFS on a second QEMU IDE
+disk. The layout is intentionally simple: superblock, file table, allocation
+bitmap, and contiguous file data.
 
-EXCEPTION: BREAKPOINT
-CHRONOSAPIAN
-Era: 1984
-CHRONO/84> _
-```
+`fsck`, `fsck repair`, and a tiny journal are implemented in code. Repair and
+recovery are conservative and still need runtime verification under controlled
+disk states.
 
-With `-serial stdio`, the QEMU terminal shows:
+## Memory In Plain Language
 
-```text
-[CHRONO] boot start
-[CHRONO] serial initialized
-[CHRONO] fb: 1024x768 initialized
-[CHRONO] console initialized
-[CHRONO] GDT loaded
-[CHRONO] IDT loaded
-[CHRONO] interrupt: breakpoint at 0x...
-[CHRONO] breakpoint resolved
-[CHRONO] mem: heap initialized at 0x200000 size 1MB
-[CHRONO] smp: BSP online (core 0)
-[CHRONO] timer: PIT initialized at 100Hz
-[CHRONO] active era: 1984
-[CHRONO] smp: core 1 online
-[CHRONO] smp: 2 cores ready
-[CHRONO] sound: beep 880hz 90ms
-[CHRONO] sound: beep 660hz 90ms
-[CHRONO] sound: beep 440hz 140ms
-[CHRONO] keyboard initialized
-[CHRONO] boot complete
-```
+The heap starts at `0x200000` and is 1 MiB. It uses a simple free-list allocator
+with splitting, freeing, sorted reinsertion, and coalescing. This is implemented
+in code but still needs runtime verification to prove reuse behavior across
+real shell/app/window/filesystem workflows.
 
-Shell commands and apps add serial lines like:
-
-```text
-[CHRONO] cmd: sysinfo
-[CHRONO] app: sysinfo launched
-[CHRONO] cmd: write hello.txt Hi there
-[CHRONO] fs: write hello.txt
-[CHRONO] disk: write sector 42
-```
-
-## Shell Commands
-
-Built-ins:
-
-- `help` lists available commands.
-- `clear` clears the framebuffer shell region and redraws the top bar.
-- `about` prints the current Chronosapian version line.
-- `reboot` asks the PS/2 controller to reset the machine.
-- `era 1984|1995|2007|2040` switches the active era style.
-- `uptime` prints elapsed seconds from the PIT tick counter.
-- `clock` prints raw PIT ticks.
-- `mem` prints total memory, heap location, and used heap space.
-- `cores` prints online CPU cores and tasks assigned to each core.
-- `beep <hz>` plays a PC speaker tone for 500ms.
-- `ring3` enters the opt-in user mode demo and intentionally catches a privileged-instruction fault.
-- `syshello` enters ring 3 and prints through `sys_write`.
-- `exec <name>` loads a static ELF64 file from ChronoFS and runs it in user mode.
-- `net` prints RTL8139 MAC, static IP, gateway state, and TX/RX counts.
-- `net arp` sends an ARP request for QEMU's `10.0.2.2` gateway.
-- `net send [ip port text]` sends a UDP packet.
-- `ls` lists files from the mounted ChronoFS disk, or the heap fallback.
-- `cat <name>` prints a file's contents.
-- `write <name> <content>` creates or overwrites a persistent file.
-- `rm <name>` deletes a file.
-
-Tiny apps:
-
-- `notes <text>` stores one short persistent note as `note.txt`.
-- `notes read` prints `note.txt`.
-- `calc <int> +|-|*|/ <int>` evaluates one integer operation.
-- `sysinfo` prints era-styled OS, era, uptime, and memory usage.
-
-## Framebuffer graphics in simple terms
-
-The bootloader asks the firmware for a linear framebuffer and passes its address
-and layout to Chronosapian. The kernel does not implement VESA or a GPU driver;
-it receives ready-to-write pixel memory from the bootloader.
-
-The framebuffer is a flat byte array. To draw pixel `(x, y)`, the renderer uses:
-
-```text
-offset = (y * stride + x) * bytes_per_pixel
-```
-
-`stride` is the number of pixels between the start of one scanline and the next.
-It can be wider than the visible screen because some framebuffers add padding at
-the end of each row. RGB and BGR formats store the same color channels in a
-different byte order, so the renderer writes either red-green-blue or
-blue-green-red depending on the bootloader metadata.
-
-Text is drawn with a tiny 8x8 bitmap font. Each glyph is stored as eight bytes:
-one byte per row. A set bit draws a foreground pixel; a cleared bit draws a
-background pixel. The console keeps a small text cell buffer for the shell
-region so it can scroll below the persistent top bar. Mouse support is not part
-of this milestone.
-
-## COM1 serial output in simple terms
-
-QEMU exposes a virtual 16550 UART at the classic COM1 I/O port address `0x3F8`.
-The kernel configures that serial port once during startup. After that, writing
-bytes to the COM1 data port sends text to the host terminal when QEMU is run
-with `-serial stdio`.
-
-This repo uses small inline `in` and `out` assembly helpers instead of adding a
-port I/O crate. That keeps the dependency list short and makes the hardware
-access visible while the serial code is still tiny.
-
-## PS/2 keyboard input in simple terms
-
-The PS/2 controller exposes two important I/O ports in QEMU's PC-compatible
-machine:
-
-- `0x64` is the status port. The kernel checks it to see whether a keyboard byte is ready.
-- `0x60` is the data port. The kernel reads one scancode from it after the status port says data is waiting.
-
-The keyboard module uses a small scancode lookup table for common set-1 keys.
-It turns those scancodes into ASCII bytes, backspace, or enter events. The input
-buffer is still a fixed-size array on the stack, even though later features now
-use the heap.
-
-## Interrupts and timer in simple terms
-
-The GDT gives the CPU valid segment descriptors and a Task State Segment for the
-double-fault stack plus ring 3 to ring 0 stack transitions. The IDT tells the
-CPU which Rust handler to call for exceptions and interrupts. Chronosapian
-currently handles breakpoints, general protection faults, page faults, double
-faults, and timer IRQs.
-
-The PIT is programmed to fire IRQ0 about 100 times per second. The legacy PIC is
-remapped so IRQ0 reaches IDT vector 32 instead of colliding with CPU exception
-vectors 0 through 31. Each timer interrupt increments an atomic tick counter and
-sends an end-of-interrupt command back to the PIC.
-
-The same PIT chip also feeds the PC speaker through channel 2. For `beep 440`,
-Chronosapian calculates a channel 2 divisor from the PIT input clock:
-`round(1_193_182 / 440)`. It writes that divisor to port `0x42`, then uses port
-`0x61` to open the speaker gate. Bit 0 enables the channel 2 gate, bit 1
-connects the speaker output, and clearing those bits silences the tone.
-
-## Memory management in simple terms
-
-The bootloader gives Chronosapian a memory map. The kernel uses it to count total
-memory and pick usable 4KiB physical frames. Early pages are identity mapped,
-which means a virtual address points to the same physical address. That is the
-safest starting point because printed addresses match the hardware addresses
-being used.
-
-The heap starts at `0x200000` and is 1MiB. It uses a bump allocator: each
-allocation moves a pointer forward, and freeing is a no-op. This is tiny and
-predictable, but replacing notes or allocating more objects consumes heap space
-until reboot.
-
-## Persistent filesystem in simple terms
-
-Chronosapian now has a tiny disk-backed filesystem named ChronoFS. The run
-scripts attach a separate 16 MiB IDE data disk, so the boot image remains
-untouched and sector 0 of the data disk can hold filesystem metadata.
-
-The ATA driver uses PIO mode: the CPU waits for the disk, then copies one
-512-byte sector at a time through port `0x1F0`. ChronoFS uses LBA numbers, so
-the disk is just sector `0`, sector `1`, sector `2`, and so on.
-
-ChronoFS keeps a small heap cache for shell reads, but disk is the source of
-truth after mount. If the second disk is missing or broken, the kernel falls
-back to the old heap-only file list and logs that choice to serial.
-
-Current limits:
-
-- filenames are at most 32 bytes,
-- filenames cannot contain whitespace,
-- file contents are one shell line,
-- each file can use at most 64 KiB,
-- there are 64 file slots,
-- no journaling exists yet, so killing QEMU during a write can corrupt files.
-
-## What to build next
-
-1. Add interrupt-driven keyboard input instead of polling.
-2. Replace the bump heap with an allocator that can reuse freed memory.
-3. Add crash recovery or a journal for disk writes.
-4. Add more app-like shell programs after the kernel basics stay stable.
-
-## What is ours and what is borrowed
+## What Is Ours And What Is Borrowed
 
 Ours:
-- Kernel entry and startup flow
-- Panic handling
-- Framebuffer text output and bitmap font rendering
-- GDT, IDT, PIC, and PIT setup
-- Exception and timer handlers
-- Basic memory management and bump allocation
-- ATA PIO storage and ChronoFS
-- UEFI loader and ESP image builder
-- Theme and era model
-- Shell commands and tiny built-in apps
-- Scripts and docs
+
+- Kernel startup after handoff
+- Serial, console, framebuffer text rendering
+- GDT, IDT, PIC, PIT, keyboard, mouse, sound, and basic device paths
+- Memory helpers and free-list heap
+- ATA PIO and ChronoFS
+- Shell, eras, apps, museum, quests, and product commands
+- Scheduler, SMP work, networking, userspace demos, syscalls, and ELF loader
+- UEFI loader and image builders
 
 Borrowed:
-- The `bootloader` crate
-- The `uefi` crate
-- The `x86_64` crate for low-level CPU data structures
+
+- `bootloader` and `bootloader_api`
+- `uefi`
+- `x86_64`
 - QEMU
 - Rust bare-metal toolchain support
 
-That split is deliberate: the early boot path is borrowed so the kernel itself can stay raw, readable, and educational.
+That split is deliberate: early boot and CPU helpers are borrowed where they
+keep the project readable, while ChronoOS owns the teaching surface and kernel
+pieces it is meant to explain.
