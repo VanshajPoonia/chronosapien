@@ -1,42 +1,21 @@
 # ChronoFS Persistent Storage
 
-ChronoOS stores shell files on a second QEMU IDE disk named
-`chronofs-data.img`. The boot image stays separate, so the filesystem can own
-sector 0 of the data disk without overwriting the BIOS boot sector.
+ChronoOS stores shell files on a second QEMU IDE disk named `chronofs-data.img`.
+The boot image stays separate, so the filesystem can own sector 0 of the data
+disk without overwriting the BIOS boot sector.
+
+Status: implemented in code, needs runtime verification.
 
 ## ATA PIO
 
 ATA is the old PC hard-disk interface that QEMU can emulate with simple port
 I/O. ChronoOS talks to the primary IDE channel at ports `0x1F0..0x1F7` and
 selects the primary slave disk. PIO means "programmed I/O": the CPU copies each
-16-bit word through the data port itself. That is slower than DMA, but it is the
-simplest disk path to understand because every sector read and write is visible
-in the driver.
+16-bit word through the data port itself.
 
-For one-sector reads, the kernel:
-
-1. Waits until the disk is not busy.
-2. Selects the slave drive and the high LBA bits through port `0x1F6`.
-3. Writes sector count `1` and the low 24 LBA bits to ports `0x1F2..0x1F5`.
-4. Sends command `0x20` to port `0x1F7`.
-5. Polls status until `DRQ` says data is ready.
-6. Reads 256 words from port `0x1F0`.
-
-Writes use command `0x30`, copy 256 words to port `0x1F0`, then send cache
-flush command `0xE7`. Every successful operation logs a line such as
-`[CHRONO] disk: write sector 42`.
-
-## LBA Addressing
-
-LBA means logical block addressing. Instead of the older cylinder/head/sector
-geometry, the disk is treated as a flat array of 512-byte sectors:
-
-```text
-sector 0, sector 1, sector 2, ...
-```
-
-ChronoOS uses 28-bit LBA, which is plenty for the 16 MiB teaching disk. The
-first version reads and writes one sector at a time so the math stays obvious.
+For one-sector reads, the kernel waits for the disk, selects the LBA, sends
+command `0x20`, waits for `DRQ`, and reads 256 words from port `0x1F0`. Writes
+use command `0x30`, copy 256 words to the data port, then flush with `0xE7`.
 
 ## On-Disk Layout
 
@@ -49,32 +28,47 @@ sectors 9-16  free-sector bitmap
 sectors 17+   file data
 ```
 
-The superblock is the filesystem's table of contents. It stores the magic
-number `CHRONFS1`, format version, disk size, file count, metadata locations,
-and a tiny checksum. If the magic or layout does not match, ChronoOS formats an
-empty ChronoFS disk.
+The superblock stores magic `CHRONFS1`, format version, disk size, file count,
+metadata locations, and a small checksum. The file table has 64 fixed-size
+entries. File data is allocated as contiguous sector runs so the layout stays
+easy to inspect.
 
-The file table has 64 fixed-size entries. Each entry stores:
+Current limits:
 
-- whether the slot is used
-- filename length and up to 32 filename bytes
-- file size in bytes
-- first data sector
-- number of data sectors
+- filenames are at most 32 bytes
+- filenames cannot contain whitespace
+- each file can use at most 64 KiB
+- there are 64 file slots
+- there are no directories, permissions, timestamps, or POSIX compatibility
 
-The free-sector bitmap has one bit per sector. A set bit means the sector is in
-use. Metadata sectors are marked used during format. File data is allocated as
-one contiguous run of sectors, which keeps reads and writes easy to inspect.
+## fsck And Repair
 
-## No Journaling Yet
+`fsck` is implemented in code as a conservative checker. It inspects the
+superblock, file table, filename validity, file extents, allocation bitmap, and
+duplicate sector claims.
 
-ChronoFS writes file data before metadata, but it does not journal operations.
-If power is lost or QEMU is killed during a write or remove, the file table and
-bitmap can disagree. Real filesystems use journals, copy-on-write trees, or
-repair tools to recover from that kind of interrupted update. ChronoFS skips
-that for now so the storage format stays small enough to understand fully.
+`fsck repair` is intentionally narrow. It can repair safe bitmap mismatches and
+clear stale metadata in unused file table slots. It refuses ambiguous damage,
+duplicate-sector ownership, untrusted superblocks, and cases where guessing
+would risk user data.
 
-## QEMU Testing
+Status: implemented in code, needs runtime verification.
+
+## Journal And Recovery
+
+ChronoFS now has a tiny hidden one-sector journal stored as `__chronofs_journal`.
+The journal records one write/remove intent at a time, marks it committed after
+metadata sync, and is checked during mount.
+
+Mount recovery can roll back an uncommitted intent or roll forward a committed
+operation when the journal record is safe. Recovery also rebuilds the bitmap
+from file table entries. Unsafe or corrupt journal records are refused and
+reported through serial logs.
+
+Status: implemented in code, needs runtime verification. Crash recovery has not
+been proven in QEMU or on hardware in this repo.
+
+## QEMU Smoke Test Target
 
 The run scripts create this disk if it does not exist:
 
@@ -82,11 +76,5 @@ The run scripts create this disk if it does not exist:
 target\x86_64-unknown-none\debug\chronofs-data.img
 ```
 
-The smoke test is:
-
-```text
-CHRONO/84> write hello.txt Hi there
-CHRONO/84> reboot
-CHRONO/84> cat hello.txt
-Hi there
-```
+Manual verification should use `docs/manual-testing.md` and record real
+evidence before changing any status to runtime-verified.
