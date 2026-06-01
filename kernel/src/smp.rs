@@ -78,22 +78,28 @@ static mut AP_STACKS: [ApStack; MAX_CORES] = [ApStack {
 
 global_asm!(
     r#"
-    .intel_syntax noprefix
     .section .ap_trampoline, "ax"
     .global __ap_trampoline_start
     .global __ap_trampoline_end
 
 __ap_trampoline_start:
+    .set ap_gdt_descriptor_phys, 0x8000 + ap_gdt_descriptor - __ap_trampoline_start
+    .set ap_protected_phys, 0x8000 + ap_protected - __ap_trampoline_start
+    .set ap_long_phys, 0x8000 + ap_long - __ap_trampoline_start
+    .set ap_gdt_phys, 0x8000 + ap_gdt - __ap_trampoline_start
+
     .code16
     cli
     cld
     xor ax, ax
     mov ds, ax
-    lgdt [0x8000 + ap_gdt_descriptor - __ap_trampoline_start]
+    lgdt [ap_gdt_descriptor_phys]
     mov eax, cr0
     or eax, 1
     mov cr0, eax
-    ljmp 0x08, 0x8000 + ap_protected - __ap_trampoline_start
+    .byte 0xea
+    .word ap_protected_phys
+    .word 0x08
 
 ap_protected:
     .code32
@@ -119,7 +125,9 @@ ap_protected:
     mov eax, cr0
     or eax, 0x80000000
     mov cr0, eax
-    ljmp 0x18, 0x8000 + ap_long - __ap_trampoline_start
+    .byte 0xea
+    .long ap_long_phys
+    .word 0x18
 
 ap_long:
     .code64
@@ -140,11 +148,10 @@ ap_gdt:
     .quad 0x00af9a000000ffff
 ap_gdt_descriptor:
     .word ap_gdt_descriptor - ap_gdt - 1
-    .long 0x8000 + ap_gdt - __ap_trampoline_start
+    .long ap_gdt_phys
 
 __ap_trampoline_end:
     .code64
-    .att_syntax prefix
 "#
 );
 
@@ -300,7 +307,7 @@ fn write_boot_data(core_id: usize, pml4: u64) {
     let data = ApBootData {
         pml4,
         stack_top,
-        entry: chrono_ap_main as usize as u64,
+        entry: chrono_ap_main as *const () as usize as u64,
         core_id: core_id as u64,
     };
     let destination =
@@ -368,10 +375,8 @@ fn enable_local_apic() {
 }
 
 fn initial_apic_id() -> u8 {
-    unsafe {
-        let cpuid = core::arch::x86_64::__cpuid(1);
-        (cpuid.ebx >> 24) as u8
-    }
+    let cpuid = core::arch::x86_64::__cpuid(1);
+    (cpuid.ebx >> 24) as u8
 }
 
 unsafe fn read_lapic(lapic: u64, offset: u64) -> u32 {
