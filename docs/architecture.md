@@ -1,203 +1,122 @@
 # Architecture Notes
 
-Chronosapian is split into **our code** and **borrowed infrastructure** on purpose.
+ChronoOS is split into **our code** and **borrowed infrastructure** on purpose.
+The public/product name is ChronoOS; the repo/package name may remain
+`chronosapien`.
+
+## Status Labels
+
+- implemented in code: present in the source tree.
+- partially implemented: useful teaching version, not a complete production system.
+- needs runtime verification: must be proven in QEMU or hardware before success is claimed.
+- roadmap/design-only: intentionally not implemented yet.
 
 ## Ours
 
-- The kernel entrypoint in `kernel/src/main.rs`
-- The panic path in `kernel/src/panic.rs`
-- The serial logger in `kernel/src/serial.rs`
-- The public console layer in `kernel/src/console.rs`
-- The polling keyboard reader in `kernel/src/keyboard.rs`
-- The framebuffer text renderer in `kernel/src/framebuffer/`
-- The ATA PIO disk driver and ChronoFS filesystem
-- The opt-in ring 3 privilege transition demo
-- The era model in `kernel/src/theme.rs`
-- The startup welcome message
-- The PowerShell helper scripts and documentation
+- Kernel entry and startup flow in `kernel/src/main.rs`.
+- Panic handling, serial logging, framebuffer text output, and bitmap font rendering.
+- GDT, IDT, PIC, PIT, exception handlers, timer IRQ, keyboard IRQ, and mouse IRQ paths.
+- PS/2 keyboard decoding with IRQ buffering and polling fallback.
+- PS/2 mouse packet decoding and fixed-capacity window interactions.
+- Basic memory map handling, page mapping helpers, and a 1 MiB free-list heap.
+- ATA PIO storage, ChronoFS, `fsck`, conservative repair, and a tiny journal.
+- Era model, museum pages, quests, shell commands, small apps, and product/demo commands.
+- Cooperative scheduler, early SMP work, ring 3 demo, syscall layer, static ELF execution, and ARP/UDP networking.
+- PowerShell helper scripts and documentation.
 
-## Borrowed infrastructure
+## Borrowed Infrastructure
 
-- The `bootloader` crate, which packages the kernel into a BIOS image
-- The `bootloader_api` crate, which provides boot information to the kernel
-- QEMU, which emulates the machine we are developing against
-- The Rust compiler and core library
+- The `bootloader` crate packages the kernel into a BIOS image.
+- The `bootloader_api` crate provides boot information to the kernel.
+- The `uefi` crate supports the UEFI loader.
+- The `x86_64` crate provides low-level CPU structures and helpers.
+- QEMU emulates the development machine.
+- Rust bare-metal toolchain support provides `core`, `alloc`, and target support.
 
-## Why this split is good for learning
+## Console, Serial, And Framebuffer
 
-We keep the early boot plumbing borrowed so you can focus on kernel code first. That keeps Milestone 1 centered on a few core ideas: entrypoints, console output, panic handling, and the basic shape of a bare-metal Rust crate.
+Status: implemented in code, needs runtime verification.
 
-## COM1 serial logging
+ChronoOS writes debug logs to COM1 at port `0x3F8` and draws text directly into
+the linear framebuffer provided by the boot path. The console keeps a text cell
+buffer so shell output can scroll below the persistent top bar.
 
-QEMU provides a virtual 16550-compatible serial device at COM1 port `0x3F8`.
-When QEMU runs with `-serial stdio`, bytes written to that port appear in the
-host terminal. Chronosapian uses that path for early boot logs and panic
-messages because it still works when framebuffer output is hard to inspect.
+The framebuffer path is not a GPU driver. BIOS/UEFI/bootloader code provides
+pixel memory, and the kernel writes pixels using the reported width, height,
+stride, bytes-per-pixel, and RGB/BGR format.
 
-## Framebuffer graphics
+## Input And Windows
 
-The bootloader asks the firmware for a linear framebuffer and passes its
-address, dimensions, stride, bytes-per-pixel, and pixel format to the kernel.
-Chronosapian writes pixels directly into that memory. RGB and BGR layouts store
-the same red, green, and blue color channels in different byte orders, so the
-renderer checks the bootloader metadata before writing each pixel.
+Status: implemented in code, needs runtime verification.
 
-Text is rendered with a tiny 8x8 bitmap font. Each glyph is eight bytes: one
-byte per row, with set bits producing foreground pixels. The console keeps a
-small text cell buffer so shell output can scroll below the top bar without
-overwriting it.
+Keyboard input has an IRQ1 event buffer and a polling fallback through the PS/2
+controller. Mouse input has an IRQ12 packet path that publishes simple events to
+the window manager. The window manager is fixed-capacity and supports small
+notes/sysinfo windows, dragging, focus order, and close buttons.
 
-## CPU exception handling
+This is partially implemented as a teaching UI. It is not a full desktop,
+compositor, or GUI toolkit.
 
-Chronosapian loads its own Global Descriptor Table (GDT) during early boot. In
-x86_64 long mode, old-style segmentation is mostly disabled, but the CPU still
-needs valid code and data descriptors to move between kernel ring 0 and user
-ring 3. The GDT also contains the Task State Segment (TSS), which gives the CPU
-dedicated stacks to use for especially dangerous exceptions and for traps from
-ring 3 back into the kernel.
+## CPU Exceptions, Timer, And Sound
 
-The Interrupt Descriptor Table (IDT) is the CPU's exception and interrupt
-vector table. Chronosapian registers Rust handlers for breakpoint, page fault, and
-double fault entries, plus a general protection fault handler for the ring 3
-demo, then loads the table with `lidt`. These handlers use Rust's
-`extern "x86-interrupt"` ABI so the compiler preserves the stack layout that
-the CPU expects.
+Status: implemented in code, needs runtime verification.
 
-A double fault happens when the CPU encounters a second exception while trying
-to deliver or handle an earlier one. If the normal stack is already corrupted,
-handling the double fault on that same stack can immediately become a triple
-fault and reset the machine. Chronosapian assigns double faults a separate TSS
-Interrupt Stack Table entry so the handler has a clean stack to report the
-failure.
+ChronoOS loads a GDT and IDT, handles breakpoint, page fault, double fault, and
+general protection fault paths, and uses the PIT at 100 Hz for ticks and uptime.
+The PIC is remapped so hardware IRQs do not collide with CPU exceptions. PIT
+channel 2 is also used for simple PC speaker tones.
 
-The `ring3` shell command builds an `iretq` frame that enters a tiny
-user-accessible code page. The first user instruction is privileged, so the CPU
-raises a general protection fault instead of executing it. That proves the
-privilege boundary is active independently from the syscall demo.
+## Memory
 
-The `syshello` command uses the same ring 3 entry machinery but runs a tiny
-user program that executes `SYSCALL`. Chronosapian configures the x86_64 syscall
-MSRs during boot, switches from the user stack to a dedicated kernel syscall
-stack on entry, dispatches the request by the number in `rax`, and returns with
-`SYSRET` for normal calls. This gives user mode a controlled way to ask for
-kernel services without jumping directly into kernel functions.
+Status: implemented in code, needs runtime verification.
 
-The `exec` command reads a static ELF64 file from ChronoFS, validates its
-program headers, creates a foreground process page table, maps each `PT_LOAD`
-segment into the ELF user window, and enters the file's entry point in ring 3.
-Kernel mappings remain supervisor-only in the process page table so syscalls and
-exceptions still work after CR3 changes, while user buffers are checked against
-the active process ranges.
+ChronoOS reads the boot memory map, identity maps early kernel/heap pages, maps
+fixed ring 3 demo pages, and provides helpers for user address spaces. The heap
+starts at `0x200000`, is 1 MiB, and uses a simple free-list allocator with
+splitting, deallocation, address-sorted reinsertion, and coalescing.
 
-## PIT timer and PIC remapping
+This allocator is no longer bump-only, but reuse behavior still needs runtime
+verification under real file, app, task, window, and ELF workflows.
 
-Chronosapian uses the legacy Programmable Interval Timer (PIT) for a simple uptime
-clock. The PIT runs from a fixed input frequency of 1,193,182 Hz. Programming
-channel 0 with a divisor turns that input clock into periodic IRQ0 interrupts;
-for the current 100 Hz timer, the divisor is `1_193_182 / 100`.
+## Persistent Storage
 
-Hardware IRQs arrive through the legacy 8259 Programmable Interrupt Controller
-(PIC). By default, the PIC's IRQ vectors overlap the CPU exception vectors,
-which occupy IDT entries 0 through 31. Chronosapian remaps the master PIC to start
-at vector 32 and the slave PIC to start at vector 40, so IRQ0 becomes IDT vector
-32 instead of colliding with an exception.
+Status: implemented in code, needs runtime verification.
 
-The timer path is intentionally small: PIT channel 0 fires IRQ0, the remapped
-PIC forwards that as vector 32, the IDT dispatches the timer handler, the
-handler increments an atomic tick counter, and then it sends an end-of-interrupt
-command back to the PIC. The handler does not print per tick, because serial
-and framebuffer output are not interrupt-safe yet.
+ChronoOS attaches a second QEMU IDE data disk for ChronoFS. The kernel talks to
+that disk with ATA PIO. ChronoFS stores a superblock, fixed file table, free
+sector bitmap, contiguous file extents, and a small heap cache for shell reads.
 
-Chronosapian also uses PIT channel 2 for the PC speaker. Unlike channel 0,
-channel 2 does not interrupt the CPU in this kernel; it produces a square wave
-that can be routed to the speaker. A requested tone is converted into a PIT
-divisor with `round(1_193_182 / frequency_hz)`, then the low and high divisor
-bytes are written to channel 2 data port `0x42` after programming command port
-`0x43`.
+`fsck`, `fsck repair`, and a tiny one-record journal are implemented in code.
+Repair is intentionally conservative and journal recovery refuses unsafe
+records. Crash recovery still needs controlled runtime verification.
 
-The final speaker gate is port `0x61`. Bit 0 enables the PIT channel 2 gate, and
-bit 1 connects the speaker output path. Setting both bits lets the channel 2
-waveform reach the speaker; clearing those two bits preserves the rest of the
-port state and silences the tone. Sound events are logged to serial, for example
-`[CHRONO] sound: beep 440hz 500ms`.
+## Userspace, Syscalls, And ELF
 
-## Symmetric multiprocessing
+Status: partially implemented, needs runtime verification.
 
-Chronosapian's first SMP milestone starts with two QEMU CPUs using `-smp 2`.
-The bootstrap processor (BSP) is core 0: firmware starts it first, and it owns
-early boot, device setup, and the shell. Application processors (APs) are the
-other CPUs. They wait until the BSP discovers them in the ACPI MADT table and
-sends startup commands through the local APIC.
+The `ring3` command demonstrates an opt-in transition to user mode. The
+`syshello` path uses SYSCALL/SYSRET for a tiny syscall demo. The `exec <name>`
+path reads a static ELF64 file from ChronoFS, validates a small `PT_LOAD`
+subset, maps a foreground user address space, and enters ring 3.
 
-ACPI's MADT lists the local APIC IDs for usable processors and the local APIC
-MMIO address. The BSP parses RSDP, XSDT or RSDT, and MADT directly from the
-physical-memory mapping passed by the bootloader. If those tables are missing,
-Chronosapian logs the fallback and continues as a single-core kernel.
+There is no dynamic linker, argv/env, general process table, permissions model,
+or mature lifecycle management yet.
 
-AP startup uses the classic INIT-SIPI-SIPI sequence. INIT resets the target AP,
-the first SIPI points it at a low-memory trampoline page, and the second SIPI is
-sent for compatibility with hardware that misses the first one. The trampoline
-switches the AP from real mode to protected mode to long mode, loads the shared
-kernel page table, then jumps into Rust. Each online core loads its own GDT,
-IDT, TSS, double-fault stack, and ring 0 stack before entering the cooperative
-scheduler.
+## SMP And Scheduling
 
-SMP also changes synchronization. Disabling interrupts only stops interrupts on
-the current CPU; it does not stop another CPU from editing the same global data.
-Chronosapian uses a small spinlock for shared kernel state such as serial output
-and scheduler tables. A spinlock is an atomic busy-wait lock: one core flips an
-atomic flag to take ownership, while other cores spin until the flag is released.
+Status: partially implemented, needs runtime verification.
 
-Modern x86 systems, including QEMU's emulated machine, keep normal memory cache
-coherent across cores. That means all cores eventually see the same memory
-contents, but atomics and acquire/release ordering still matter: they define
-when updates protected by locks become visible to other cores.
+ChronoOS can discover CPUs through ACPI MADT, start APs through INIT-SIPI-SIPI,
+and run a cooperative scheduler with fixed task slots. The shell stays on core
+0 while tasks can be assigned to online cores.
 
-The v1 scheduler remains cooperative. Timer preemption, IOAPIC routing, x2APIC,
-CPU hotplug, and live task migration are intentionally left for later. Ready
-tasks are assigned to the least-loaded online core when spawned, APs run ready
-kernel tasks from the shared table, and the shell stays on core 0.
+Preemption, IOAPIC routing, x2APIC, CPU hotplug, blocking I/O integration, and
+production-grade scheduling are roadmap/design-only.
 
-## Basic memory management
+## Networking
 
-Chronosapian reads the bootloader's memory map to learn which physical RAM ranges
-exist and which ranges are safe for the kernel to use. A physical frame is a
-fixed-size chunk of physical RAM; this kernel starts with 4KiB frames because
-that is the default granularity used by x86_64 page tables.
+Status: partially implemented, needs runtime verification.
 
-The kernel's physical frames and the first heap are identity mapped, meaning a
-virtual address such as `0x200000` points to physical address `0x200000`.
-Identity mapping is the safest starting point here because the addresses
-printed by the kernel match the hardware addresses being used, which keeps
-early debugging straightforward.
-
-The heap uses a bump allocator. A bump allocator keeps one pointer to the next
-free byte and moves it forward for each allocation. That makes it tiny and
-predictable, but freeing memory is a no-op, so used heap space never comes back
-until the kernel grows a more complete allocator.
-
-## Persistent storage
-
-Chronosapian attaches a separate QEMU IDE data disk for shell files. The kernel
-talks to that disk with ATA PIO on the primary IDE channel: commands and status
-go through ports `0x1F0..0x1F7`, and sector data is copied as 256 16-bit words
-per 512-byte sector.
-
-The disk format is ChronoFS. Sector 0 is a superblock with the magic number,
-layout, file count, and checksum. The next sectors hold a fixed file table and
-a free-sector bitmap. File data is stored in contiguous sector runs. This is
-easy to inspect, but it has no journal, so an interrupted write can leave
-metadata inconsistent.
-
-## What still hides low-level behavior
-
-- `bootloader` still hides the CPU mode switch, stack setup, paging setup, and the exact boot handoff details.
-- `bootloader` still hides host-side image packaging, but it does not hide the runtime behavior of the kernel inside QEMU.
-
-## What to replace later for more ownership
-
-If you want to own more of the boot path later, replace pieces in this order:
-
-1. Replace the `BootInfo`-based handoff with your own chosen boot protocol.
-2. Replace the borrowed bootloader with a more explicit protocol such as Multiboot2 or Limine.
-3. Replace that protocol with your own bootloader stages and long-mode entry path.
+ChronoOS targets QEMU's RTL8139 NIC and implements a small static IPv4 path with
+ARP and UDP. There is no DHCP, DNS, TCP, socket API, broad driver support, or
+real-hardware network support yet.
