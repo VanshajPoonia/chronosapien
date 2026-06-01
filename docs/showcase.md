@@ -58,37 +58,47 @@ Use `docs/screenshots.md` for naming and verification notes.
 - ChronoFS workflows: `ls`, `write`, `cat`, `rm`, `fsck`, and `journal`.
 - Poster screens: `poster`, `poster boot`, `poster system`, `poster roadmap`, and `poster eras`.
 - App launcher: `apps` and selected `apps <name>` entries.
-- Notes flow: `notes write <text>`, `notes read`, and `notes clear`.
+- Notes flow: `notes write <text>`, `notes read`, `notes clear`, and `notes open`.
 - Diagnostic/guided outputs: `doctor`, `capsule`, `tour`, and `demo`.
 
 ## Resume Bullet Ideas
 
-- Built a Rust `no_std` x86_64 educational operating system with a shell-first product experience.
-- Designed Time Capsule OS identity around era profiles, museum-style learning pages, and build-in-public progress tools.
-- Implemented code-present ChronoFS tooling for basic file workflows, consistency checking, repair boundaries, and journal status.
+- Built ChronoOS, a Rust `no_std` x86_64 educational operating system with a shell-first product experience.
+- Designed an era-based OS identity around museum-style learning pages, quests, and build-in-public progress tools.
+- Implemented ChronoFS tooling for basic file workflows, consistency checking, conservative repair, and journal status.
 - Created beginner-friendly OS education commands covering boot, memory, filesystems, userspace, syscalls, ELF, SMP, scheduling, and roadmap status.
 - Developed text-based app and launcher flows that reuse existing kernel/shell paths without introducing heavy GUI architecture.
-- Practiced honest systems documentation by separating code-present, partial, planned, and runtime-verification-needed work.
+- Practiced honest systems documentation by separating implemented-in-code, partially implemented, needs-runtime-verification, and roadmap/design-only work.
 
 ## Future Roadmap
 
-- `planned`: Run a build-only verification pass once toolchain use is available.
-- `planned`: Verify shell behavior in the OS for guide, filesystem, app, and poster commands.
-- `planned`: Capture screenshots and GIFs for the showcase targets listed above.
-- `planned`: Strengthen ChronoFS recovery examples without guessing at user data.
-- `planned`: Expand userspace and ELF examples with clearer safety boundaries.
-- `planned`: Keep improving apps and museum pages in small, understandable steps.
+- needs runtime verification: run build, boot, shell, filesystem, app, userspace, and network checks.
+- roadmap/design-only: capture screenshots and GIFs after verification.
+- roadmap/design-only: strengthen ChronoFS recovery examples without guessing at user data.
+- roadmap/design-only: expand userspace and ELF examples with clearer safety boundaries.
+- roadmap/design-only: keep improving apps and museum pages in small, understandable steps.
+
+## Demo Package
+
+The portfolio demo package is documentation-only until visible QEMU evidence is
+captured. The intended path is:
+
+- Use `docs/demo-script.md` to choose a 2-minute, 5-minute, or 10-minute command
+  sequence.
+- Use `docs/screenshots.md` to capture boot, shell, era, app, filesystem,
+  museum, poster, userspace, and networking evidence with accurate status tags.
+- Use `docs/release-checklist.md` before publishing a README update, showcase
+  post, or demo build.
+- Keep `docs/CURRENT_STATUS.md` as the final word on which claims are verified,
+  partial, or roadmap/design-only.
 
 ## Build-In-Public Story
 
-Time Capsule OS has grown from kernel basics into a small educational environment. The project now emphasizes not just whether a subsystem exists, but how clearly it can be explained from inside the OS.
+ChronoOS has grown from kernel basics into a small educational environment. The
+project now emphasizes not just whether a subsystem exists, but how clearly it
+can be explained from inside the OS.
 
-The current story is:
-
-- Build the kernel foundation.
-- Add shell commands that make the system observable.
-- Add ChronoFS so the OS has its own small file story.
-- Add consistency, repair, and journaling concepts conservatively.
-- Add guides, museum pages, app launcher flows, and poster screens so progress can be shared clearly.
-
-Runtime verification remains separate from code-present claims. The next strong portfolio step is to run a build/shell verification pass, capture screenshots, and attach real runtime evidence to the showcase.
+Runtime verification remains separate from implemented-in-code claims. The next
+strong portfolio step is a visible BIOS QEMU pass: framebuffer, shell prompt,
+keyboard input, storage commands, product commands, and screenshots tied to real
+evidence.
