@@ -73,9 +73,6 @@ pub fn run() -> ! {
                 wm::redraw_if_open();
                 idle_ticks = 0;
             }
-            Some(_) => {
-                idle_ticks = 0;
-            }
             None => {
                 if mouse_activity {
                     idle_ticks = 0;
@@ -249,7 +246,7 @@ fn run_demo(command: &str) {
 
     let profile = theme::active_profile();
 
-    println!("Time Capsule OS demo");
+    println!("ChronoOS demo");
     println!("This guide is text-only. It does not change system state.");
     println!();
 
@@ -329,11 +326,11 @@ fn print_tour_usage() {
 fn tour_overview() {
     let profile = theme::active_profile();
 
-    println!("Time Capsule OS tour");
+    println!("ChronoOS tour");
     println!("Active era: {}", profile.name);
     println!("Prompt style: {}", profile.screen_prompt);
     println!();
-    println!("This tour explains what is already code-present inside the OS.");
+    println!("This tour explains what is already implemented in code inside the OS.");
     println!("It only reads state and prints text; it does not change files, eras, tasks, or apps.");
     println!();
     println!("Tour topics:");
@@ -351,7 +348,7 @@ fn tour_boot() {
     println!("Tour: boot");
     println!("Era lens: {}", profile.name);
     println!();
-    println!("Time Capsule OS begins with the bootloader placing the kernel in memory.");
+    println!("ChronoOS begins with the bootloader placing the kernel in memory.");
     println!("The kernel sets up the CPU basics, interrupts, memory services, and device input.");
     println!("After that, the shell becomes the friendly front desk for exploring the system.");
     println!();
@@ -369,7 +366,7 @@ fn tour_memory() {
     println!("Era lens: {}", profile.name);
     println!();
     println!("Memory is the workspace the kernel uses while the machine is running.");
-    println!("Time Capsule OS has code-present pieces for tracking memory, using a heap,");
+    println!("ChronoOS has implemented-in-code pieces for tracking memory, using a heap,");
     println!("and explaining frames/pages in beginner-friendly museum pages.");
     println!();
     println!("Useful commands:");
@@ -384,7 +381,7 @@ fn tour_files() {
     println!("Tour: files");
     println!("Era lens: {}", profile.name);
     println!();
-    println!("ChronoFS is the small educational filesystem for Time Capsule OS.");
+    println!("ChronoFS is the small educational filesystem for ChronoOS.");
     println!("It stores named files, tracks file extents, checks consistency with fsck,");
     println!("and keeps a tiny journal for safer write/remove metadata operations.");
     println!();
@@ -424,7 +421,7 @@ fn tour_apps() {
     println!("Tour: apps");
     println!("Era lens: {}", profile.name);
     println!();
-    println!("Time Capsule OS has small shell apps and window previews that help show");
+    println!("ChronoOS has small shell apps and window previews that help show");
     println!("what an operating system can do without hiding the learning steps.");
     println!();
     println!("Code-present app commands:");
@@ -444,7 +441,7 @@ fn tour_userspace() {
     println!("Era lens: {}", profile.name);
     println!();
     println!("User-space is where programs run with fewer privileges than the kernel.");
-    println!("Time Capsule OS has code-present demos for entering ring 3, making a simple");
+    println!("ChronoOS has implemented-in-code demos for entering ring 3, making a simple");
     println!("syscall-style hello, and executing a stored program by name.");
     println!();
     println!("Related commands:");
@@ -467,7 +464,7 @@ fn tour_future() {
     println!("- clearer user-space examples");
     println!("- more museum pages that explain each subsystem");
     println!();
-    println!("Time Capsule OS should keep growing in small, understandable steps.");
+    println!("ChronoOS should keep growing in small, understandable steps.");
 }
 
 fn run_capsule(command: &str) {
@@ -498,14 +495,14 @@ fn print_capsule_header(title: &str) {
 fn capsule_overview() {
     print_capsule_header("Capsule timeline");
 
-    println!("A build-in-public map of Time Capsule OS.");
+    println!("A build-in-public map of ChronoOS.");
     println!("This command is read-only: it does not change eras, files, apps, tasks, or userspace.");
     println!();
     println!("Legend:");
-    println!("- code-present: implemented in the source tree");
-    println!("- partial: present, but still limited or educational");
-    println!("- planned: next ideas, not finished systems");
-    println!("- runtime verification needed: still needs build or OS-shell checks");
+    println!("- implemented in code: present in the source tree");
+    println!("- partially implemented: present, but still limited or educational");
+    println!("- roadmap/design-only: next ideas, not finished systems");
+    println!("- needs runtime verification: still needs build or OS-shell checks");
     println!();
     println!("Open a capsule:");
     println!("- capsule milestones");
@@ -516,7 +513,7 @@ fn capsule_overview() {
 fn capsule_milestones() {
     print_capsule_header("Capsule milestones");
 
-    println!("[code-present]");
+    println!("[implemented in code]");
     println!("- Shell command center with help, eras, museum pages, quests, and guides");
     println!("- Era themes for 1984, 1995, 2007, and 2040");
     println!("- Museum explanations for boot, kernel, memory, interrupts, keyboard, serial, and eras");
@@ -527,7 +524,7 @@ fn capsule_milestones() {
     println!("- User-space demos where available: ring3, syshello, and exec <name>");
     println!();
 
-    println!("[partial]");
+    println!("[partially implemented]");
     println!("- Window and task features are useful previews, not a complete desktop environment");
     println!("- User-space execution exists as an educational path, not a full process platform");
     println!("- ChronoFS recovery is conservative and refuses ambiguous repairs");
@@ -535,7 +532,7 @@ fn capsule_milestones() {
     println!("- Guides explain current behavior, but still need runtime walkthrough checks");
     println!();
 
-    println!("[planned]");
+    println!("[roadmap/design-only]");
     println!("- Stronger build and shell verification loops");
     println!("- Richer guided lessons that connect quests, museum pages, and commands");
     println!("- Deeper app workflows while staying beginner-friendly");
@@ -543,7 +540,7 @@ fn capsule_milestones() {
     println!("- Clearer user-space examples and documentation");
     println!();
 
-    println!("[runtime verification needed]");
+    println!("[needs runtime verification]");
     println!("- Build sanity for the current source tree");
     println!("- Shell checks for capsule, tour, demo, and invalid command forms");
     println!("- ChronoFS checks for ls, cat, write, rm, fsck, fsck repair, and journal");
@@ -554,18 +551,18 @@ fn capsule_milestones() {
 fn capsule_current() {
     print_capsule_header("Capsule current");
 
-    println!("[code-present]");
-    println!("- Time Capsule OS can present itself through help, demo, tour, museum, and capsule text");
+    println!("[implemented in code]");
+    println!("- ChronoOS can present itself through help, demo, tour, museum, and capsule text");
     println!("- ChronoFS has basic file commands, fsck/repair, and journal status support");
     println!("- Era identity and educational shell commands are part of the current experience");
     println!();
 
-    println!("[partial]");
+    println!("[partially implemented]");
     println!("- Some systems are intentionally small teaching versions");
     println!("- Recovery, user-space, windows, tasks, and apps still need more runtime confidence");
     println!();
 
-    println!("[runtime verification needed]");
+    println!("[needs runtime verification]");
     println!("- Build sanity");
     println!("- OS-shell checks for capsule milestones, capsule current, capsule next, and bad input");
 }
@@ -579,7 +576,7 @@ fn capsule_next() {
     println!("- Exercise ChronoFS fsck and journal status before adding broader filesystem work");
     println!("- Keep new lessons text-first until the runtime behavior is verified");
     println!();
-    println!("[planned, not implemented here]");
+    println!("[roadmap/design-only, not implemented here]");
     println!("- Better guided learning paths");
     println!("- Stronger recovery documentation and examples");
     println!("- More polished app and user-space demos");
@@ -606,71 +603,70 @@ fn print_doctor_line(name: &str, status: &str, note: &str) {
 fn print_doctor_report() {
     let profile = theme::active_profile();
 
-    println!("Time Capsule OS doctor");
+    println!("ChronoOS doctor");
     println!("Era lens: {}", profile.name);
     println!("Prompt style: {}", profile.screen_prompt);
     println!();
     println!("Legend:");
     println!("- ok: checked safely inside this command");
-    println!("- code-present: source paths or shell commands exist, but no live probe was run");
-    println!("- partial: useful teaching version with known limits");
-    println!("- unknown: no safe read-only status is exposed here");
+    println!("- implemented in code: source paths or shell commands exist, but no live probe was run");
+    println!("- partially implemented: useful teaching version with known limits");
     println!("- needs runtime verification: build or OS-shell testing is still needed");
     println!();
     println!("Subsystem health:");
     print_doctor_line(
         "serial",
-        "code-present",
+        "implemented in code",
         "serial logging paths exist; doctor does not perform a port loopback test",
     );
     print_doctor_line(
         "framebuffer",
-        "code-present",
+        "implemented in code",
         "shell text uses the display path; doctor does not probe graphics hardware",
     );
     print_doctor_line(
         "timer",
-        "code-present",
+        "implemented in code",
         "uptime and clock commands are available; interrupt timing is not certified here",
     );
     print_doctor_line(
         "keyboard",
-        "code-present",
+        "implemented in code",
         "the shell has an input path; doctor does not run an interactive key test",
     );
     print_doctor_line(
         "mouse",
-        "unknown",
-        "no safe mouse health probe is exposed to this report",
+        "implemented in code",
+        "PS/2 mouse and window paths exist; doctor does not run a live mouse probe",
     );
     print_doctor_line(
         "filesystem",
-        "code-present",
+        "implemented in code",
         "ChronoFS, fsck, repair, and journal commands exist; doctor does not run fsck",
     );
     print_doctor_line(
         "heap",
-        "code-present",
+        "implemented in code",
         "memory reporting exists through mem; doctor does not allocate test blocks",
     );
     print_doctor_line(
         "network",
-        "unknown",
-        "no safe network status API is exposed to this report",
+        "partially implemented",
+        "ARP/UDP paths and net commands exist; doctor does not query NIC state",
     );
     print_doctor_line(
         "SMP/core count",
-        "code-present",
-        "the cores command can report detected cores; doctor does not read or validate it",
+        "partially implemented",
+        "core reporting and AP startup paths exist; doctor does not validate SMP",
     );
     print_doctor_line(
         "scheduler",
-        "partial",
+        "partially implemented",
         "task commands are present as teaching tools; this is not a full scheduler audit",
     );
     print_doctor_line(
         "userspace/ELF support",
-        "code-present",
+        "partially implemented",
         "ring3, syshello, and exec paths exist; doctor does not execute user programs",
     );
     println!();
@@ -912,7 +908,7 @@ fn run_travel(command: &str) {
         Some(mapping) => mapping,
         None => {
             println!("Unsupported travel year: {}", year);
-            println!("Time Capsule OS currently maps years from 1980 onward.");
+            println!("ChronoOS currently maps years from 1980 onward.");
             print_travel_usage();
             return;
         }
@@ -976,7 +972,7 @@ fn print_deep_museum_page(
     println!("What it means");
     println!("{}", meaning);
     println!();
-    println!("What Time Capsule OS currently does");
+    println!("What ChronoOS currently does");
     println!("{}", current);
     println!();
     println!("What real operating systems do");
@@ -990,7 +986,7 @@ fn print_museum_disk_page() {
     print_deep_museum_page(
         "disk",
         "A disk is persistent storage split into addressable blocks or sectors. The kernel asks it to read or write bytes that should survive reboot.",
-        "Time Capsule OS uses disk-backed paths for ChronoFS when available, and falls back conservatively when persistent disk state is not available.",
+        "ChronoOS uses disk-backed paths for ChronoFS when available, and falls back conservatively when persistent disk state is not available.",
         "Real operating systems have storage drivers, request queues, caches, partitions, error handling, and careful ordering so data survives crashes.",
         "Robust driver coverage, broad device support, deep caching, full crash-safety, and runtime-verified recovery are still missing.",
     );
@@ -1000,7 +996,7 @@ fn print_museum_filesystem_page() {
     print_deep_museum_page(
         "filesystem",
         "A filesystem gives names and metadata to bytes on disk so people can work with files instead of raw sectors.",
-        "Time Capsule OS has ChronoFS with simple named files, contiguous extents, ls/cat/write/rm, fsck/repair, and a tiny journal for metadata safety.",
+        "ChronoOS has ChronoFS with simple named files, contiguous extents, ls/cat/write/rm, fsck/repair, and a tiny journal for metadata safety.",
         "Real operating systems add directories, permissions, caching, journaling or copy-on-write, quotas, timestamps, and many compatibility rules.",
         "ChronoFS is still intentionally small: no full POSIX model, no directories, limited recovery, and no broad real-world filesystem compatibility.",
     );
@@ -1010,7 +1006,7 @@ fn print_museum_userspace_page() {
     print_deep_museum_page(
         "userspace",
         "Userspace is where regular programs run with less privilege than the kernel, so mistakes are easier to contain.",
-        "Time Capsule OS has educational paths like ring3, syshello, and exec <name> that show the idea without pretending to be a full process platform.",
+        "ChronoOS has educational paths like ring3, syshello, and exec <name> that show the idea without pretending to be a full process platform.",
         "Real operating systems isolate processes with virtual memory, permissions, handles, signals, scheduling, and carefully validated kernel entry points.",
         "A mature process model, strong isolation, broad runtime verification, and production-grade program lifecycle management are still missing.",
     );
@@ -1020,7 +1016,7 @@ fn print_museum_syscalls_page() {
     print_deep_museum_page(
         "syscalls",
         "A syscall is a controlled doorway from userspace into the kernel for services like output, files, memory, and time.",
-        "Time Capsule OS includes simple syscall-style teaching demos through userspace examples such as syshello.",
+        "ChronoOS includes simple syscall-style teaching demos through userspace examples such as syshello.",
         "Real operating systems define stable syscall ABIs, validate every pointer and argument, enforce permissions, and keep compatibility for years.",
         "A broad syscall table, hardened validation, permissions, tracing, and complete ABI documentation are still missing.",
     );
@@ -1030,7 +1026,7 @@ fn print_museum_elf_page() {
     print_deep_museum_page(
         "ELF",
         "ELF is a common executable file format that describes program code, data, entry points, and loading rules.",
-        "Time Capsule OS exposes exec <name> as a code-present educational path for loading stored programs where supported.",
+        "ChronoOS exposes exec <name> as an implemented-in-code educational path for loading stored programs where supported.",
         "Real operating systems parse many ELF sections and segments, map pages, handle relocations, link libraries, and prepare process state.",
         "Broad ELF feature support, dynamic linking, relocation coverage, safety hardening, and runtime verification are still missing.",
     );
@@ -1040,7 +1036,7 @@ fn print_museum_networking_page() {
     print_deep_museum_page(
         "networking",
         "Networking moves packets between machines through devices, protocols, addresses, and routing rules.",
-        "Time Capsule OS treats networking conservatively in the shell reports; no full verified network stack is claimed here.",
+        "ChronoOS treats networking conservatively in the shell reports; no full verified network stack is claimed here.",
         "Real operating systems drive network cards, handle interrupts, implement protocols like Ethernet/IP/TCP/UDP, and expose sockets to programs.",
         "A verified driver path, protocol stack, socket API, packet tools, and runtime network tests are still missing.",
     );
@@ -1050,7 +1046,7 @@ fn print_museum_smp_page() {
     print_deep_museum_page(
         "SMP",
         "SMP means symmetric multiprocessing: more than one CPU core can run kernel or program work at the same time.",
-        "Time Capsule OS has code-present core-count and multicore teaching concepts, surfaced through commands like cores.",
+        "ChronoOS has implemented-in-code core-count and multicore teaching concepts, surfaced through commands like cores.",
         "Real operating systems bring up application processors, send inter-processor interrupts, balance work, and protect shared data with locks.",
         "Deep multicore verification, mature synchronization, cross-core scheduling confidence, and stress testing are still missing.",
     );
@@ -1060,7 +1056,7 @@ fn print_museum_scheduler_page() {
     print_deep_museum_page(
         "scheduler",
         "A scheduler chooses which task gets CPU time next, making one processor feel like it can do many things.",
-        "Time Capsule OS has task and scheduler teaching paths that are useful previews, not a production scheduler audit.",
+        "ChronoOS has task and scheduler teaching paths that are useful previews, not a production scheduler audit.",
         "Real operating systems handle priorities, blocking, wakeups, fairness, preemption, CPU affinity, and many edge cases under load.",
         "Full production behavior, fairness tuning, blocking I/O integration, multicore stress confidence, and runtime verification are still missing.",
     );
@@ -1108,7 +1104,7 @@ fn poster_overview() {
     println!("Screens");
     print_poster_row("poster boot", "boot and kernel learning flow");
     print_poster_row("poster system", "compact subsystem status card");
-    print_poster_row("poster roadmap", "code-present, partial, planned");
+    print_poster_row("poster roadmap", "implemented, partial, roadmap");
     print_poster_row("poster eras", "1984, 1995, 2007, 2040 showcase");
 }
 
@@ -1130,39 +1126,39 @@ fn poster_boot() {
 
 fn poster_system() {
     print_poster_header("SYSTEM STATUS CARD");
-    print_poster_row("serial", "code-present");
-    print_poster_row("framebuffer", "code-present");
-    print_poster_row("timer", "code-present");
-    print_poster_row("keyboard", "code-present");
-    print_poster_row("mouse", "unknown");
-    print_poster_row("filesystem", "code-present: ChronoFS, fsck, journal");
-    print_poster_row("heap", "code-present");
-    print_poster_row("network", "unknown");
-    print_poster_row("SMP/core count", "code-present");
-    print_poster_row("scheduler", "partial teaching path");
-    print_poster_row("userspace/ELF", "code-present, verification needed");
+    print_poster_row("serial", "implemented in code");
+    print_poster_row("framebuffer", "implemented in code");
+    print_poster_row("timer", "implemented in code");
+    print_poster_row("keyboard", "implemented in code");
+    print_poster_row("mouse", "implemented in code");
+    print_poster_row("filesystem", "implemented in code");
+    print_poster_row("heap", "implemented in code");
+    print_poster_row("network", "partially implemented");
+    print_poster_row("SMP/core count", "partially implemented");
+    print_poster_row("scheduler", "partially implemented");
+    print_poster_row("userspace/ELF", "partially implemented");
     println!();
     print_poster_row("Note", "poster does not run doctor or probes");
 }
 
 fn poster_roadmap() {
     print_poster_header("BUILD-IN-PUBLIC ROADMAP");
-    println!("code-present");
+    println!("implemented in code");
     print_poster_row("Shell", "help, eras, apps, guides, museum");
     print_poster_row("ChronoFS", "files, fsck, repair, tiny journal");
     print_poster_row("Learning", "demo, tour, capsule, doctor, poster");
     println!();
-    println!("partial");
+    println!("partially implemented");
     print_poster_row("Windows/tasks", "useful previews, not full desktop");
     print_poster_row("Userspace", "teaching path, not mature platform");
     print_poster_row("Recovery", "conservative, refuses guesses");
     println!();
-    println!("planned");
+    println!("roadmap/design-only");
     print_poster_row("Verification", "build and shell confidence loop");
     print_poster_row("Lessons", "richer quests and museum trails");
     print_poster_row("Apps", "small workflows before big systems");
     println!();
-    println!("runtime verification needed");
+    println!("needs runtime verification");
     print_poster_row("Next", "build sanity and OS-shell checks");
 }
 
@@ -1185,7 +1181,7 @@ fn poster_eras() {
 fn print_about() {
     let profile = theme::active_profile();
 
-    println!("Chronosapian | Era: {} | v0.1", profile.name);
+    println!("ChronoOS | Era: {} | v0.1", profile.name);
 }
 
 fn print_uptime() {
