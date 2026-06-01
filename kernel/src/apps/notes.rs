@@ -1,6 +1,6 @@
 //! Tiny note app backed by the shared filesystem facade.
 
-const NOTE_FILE: &str = "note.txt";
+const NOTE_FILE: &str = "notes";
 
 pub fn run(args: &str) {
     let args = args.trim();
