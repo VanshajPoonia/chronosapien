@@ -287,7 +287,7 @@ static WINDOW_MANAGER: GlobalWindowManager =
 pub fn open_notes(task_id: u8) -> bool {
     let mut content = ContentBuffer::new();
 
-    match crate::fs::read("note.txt") {
+    match crate::fs::read("notes") {
         Ok(text) => content.push_str(text),
         Err(_) => content.push_str("No note stored."),
     }
@@ -303,7 +303,7 @@ pub fn open_sysinfo(task_id: u8) -> bool {
     let uptime = crate::timer::uptime_seconds();
     let used_kb = memory.heap_used_bytes / 1024;
 
-    let _ = write!(content, "OS: Chronosapian\n");
+    let _ = write!(content, "OS: ChronoOS\n");
     let _ = write!(content, "Era: {}\n", profile.name);
     let _ = write!(content, "Uptime: {} seconds\n", uptime);
     let _ = write!(content, "Memory used: {} KB", used_kb);

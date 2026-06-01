@@ -16,7 +16,7 @@ pub fn run(args: &str) {
     crate::println!("{}", style.header);
     if style.compact {
         crate::println!(
-            "{}{}Chronosapian {}{}{}",
+            "{}{}ChronoOS {}{}{}",
             style.os_label,
             style.separator,
             style.era_label,
@@ -35,7 +35,7 @@ pub fn run(args: &str) {
             free_kb
         );
     } else {
-        crate::println!("{}{}Chronosapian", style.os_label, style.separator);
+        crate::println!("{}{}ChronoOS", style.os_label, style.separator);
         crate::println!("{}{}{}", style.era_label, style.separator, profile.name);
         crate::println!(
             "{}{}{} seconds",

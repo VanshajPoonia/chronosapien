@@ -160,13 +160,13 @@ const BOOT_1984: [&str; 5] = [
     "ChronoOS BASIC ROM shadowed",
 ];
 const BOOT_1995: [&str; 4] = [
-    "Starting Chronosapian 95...",
+    "Starting ChronoOS 95...",
     "HIMEM.SYS loaded",
     "Mouse driver initialized",
     "Program Manager ready",
 ];
 const BOOT_2007: [&str; 4] = [
-    "launchd: Chronosapian services",
+    "launchd: ChronoOS services",
     "Quartz framebuffer online",
     "Airport: not configured",
     "Dock compositor ready",
@@ -330,7 +330,7 @@ impl Era {
                 name: self.name(),
                 prompt: "C:\\CHRONO>",
                 screen_prompt: "C:\\CHRONO>",
-                boot_welcome: "Chronosapian 95",
+                boot_welcome: "ChronoOS 95",
                 boot_lines: &BOOT_1995,
                 boot_chime: &CHIME_1995,
                 fg: Color::BLACK,
@@ -371,7 +371,7 @@ impl Era {
                 name: self.name(),
                 prompt: "chrono@millennium:~$",
                 screen_prompt: "chrono@millennium:~$",
-                boot_welcome: "Chronosapian Millennium",
+                boot_welcome: "ChronoOS Millennium",
                 boot_lines: &BOOT_2007,
                 boot_chime: &CHIME_2007,
                 fg: Color::BLACK,
@@ -412,7 +412,7 @@ impl Era {
                 name: self.name(),
                 prompt: "›",
                 screen_prompt: ">",
-                boot_welcome: "Chronosapian 2040",
+                boot_welcome: "ChronoOS 2040",
                 boot_lines: &BOOT_2040,
                 boot_chime: &CHIME_2040,
                 fg: Color::WHITE,
