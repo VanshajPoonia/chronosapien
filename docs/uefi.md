@@ -1,8 +1,10 @@
 # UEFI Boot Port
 
-ChronoOS now has a UEFI boot path alongside the BIOS bootloader paths. The UEFI
-path builds a removable-media style disk image with a GPT partition table and a
-FAT32 EFI System Partition.
+Status: implemented in code, needs runtime verification.
+
+ChronoOS contains a UEFI boot path alongside the BIOS bootloader paths. The
+UEFI path builds a removable-media style disk image with a GPT partition table
+and a FAT32 EFI System Partition.
 
 ## Boot Steps
 

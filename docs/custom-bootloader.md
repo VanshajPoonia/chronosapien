@@ -1,5 +1,7 @@
 # ChronoOS Custom BIOS Bootloader
 
+Status: partially implemented, risky, needs runtime verification.
+
 ChronoOS keeps the existing `bootloader` crate image as a fallback and adds a
 separate custom image at:
 
