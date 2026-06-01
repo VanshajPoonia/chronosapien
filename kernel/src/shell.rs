@@ -704,7 +704,7 @@ fn print_notes_usage() {
 fn print_notes_home() {
     let profile = theme::active_profile();
 
-    println!("Time Capsule Notes");
+    println!("ChronoOS Notes");
     println!("Era lens: {}", profile.name);
     println!("Storage: ChronoFS file '{}'", NOTES_FILE_NAME);
     println!();
@@ -812,7 +812,7 @@ fn apps_style_for_era(name: &str) -> (&'static str, &'static str, &'static str) 
     } else if name.contains("2040") {
         ("Capsule Grid", "[+]", "Future lab console")
     } else {
-        ("App Launcher", "[-]", "Time Capsule shelf")
+        ("App Launcher", "[-]", "ChronoOS shelf")
     }
 }
 
