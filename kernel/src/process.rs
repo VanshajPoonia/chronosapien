@@ -282,10 +282,7 @@ unsafe fn enter_user_mode(entry: u64, stack_top: u64) -> ! {
     core::arch::asm!(
         "push {user_data}",
         "push {user_stack}",
-        "pushfq",
-        "pop rax",
-        "or rax, 0x200",
-        "push rax",
+        "push 0x202",
         "push {user_code}",
         "push {user_entry}",
         "iretq",
@@ -293,7 +290,6 @@ unsafe fn enter_user_mode(entry: u64, stack_top: u64) -> ! {
         user_stack = in(reg) stack_top,
         user_code = in(reg) selectors.user_code.0 as u64,
         user_entry = in(reg) entry,
-        out("rax") _,
         options(noreturn),
     );
 }
