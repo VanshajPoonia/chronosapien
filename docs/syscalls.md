@@ -1,6 +1,8 @@
 # ChronoOS System Calls
 
-ChronoOS now has a tiny system call path for ring 3 code. This is not a full
+Status: partially implemented, risky, needs runtime verification.
+
+ChronoOS contains a tiny system call path for ring 3 code. This is not a full
 process model yet: the demo program still runs in the same address space as the
 kernel, and `sys_exit` parks the CPU instead of returning to the shell. The goal
 is to prove the controlled transition from user code into kernel services.

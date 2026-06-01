@@ -1,8 +1,11 @@
 # ELF64 Loading
 
-ChronoOS can run one foreground static ELF64 program with `exec <filename>`.
-The file is read from ChronoFS as bytes, parsed in the kernel, mapped into a
-new user address space, and entered at its ELF entry point.
+Status: partially implemented, risky, needs runtime verification.
+
+ChronoOS contains code to run one foreground static ELF64 program with
+`exec <filename>`. The file is read from ChronoFS as bytes, parsed in the
+kernel, mapped into a new user address space, and entered at its ELF entry
+point.
 
 ## ELF Header
 

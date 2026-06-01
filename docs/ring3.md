@@ -1,6 +1,8 @@
 # Ring 3 User Mode Demo
 
-ChronoOS now has a tiny opt-in user mode demo behind the `ring3` shell command.
+Status: partially implemented, risky, needs runtime verification.
+
+ChronoOS contains a tiny opt-in user mode demo behind the `ring3` shell command.
 It is deliberately not a process model yet: it proves that the CPU can leave
 kernel mode, run code at ring 3, and trap back to the kernel when user code
 tries to execute a privileged instruction.
