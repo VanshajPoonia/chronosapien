@@ -1,22 +1,22 @@
 # AI / Codex Project Instructions
 
-This project is Chronosapian / Time Capsule OS, a Rust `no_std` x86_64 educational hobby operating system.
+This project is ChronoOS, a Rust `no_std` x86_64 educational hobby operating system.
 
-The public identity is **Time Capsule OS**. The repository, package, binary names, and older documentation may still use Chronosapian, `chronosapien`, or ChronoOS. Do not rename the project unless explicitly asked.
+The public/product identity is **ChronoOS**. The repository, package, generated image names, and some legacy source text may still use Chronosapian or `chronosapien`; do not rename those unless explicitly asked.
 
 ## Core Rules
 
 - Do not claim runtime success unless it was actually tested.
 - Clearly separate:
-  - code-present
-  - implemented
-  - partial
+  - implemented in code
+  - partially implemented
+  - needs runtime verification
+  - roadmap/design-only
   - missing
-  - runtime-verified
 - Keep the project beginner-friendly, terminal-first, and educational.
 - Avoid unnecessary dependencies.
 - Avoid broad refactors unless explicitly requested.
-- Preserve the Time Capsule identity: eras, museum mode, quest/progress feeling, and educational explanations.
+- Preserve the ChronoOS identity: eras, museum mode, quest/progress feeling, and educational explanations.
 - Do not add new OS features during stabilization or documentation tasks unless explicitly requested.
 
 ## Required Progress Tracking
@@ -35,4 +35,3 @@ When reporting work, include:
 - Whether runtime behavior was verified.
 - What still needs verification.
 - The safest next engineering step.
-
