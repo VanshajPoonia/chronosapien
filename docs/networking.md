@@ -1,6 +1,8 @@
 # ChronoOS Networking
 
-ChronoOS currently targets QEMU's RTL8139 PCI network card. The first network
+Status: partially implemented, needs runtime verification.
+
+ChronoOS contains code for QEMU's RTL8139 PCI network card. The first network
 milestone is intentionally small:
 
 - static IPv4 address: `10.0.2.15`
