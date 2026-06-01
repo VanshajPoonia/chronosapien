@@ -45,9 +45,11 @@ static mut SELECTORS: [Option<Selectors>; MAX_CORES] = [None; MAX_CORES];
 #[derive(Clone, Copy)]
 pub struct Selectors {
     pub kernel_code: SegmentSelector,
+    #[allow(dead_code)]
     pub kernel_data: SegmentSelector,
     pub user_data: SegmentSelector,
     pub user_code: SegmentSelector,
+    #[allow(dead_code)]
     pub tss: SegmentSelector,
 }
 
@@ -60,6 +62,7 @@ pub fn init_ap(core_id: usize) {
     init_core(core_id);
 }
 
+#[allow(dead_code)]
 pub fn init() {
     init_bsp();
 }
@@ -87,11 +90,11 @@ fn init_core(core_id: usize) {
         let ring0_stack_end = ring0_stack_start + RING0_STACK_SIZE;
         TSS[core_id].privilege_stack_table[0] = ring0_stack_end;
 
-        let kernel_code = GDT[core_id].append(Descriptor::kernel_code_segment());
-        let kernel_data = GDT[core_id].append(Descriptor::UserSegment(DescriptorFlags::KERNEL_DATA.bits()));
-        let user_data = GDT[core_id].append(Descriptor::user_data_segment());
-        let user_code = GDT[core_id].append(Descriptor::user_code_segment());
-        let tss_selector = GDT[core_id].append(Descriptor::tss_segment(&TSS[core_id]));
+        let kernel_code = GDT[core_id].add_entry(Descriptor::kernel_code_segment());
+        let kernel_data = GDT[core_id].add_entry(Descriptor::UserSegment(DescriptorFlags::KERNEL_DATA.bits()));
+        let user_data = GDT[core_id].add_entry(Descriptor::user_data_segment());
+        let user_code = GDT[core_id].add_entry(Descriptor::user_code_segment());
+        let tss_selector = GDT[core_id].add_entry(Descriptor::tss_segment(&TSS[core_id]));
         SELECTORS[core_id] = Some(Selectors {
             kernel_code,
             kernel_data,
