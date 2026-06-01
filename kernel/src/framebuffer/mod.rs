@@ -74,6 +74,7 @@ pub struct Framebuffer {
 impl Color {
     pub const BLACK: Self = Self::rgb(0, 0, 0);
     pub const WHITE: Self = Self::rgb(255, 255, 255);
+    #[allow(dead_code)]
     pub const GREEN: Self = Self::rgb(0, 255, 96);
     pub const PHOSPHOR: Self = Self::rgb(40, 255, 104);
     pub const PHOSPHOR_DIM: Self = Self::rgb(0, 108, 42);
@@ -239,10 +240,13 @@ impl Writer {
             return;
         }
 
-        self.fill_rect(0, 0, self.info.width, self.info.height, self.background);
+        let foreground = self.foreground;
+        let background = self.background;
+
+        self.fill_rect(0, 0, self.info.width, self.info.height, background);
 
         for cell in self.visible_cells_mut() {
-            *cell = Cell::blank(self.foreground, self.background);
+            *cell = Cell::blank(foreground, background);
         }
 
         self.column_position = 0;
@@ -377,12 +381,12 @@ impl Writer {
         self.draw_text_at(
             8,
             TOP_BAR_TEXT_Y,
-            "Chronosapian | Era: ",
+            "ChronoOS | Era: ",
             self.top_bar_foreground,
             self.top_bar_background,
         );
         self.draw_text_at(
-            8 + 22 * font::FONT_WIDTH,
+            8 + 16 * font::FONT_WIDTH,
             TOP_BAR_TEXT_Y,
             crate::theme::active_profile().name,
             self.top_bar_foreground,

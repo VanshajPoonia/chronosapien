@@ -108,7 +108,7 @@ static BOOTLOADER_REGIONS: BootloaderRegions =
 
 pub fn context_from_bootloader(boot_info: &'static mut bootloader_api::BootInfo) -> BootContext {
     let region_count = copy_bootloader_regions(boot_info);
-    let memory_regions = unsafe { &(*BOOTLOADER_REGIONS.0.get())[..region_count] };
+    let memory_regions = unsafe { &(&*BOOTLOADER_REGIONS.0.get())[..region_count] };
     let framebuffer = boot_info
         .framebuffer
         .as_mut()
@@ -217,7 +217,7 @@ pub unsafe fn context_from_custom(info: *const ChronoBootInfo) -> BootContext {
     }
 }
 
-fn copy_bootloader_regions(boot_info: &'static bootloader_api::BootInfo) -> usize {
+fn copy_bootloader_regions(boot_info: &bootloader_api::BootInfo) -> usize {
     let mut count = 0;
 
     for region in boot_info.memory_regions.iter() {
