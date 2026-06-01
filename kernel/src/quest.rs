@@ -16,28 +16,28 @@ struct Quest {
 #[derive(Clone, Copy)]
 enum QuestState {
     Complete,
-    Locked,
+    NeedsRuntimeVerification,
 }
 
 impl QuestState {
     const fn is_complete(self) -> bool {
         match self {
             Self::Complete => true,
-            Self::Locked => false,
+            Self::NeedsRuntimeVerification => false,
         }
     }
 
     const fn marker(self) -> &'static str {
         match self {
             Self::Complete => "[x]",
-            Self::Locked => "[ ]",
+            Self::NeedsRuntimeVerification => "[?]",
         }
     }
 
     const fn label(self) -> &'static str {
         match self {
             Self::Complete => "complete",
-            Self::Locked => "locked",
+            Self::NeedsRuntimeVerification => "needs runtime verification",
         }
     }
 }
@@ -176,18 +176,18 @@ const QUESTS: &[Quest] = &[
     Quest {
         title: "Swift Fingers",
         summary: "Interrupt-driven keyboard input",
-        flavor: "",
-        inventory: None,
-        next_step: "Replace keyboard polling with IRQ-driven input.",
-        state: QuestState::Locked,
+        flavor: "IRQ1 buffering is in the code; now it needs a real keyboard run.",
+        inventory: Some("IRQ Keyboard Path"),
+        next_step: "Verify IRQ1 delivery, shell typing, and polling fallback in QEMU.",
+        state: QuestState::NeedsRuntimeVerification,
     },
     Quest {
         title: "Reclaimer",
         summary: "Reusable heap allocator",
-        flavor: "",
-        inventory: None,
-        next_step: "Upgrade the bump heap so freed memory can be reused.",
-        state: QuestState::Locked,
+        flavor: "The free-list heap is in the code; reuse behavior still needs stress.",
+        inventory: Some("Reusable Heap"),
+        next_step: "Verify allocation reuse through file, app, task, and window workflows.",
+        state: QuestState::NeedsRuntimeVerification,
     },
 ];
 
@@ -280,7 +280,10 @@ fn print_quest_status() {
 
     print_header("QUEST STATUS", style);
     print_frame_line(ProgressLine(progress.completed, progress.total), style);
-    print_frame_line(CountLine("Locked Quests", progress.locked), style);
+    print_frame_line(
+        CountLine("Needs Runtime Verification", progress.locked),
+        style,
+    );
     print_frame_line("", style);
 
     match QUESTS.iter().find(|quest| !quest.state.is_complete()) {
@@ -306,7 +309,10 @@ fn print_stats() {
     print_header("PLAYER STATS", style);
     print_frame_line(StatLine("Systems Online", progress.completed, progress.total), style);
     print_frame_line(CountLine("Artifacts Found", progress.completed), style);
-    print_frame_line(CountLine("Locked Quests", progress.locked), style);
+    print_frame_line(
+        CountLine("Needs Runtime Verification", progress.locked),
+        style,
+    );
     print_frame_line(RankLine(rank_for(progress.completed, progress.total)), style);
     print_frame_line(EraLine(era), style);
     match active_quest() {
