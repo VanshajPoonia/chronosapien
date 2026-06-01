@@ -2,15 +2,17 @@
 
 ## Purpose
 
-This file tracks every major Codex/AI-assisted change to Time Capsule OS.
+This file tracks every major Codex/AI-assisted change to ChronoOS.
 
 ## Current Source of Truth
 
-- Public OS identity: Time Capsule OS.
-- Repo/package name: Chronosapian / `chronosapien`.
-- Current development phase: stabilization, documentation, and verification planning before new feature work.
-- Code-present but unverified: BIOS boot path, optional custom BIOS bootloader, UEFI loader, framebuffer UI, serial logging, shell, era themes, keyboard polling, IRQ1 keyboard buffering, mouse, timer, GDT/IDT/PIC, memory, ChronoFS, ATA storage, networking, ring 3 demo, syscalls, ELF execution, SMP, scheduler, apps, museum, and quests.
-- Partial/missing systems: ChronoFS repair/journaling, richer graphics shell, fuller process model, preemptive scheduler, broader networking, real hardware/USB support, and runtime verification of IRQ keyboard input and reusable heap allocation.
+- Public OS identity: ChronoOS.
+- Repo/package name: `chronosapien`; older internal/source text may still mention Chronosapian.
+- Current development phase: post-Phase-4 stabilization, documentation, and verification planning before new feature work.
+- Current source-truth handoff: `docs/CURRENT_STATUS.md`.
+- Verified in QEMU with limits: single-core BIOS serial-only boot reached `[CHRONO] boot complete`, and boot-time serial logging was observed through that point.
+- Implemented in code but still needs broader or first runtime verification: optional custom BIOS bootloader, UEFI loader, framebuffer UI, visible shell prompt/input, era themes, keyboard polling fallback, IRQ1 keyboard buffering, mouse, timer behavior from the shell, GDT/IDT/PIC behavior beyond boot, reusable heap allocator reuse, ChronoFS shell workflows, ATA storage workflows, ChronoFS `fsck`, ChronoFS journal/recovery, networking, ring 3 demo, syscalls, ELF execution, SMP/AP startup, scheduler task lifecycle, apps, museum, quests, and product commands.
+- Partial/missing systems: richer graphics shell, fuller process model, preemptive scheduler, broader networking, real hardware/USB support, and runtime verification of current implemented-in-code systems.
 - Current priority: preserve context, stabilize the repo, verify existing systems, and avoid new OS features until build/runtime status is known.
 
 ## Log Entries
@@ -26,6 +28,66 @@ Each future entry should use this format:
 - If not verified, what still needs verification:
 - New risks introduced:
 - Next recommended step:
+
+### 2026-06-01 — Add demo and release documentation package
+- Prompt/task: Create a ChronoOS demo/release package for portfolio and build-in-public use without adding risky kernel features or upgrading verification claims.
+- Files changed: `docs/demo-script.md`, `docs/screenshots.md`, `docs/release-checklist.md`, `README.md`, `docs/showcase.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added 2-minute, 5-minute, and 10-minute demo paths; documented commands for identity, eras, museum/quest, apps, filesystem, fsck/journal, userspace/syscalls/ELF, and networking; added screenshot/GIF capture checklists with naming conventions and status tags; added a release checklist covering build, QEMU boot, serial, keyboard, mouse/window, filesystem, apps, demo commands, docs, README, and known limitations; improved the README portfolio narrative and known-limitations section; and linked the showcase to the new demo/release package docs.
+- What was intentionally avoided: No kernel behavior changes, risky OS features, QEMU run, hardware test, TCP, DHCP, DNS, USB, dynamic linker, package manager, full compositor, preemptive scheduler, broad runtime claim, or project/package rename.
+- Runtime verified: no new runtime verification. Existing evidence remains limited to single-core BIOS serial-only QEMU reaching `[CHRONO] boot complete` and boot-time serial logging through that point.
+- If not verified, what still needs verification: visual framebuffer, shell interaction, apps, filesystem workflows, userspace/syscalls/ELF, networking, mouse/windows, UEFI, custom BIOS, SMP/AP, and hardware.
+- New risks introduced: Low; this is documentation-only and intentionally conservative.
+- Next recommended step: Run the visible BIOS QEMU demo path, capture screenshots/logs with `docs/screenshots.md`, and update `docs/AI_PROGRESS_LOG.md` before publishing portfolio claims.
+
+### 2026-06-01 — Add post-Phase-4 current status audit
+- Prompt/task: Create a post-Phase-4 reality audit before adding new features, align high-level docs to source truth, and keep runtime claims limited to existing evidence.
+- Files changed: `docs/CURRENT_STATUS.md`, `README.md`, `docs/roadmap.md`, `docs/NEXT_STEPS.md`, `docs/showcase.md`, `docs/manual-testing.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `docs/CURRENT_STATUS.md` as the compact current-state handoff; documented project identity, boot paths, framebuffer/serial/UI, shell, apps, museum/quest/product layer, Phase 3 product ideas, ChronoFS, input/windows, heap, scheduler/SMP, Ring 3/syscalls/ELF, networking, and long-term systems 96-110; linked README/showcase/NEXT_STEPS to the new handoff; restored a clear Phase 4 roadmap section with networking, USB/real hardware, scheduler/process/user mode, app loading/package model, and GUI/compositor tracks; and expanded manual-testing boundary checks for Phase 3 and Phase 4.
+- What was intentionally avoided: No source behavior changes, new features, DHCP, DNS, TCP, USB, dynamic linker, package manager, full compositor, preemptive scheduler, QEMU run, hardware test, or project/package rename.
+- Runtime verified: no new runtime verification in this audit. Existing evidence remains limited to build checks with no warnings and single-core BIOS serial-only QEMU reaching `[CHRONO] boot complete`.
+- If not verified, what still needs verification: Visible framebuffer output, shell prompt, keyboard input, PIT/timer shell behavior, filesystem shell commands, product/demo commands, apps, mouse/window interaction, heap reuse, ChronoFS fsck/repair/journal recovery, UEFI boot, custom BIOS boot, ring 3, syscalls, static ELF execution, ARP/UDP networking, SMP/AP startup, and hardware boot.
+- New risks introduced: Low; changes are documentation-only and intentionally conservative.
+- Next recommended step: Run a visible BIOS QEMU pass and record framebuffer, shell, keyboard, ChronoFS, app, and product-command evidence before adding features or upgrading status labels.
+
+### 2026-06-01 — Install runtime tooling and clean warning baseline
+- Prompt/task: Implement the runtime setup, commit prep, and warning-cleanup plan while preserving honest runtime verification labels.
+- Files changed: `kernel/src/framebuffer/mod.rs`, `kernel/src/fs.rs`, `kernel/src/gdt.rs`, `kernel/src/interrupts.rs`, `kernel/src/memory.rs`, `kernel/src/net.rs`, `kernel/src/pci.rs`, `kernel/src/sched.rs`, `kernel/src/shell.rs`, `kernel/src/smp.rs`, `kernel/src/syscall.rs`, `docs/status-audit.md`, `docs/manual-testing.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Installed QEMU and PowerShell with Homebrew; verified QEMU 11.0.1 and PowerShell 7.6.2; reduced the kernel and host-target build warning baseline to zero warnings using mechanical cleanup and narrow `#[allow(dead_code)]` annotations for intentional teaching scaffolding; built the BIOS image with `pwsh -NoProfile -File scripts/build.ps1`; created the expected 16 MiB ChronoFS data image; and ran serial-only BIOS QEMU smoke checks.
+- What was intentionally avoided: No DHCP, DNS, TCP, USB, dynamic linker, package manager, full compositor, preemptive scheduler, broad SMP/scheduler/userspace rewrite, visual framebuffer claim, shell-interaction claim, app/filesystem-command claim, or hardware claim.
+- Runtime verified: yes, limited. Single-core BIOS serial-only QEMU reached `[CHRONO] boot complete`, and boot-time serial output was observed. A two-core BIOS serial-only QEMU run exited before `[CHRONO] boot complete`, after `[CHRONO] active era: 1984`.
+- If not verified, what still needs verification: Visible framebuffer output, shell prompt, keyboard input, PIT/timer behavior from shell commands, filesystem shell commands, apps/product commands, mouse/window interaction, heap reuse, ChronoFS fsck/repair/journal recovery, UEFI boot, custom BIOS boot, ring 3, syscalls, static ELF execution, ARP/UDP networking, SMP/AP startup, and hardware boot remain unverified.
+- New risks introduced: Low; warning cleanup was mechanical and kept educational scaffolding. Runtime evidence exposed an existing SMP/AP startup risk in the two-core BIOS smoke.
+- Next recommended step: Run a visual BIOS QEMU pass for framebuffer, shell prompt, keyboard, and ChronoFS basics, then investigate the two-core SMP/AP boot exit separately.
+
+### 2026-06-01 — Restore build sanity and audit local runtime tooling
+- Prompt/task: Implement the combined build-sanity, runtime-audit, and docs-polish plan without adding large features or claiming runtime verification.
+- Files changed: `Cargo.lock`, `kernel/src/gdt.rs`, `kernel/src/process.rs`, `kernel/src/ring3.rs`, `kernel/src/syscall.rs`, `kernel/src/sched.rs`, `kernel/src/boot.rs`, `kernel/src/framebuffer/mod.rs`, `kernel/src/smp.rs`, `docs/status-audit.md`, `docs/manual-testing.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Refreshed the lockfile for the current workspace dependency set; fixed current compiler blockers by updating GDT entry insertion, naked function attributes, `iretq` frame assembly, bootloader-region borrowing, framebuffer clear borrowing, and AP trampoline assembler expressions/far jumps; recorded local runtime tooling availability; and updated verification docs to separate build sanity from runtime proof.
+- What was intentionally avoided: No DHCP, DNS, TCP, USB, dynamic linker, package manager, full compositor, preemptive scheduler, broad scheduler/SMP redesign, QEMU run, hardware test, or runtime verification claim.
+- Runtime verified: no.
+- If not verified, what still needs verification: `cargo check -p kernel --offline --locked` passed with warnings. `cargo check -p chronosapien --target aarch64-apple-darwin --offline --locked` passed with warnings. `qemu-system-x86_64` and `pwsh` were not available on PATH in this environment, so BIOS boot, UEFI boot, custom BIOS boot, framebuffer/serial output, shell behavior, input, storage, apps, userspace, networking, scheduler, and SMP behavior still need runtime verification.
+- New risks introduced: Low to moderate; changes touch low-level boot/userspace/SMP assembly syntax to satisfy the current compiler and assembler, but intentionally avoid changing subsystem scope or adding behavior.
+- Next recommended step: Install or expose PowerShell and QEMU locally, then start the staged BIOS QEMU pass from `docs/manual-testing.md` and record actual evidence before changing runtime status labels.
+
+### 2026-06-01 — Add Phase 2 status audit and verification checklist
+- Prompt/task: Implement the Phase 2 verification/stabilization plan by documenting implemented-in-code, partially implemented, risky, stale, and unverified systems without adding large features or claiming runtime success.
+- Files changed: `README.md`, `docs/status-audit.md`, `docs/manual-testing.md`, `docs/NEXT_STEPS.md`, `docs/networking.md`, `docs/ring3.md`, `docs/syscalls.md`, `docs/elf.md`, `docs/custom-bootloader.md`, `docs/uefi.md`, `docs/shell-commands.md`, `docs/AI_PROGRESS_LOG.md`, `kernel/src/shell.rs`.
+- What changed: Added a Phase 2 status audit with labels for boot paths, framebuffer/serial/timer/shell, window/app platform, scheduler/SMP, ring 3/syscalls/static ELF, ChronoFS journal/recovery, networking, notes, museum/quest, mouse/window interaction, heap, and IRQ keyboard behavior; expanded manual testing with build sanity, scheduler, SMP, window/app, recovery, userspace, networking, and product-command boundary checks; linked the audit from README/NEXT_STEPS; added conservative status headers to networking/userspace/boot docs; documented `notes` as the active notes backing file; and aligned doctor/poster mouse/network wording with implemented-in-code or partially implemented but unverified status.
+- What was intentionally avoided: No DHCP, DNS, TCP, USB, dynamic linker, package manager, full compositor, preemptive scheduler, broad refactor, QEMU run, hardware test, feature expansion, or package/image rename.
+- Runtime verified: no.
+- If not verified, what still needs verification: Build sanity, BIOS boot, custom BIOS boot, UEFI boot, framebuffer output, serial output, PIT/timer behavior, shell startup, app launch, filesystem commands, product/demo commands, IRQ keyboard with polling fallback, PS/2 mouse/window interactions, heap reuse, ChronoFS read/write/delete, fsck/repair, journal recovery, ring 3 demo, syscalls, static ELF execution, ARP/UDP networking, cooperative scheduler, and SMP/AP startup.
+- New risks introduced: Low; changes are documentation/status alignment plus shell wording only. No runtime behavior was intentionally changed.
+- Next recommended step: Fix the current build-only errors narrowly, then start staged QEMU evidence from BIOS boot, framebuffer/serial, shell startup, keyboard, and ChronoFS basics before touching high-risk SMP/userspace/networking paths.
+
+### 2026-06-01 — Align docs and source truth to ChronoOS
+- Prompt/task: Rename the public/product identity from Time Capsule OS to ChronoOS in public docs, remove stale source-truth claims, add manual verification and shell command reference docs, fix the notes filename mismatch, and update quest wording for IRQ keyboard/reusable heap status.
+- Files changed: `AGENTS.md`, `README.md`, `docs/showcase.md`, `docs/NEXT_STEPS.md`, `docs/storage.md`, `docs/architecture.md`, `docs/boot-flow.md`, `docs/roadmap.md`, `docs/manual-testing.md`, `docs/shell-commands.md`, `docs/AI_PROGRESS_LOG.md`, `kernel/src/quest.rs`, `kernel/src/apps/notes.rs`, `kernel/src/apps/sysinfo.rs`, `kernel/src/wm.rs`, `kernel/src/shell.rs`, `kernel/src/theme.rs`, `kernel/src/framebuffer/mod.rs`.
+- What changed: Made ChronoOS the public/product name while preserving `chronosapien` repo/package/image naming; replaced stale bump-only/no-journal/no-mouse claims with implemented-in-code and needs-runtime-verification labels; created staged manual testing checklists; added a shell command reference; standardized notes storage on the `notes` ChronoFS file; and changed quest status text so IRQ keyboard and reusable heap are implemented in code but unverified instead of locked future work.
+- What was intentionally avoided: No TCP, DHCP, DNS, USB, dynamic linker, package manager, full compositor, preemptive scheduler, large feature work, QEMU run, hardware test, image build, lockfile change, or project/package rename.
+- Runtime verified: no.
+- If not verified, what still needs verification: `cargo check -p kernel` was attempted and failed on existing low-level compile errors in naked asm attributes, asm `noreturn` outputs, GDT API usage, boot/framebuffer borrows, and related kernel paths. Build sanity, BIOS boot, custom BIOS boot, UEFI boot, framebuffer/serial output, shell commands, IRQ keyboard and polling fallback, mouse/window interactions, heap reuse, ChronoFS read/write/delete, fsck/repair, journal recovery, apps, product commands, ring 3, syscalls, static ELF execution, ARP/UDP networking, SMP, and scheduler behavior still need verification.
+- New risks introduced: Low; most changes are documentation/status alignment. Source changes are limited to user-visible strings, quest status labels, and the notes storage filename used by the small app/window path.
+- Next recommended step: Fix the current build-only errors narrowly, then follow `docs/manual-testing.md` in staged QEMU passes and record actual evidence before claiming runtime verification.
 
 ### 2026-05-26 — Add persistent AI progress tracking
 - Prompt/task: Create project-level AI/Codex instructions, an append-only AI progress log, and a living next-steps file for Chronosapian / Time Capsule OS.
