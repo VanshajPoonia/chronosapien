@@ -1,6 +1,6 @@
 # ChronoOS Current Status
 
-Date: 2026-06-01
+Date: 2026-06-02
 
 This is the compact post-Phase-4 source-of-truth handoff for ChronoOS. It
 summarizes what is implemented in code, what is partial, what is only roadmap or
@@ -33,15 +33,62 @@ design, and what has actual verification evidence.
 - Host package sanity: `cargo check -p chronosapien --target
   aarch64-apple-darwin --offline --locked` passed with no warnings on
   2026-06-01.
+- High-risk verification preflight: `cargo check -p kernel --offline --locked`
+  and `cargo check -p chronosapien --target aarch64-apple-darwin --offline
+  --locked` passed again on 2026-06-02 before UEFI/custom BIOS/SMP/networking
+  checks.
 - Runtime tooling: QEMU 11.0.1 and PowerShell 7.6.2 were installed and verified
   locally on 2026-06-01.
+- High-risk tooling proof: PowerShell, QEMU, Rustup, OVMF
+  `/opt/homebrew/share/qemu/edk2-x86_64-code.fd`, and `nc` were available on
+  2026-06-02. `nasm` was not available, so the custom BIOS build/run path was
+  blocked by a missing build dependency.
 - Runtime proof: single-core BIOS serial-only QEMU reached `[CHRONO] boot
   complete` on 2026-06-01.
-- Important limit: that QEMU smoke used `-display none`, so framebuffer output,
-  visible shell prompt, keyboard input, apps, storage commands, windows, and
-  graphics were not verified by that run.
-- Important SMP limit: a two-core BIOS serial-only QEMU smoke exited before
-  `[CHRONO] boot complete`, after `[CHRONO] active era: 1984`.
+- Runtime proof: a visible single-core BIOS QEMU run on 2026-06-02 reached
+  `[CHRONO] boot complete`, captured serial output at
+  `/private/tmp/chronoos-qemu-20260602-013807.serial.log`, and captured
+  framebuffer screenshots through QEMU `screendump`.
+- Visible UI proof: QEMU screendumps on 2026-06-02 showed the ChronoOS top bar,
+  boot text, and `CHRONO>` shell prompt. Additional screendumps showed the
+  grouped `help` output and `help start` output.
+- Keyboard/input proof: QEMU monitor `sendkey` input submitted `help` and
+  `help start`. This verifies a narrow shell input path in QEMU, but not
+  broader manual typing, Backspace, shifted symbols, or polling fallback.
+- UI/app/input proof: a second visible single-core BIOS QEMU pass on
+  2026-06-02 captured serial output at
+  `/private/tmp/chronoos-ui-input-20260602-150049.serial.log` and screenshots
+  for boot, `apps`, `notes`, `calc 6 - 7`, `open notes`, mouse movement
+  attempt, and drag attempt under `/private/tmp/chronoos-ui-input-20260602-150049-*.png`.
+  Observed serial lines include `cmd: apps`, `cmd: notes`, `cmd: calc 6 - 7`,
+  `app: calc launched`, `cmd: open notes`, `wm: open notes`, and
+  `mouse: click at 740,410`.
+- Important limit: the 2026-06-02 input run became unreliable when a longer
+  command batch was injected. Backspace produced `abouut`, `sysinfo` was
+  submitted as `ssysinfo`, and an early `open notes` attempt was submitted as
+  `oopen notes`. Treat this as partial keyboard evidence, not broad manual
+  input verification.
+- Important UI/input limit: `apps`, the `notes` home screen, and `calc 6 - 7`
+  were observed; `open notes` partially opened a window/task path; and one
+  mouse click packet was logged. `sysinfo`, `open sysinfo`, notes read/write,
+  cursor movement, drag, close, Backspace, shifted input, polling fallback,
+  GIF capture, and hardware remain unverified.
+- Important UEFI limit: `pwsh -NoLogo -NoProfile -File scripts/build-uefi.ps1`
+  downloaded the UEFI loader dependencies after escalation but failed to compile
+  `uefi-loader` because `uefi::boot::MemoryMap` no longer exists in the current
+  `uefi` crate API. No UEFI QEMU boot was attempted.
+- Important SMP limit: a 2026-06-02 two-core BIOS serial-only QEMU smoke at
+  `/private/tmp/chronoos-smp-20260602-162000.serial.log` reached
+  `[CHRONO] smp: BSP online (core 0)` and `[CHRONO] active era: 1984`, but did
+  not show AP startup, `smp: 2 cores ready`, or `[CHRONO] boot complete` before
+  the timeboxed run was stopped.
+- Important networking limit: a 2026-06-02 single-core QEMU run with RTL8139 at
+  `/private/tmp/chronoos-net-20260602-162000.serial.log` reached boot complete
+  and logged `net: rtl8139 found` plus MAC `52:54:00:12:34:56`. QEMU
+  `hostfwd=udp::9000-:9000` conflicted with the host UDP listener, and later
+  shell injection attempts submitted `n7et` and `neett`, so ARP/UDP behavior was
+  not verified. Host UDP log
+  `/private/tmp/chronoos-net-20260602-162000.host-udp.log` remained 0 bytes.
 - Hardware proof: no hardware verification is recorded in this repo.
 
 ## Compact Status Table
@@ -49,13 +96,15 @@ design, and what has actual verification evidence.
 | Feature | Status | Verification | Notes |
 | --- | --- | --- | --- |
 | Public ChronoOS identity | implemented in code | not runtime-facing | Public docs use ChronoOS; repo/package names may remain `chronosapien`. |
-| BIOS boot path | implemented in code | verified in QEMU, needs broader runtime verification | Single-core serial-only BIOS boot reached `[CHRONO] boot complete`; framebuffer, shell, and multi-core still need verification. |
-| Custom BIOS bootloader path | partially implemented | needs runtime verification | Stage/handoff code and scripts exist; no boot proof is recorded. |
-| UEFI loader path | implemented in code | needs runtime verification | Loader, docs, and scripts exist; no UEFI QEMU/hardware proof is recorded. |
-| Framebuffer console/UI | implemented in code | needs runtime verification | Text rendering/top bar paths exist; not verified because the recorded smoke was serial-only. |
-| Serial logging | implemented in code | verified in QEMU, needs broader runtime verification | Boot-time serial logging reached boot complete in single-core QEMU; shell-command serial output still needs checks. |
-| Shell command surface | implemented in code | needs runtime verification | Dispatch exists for core, product, app, filesystem, userspace, networking, museum, and quest commands. |
-| Apps | implemented in code | needs runtime verification | `notes`, `calc`, `sysinfo`, and `apps` launcher paths exist. |
+| BIOS boot path | implemented in code | verified in QEMU, needs broader runtime verification | Single-core BIOS boot reached `[CHRONO] boot complete` in serial-only and visible QEMU runs; multi-core still needs verification. |
+| Custom BIOS bootloader path | partially implemented | blocked: build dependency missing | Stage/handoff code and scripts exist, but `nasm` was not on PATH during the 2026-06-02 preflight. |
+| UEFI loader path | implemented in code | blocked: build failure | UEFI docs/scripts exist, OVMF is available, but `uefi-loader` failed to compile against the current `uefi` crate API. |
+| Framebuffer console/UI | implemented in code | verified in QEMU, needs broader runtime verification | QEMU screendump showed the top bar, boot text, and `CHRONO>` prompt; broader rendering and interaction still need checks. |
+| Serial logging | implemented in code | verified in QEMU, needs broader runtime verification | Boot-time serial logging reached boot complete in single-core QEMU; shell-command serial output is only partially observed. |
+| Shell command surface | implemented in code | verified in QEMU, needs broader runtime verification | `help`, `help start`, and `about` were observed through visible QEMU; most commands still need staged checks. |
+| Command and UX polish | implemented in code | verified in QEMU, needs broader runtime verification | Grouped `help` and `help start` were observed; other topic pages, unknown hints, and risky warnings still need checks. |
+| Apps | implemented in code | partially verified in QEMU, needs broader runtime verification | `apps`, `notes`, and `calc 6 - 7` were observed; `sysinfo`, notes read/write, and persistence still need checks. |
+| Guided onboarding | implemented in code | needs runtime verification | `start`, `welcome`, and `guide` topic pages route first-run users toward existing safe commands. |
 | Museum/quest/product layer | implemented in code | needs runtime verification | `demo`, `tour`, `capsule`, `doctor`, `poster`, `travel`, museum pages, quests, stats, and inventory exist. |
 | Theme studio | roadmap/design-only | needs runtime verification | Current `apps theme` is a text preview, not a studio. |
 | Crash lab | roadmap/design-only | needs runtime verification | Do not build before core runtime evidence is stronger. |
@@ -65,45 +114,59 @@ design, and what has actual verification evidence.
 | Network demo mode | roadmap/design-only | needs runtime verification | Current networking surface is `net`, `net arp`, and `net send`. |
 | User-space showcase | partially implemented | needs runtime verification | `ring3`, `syshello`, `exec`, and museum/tour pages exist; no polished showcase app exists. |
 | Visual boot timeline | partially implemented | needs runtime verification | `capsule` and `poster boot` are text surfaces; no visual timeline is implemented. |
-| Era-specific help/about | partially implemented | needs runtime verification | `about`, `era`, `travel`, and product text use era context; `help` is still mostly generic. |
+| Era-specific help/about | partially implemented | needs runtime verification | `about`, `era`, `travel`, product text, and category help exist; deeper era-specific help remains future polish. |
 | Mini desktop/app launcher | partially implemented | needs runtime verification | Text launcher plus small notes/sysinfo windows exist; not a full desktop. |
 | ChronoFS | implemented in code | needs runtime verification | ATA-backed named files and shell commands exist; shell workflows are not verified. |
 | fsck and journal | implemented in code | needs runtime verification | Conservative `fsck`, `fsck repair`, one-record journal, and mount recovery exist; crash states need controlled tests. |
-| Keyboard | implemented in code | needs runtime verification | IRQ1 buffering plus polling fallback exist. |
-| Mouse | implemented in code | needs runtime verification | PS/2 mouse path initialized in code; movement/window interaction not verified. |
-| Window manager | partially implemented | needs runtime verification | Fixed-capacity windows, focus, drag, close, notes/sysinfo windows, and task wiring exist. |
+| Keyboard | implemented in code | verified in QEMU, needs broader runtime verification | QEMU monitor `sendkey` submitted shell commands; manual typing, Backspace, Shift, and polling fallback still need checks. |
+| Mouse | implemented in code | partially verified in QEMU, needs broader runtime verification | Serial log showed PS/2 initialization and one click at `740,410`; cursor movement, drag, and close are not verified. |
+| Window manager | partially implemented | partially verified in QEMU, needs broader runtime verification | `open notes` spawned a task and logged `wm: open notes`; `open sysinfo`, drag, close, and focus behavior are not verified. |
+| Screenshot/GIF evidence | partially implemented | partially verified in QEMU, needs manual verification | QEMU `screendump` PNG capture works; animated GIF capture still needs manual tooling/evidence. |
 | Heap allocator | implemented in code | needs runtime verification | Free-list allocator with splitting, reinsertion, and coalescing exists; reuse/corruption behavior needs testing. |
 | Cooperative scheduler | implemented in code | needs runtime verification | Fixed task slots and spawn/kill/yield paths exist. |
-| SMP/AP startup | partially implemented | needs runtime verification | High-risk; two-core serial-only smoke exited before boot complete. |
+| SMP/AP startup | partially implemented | partially verified in QEMU, high-risk, needs runtime verification | Two-core serial smoke reached BSP startup only; no AP-online or two-core-ready evidence. |
 | Ring 3/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths exist; no general userland, dynamic linker, argv/env, libc, or package model. |
-| Networking | partially implemented | needs runtime verification | RTL8139, static IPv4, ARP, UDP send/poll exist; no DHCP, DNS, TCP, or socket stack. |
+| Networking | partially implemented | partially verified in QEMU | RTL8139 discovery and MAC were observed; ARP/UDP commands were not verified because QEMU input garbled `net` commands and host UDP saw 0 bytes. No DHCP, DNS, TCP, or socket stack. |
 | Long-term systems 96-110 | roadmap/design-only | needs runtime verification | See the long-term section below; current repo should not imply these are built. |
 
 ## Boot Paths
 
 - BIOS boot through the `bootloader` crate is implemented in code and has
-  limited QEMU evidence: single-core serial-only boot reached `[CHRONO] boot
-  complete`.
+  QEMU evidence: single-core serial-only and visible-display runs reached
+  `[CHRONO] boot complete`.
 - Custom BIOS boot is partially implemented. Keep it separate from the normal
-  BIOS path because it has its own stage/handoff risk.
-- UEFI boot is implemented in code, but no UEFI QEMU or hardware proof is
-  recorded.
-- Framebuffer and shell startup are not verified by the serial-only boot smoke.
+  BIOS path because it has its own stage/handoff risk. The 2026-06-02 custom
+  BIOS preflight was blocked because `nasm` was missing.
+- UEFI boot is implemented in code, but the 2026-06-02 UEFI image build failed
+  in `uefi-loader` before QEMU boot could be attempted.
+- Framebuffer and shell startup have limited visible QEMU evidence from the
+  2026-06-02 screendumps. UEFI, custom BIOS, and SMP/AP boot still need
+  separate verification.
 
 ## Framebuffer, Serial, And UI
 
 - Serial boot logging is verified in QEMU only for the single-core BIOS
-  serial-only boot path.
+  boot path.
 - Framebuffer text rendering, top bar drawing, cursor behavior, and visual shell
-  prompt remain needs runtime verification.
-- The UI should stay terminal-first until visual shell and input evidence exists.
+  prompt are verified in QEMU at boot/shell-prompt level by 2026-06-02
+  screendumps.
+- Broader UI behavior, redraw edge cases, app/window interaction beyond the
+  partial `open notes` path, and GIF capture remain needs runtime verification.
+- The UI should stay terminal-first until broader visual shell and input
+  evidence exists.
 
 ## Shell Command Surface
 
 - Core shell commands are implemented in code: `help`, `clear`, `about`,
   `reboot`, `era`, `uptime`, `clock`, `mem`, `cores`, and `beep <hz>`.
+- Category help is implemented in code: `help start`, `help apps`, `help fs`,
+  `help system`, `help network`, `help userspace`, `help labs`, and
+  `help roadmap`, with beginner-friendly topic aliases.
 - Product and guide commands are implemented in code: `demo`, `tour`,
   `capsule`, `doctor`, `poster`, `travel <year>`, and `apps`.
+- Guided onboarding commands are implemented in code: `start`, `welcome`,
+  `guide`, `guide quick`, `guide full`, `guide eras`, `guide apps`,
+  `guide systems`, `guide status`, and `guide next`.
 - Filesystem commands are implemented in code: `ls`, `cat`, `write`, `rm`,
   `fsck`, `fsck repair`, and `journal`.
 - Userspace commands are implemented in code: `ring3`, `syshello`, and
@@ -112,13 +175,21 @@ design, and what has actual verification evidence.
   `net send [ip port text]`.
 - Museum and quest commands are implemented in code; see
   `docs/shell-commands.md` for the command reference.
+- Runtime evidence is still narrow but growing: `help`, `help start`, `about`,
+  `apps`, `notes`, and `calc 6 - 7` were observed in visible QEMU. Longer
+  command batches via QEMU monitor input were unreliable, so staged manual or
+  scripted shell verification is still needed for the rest of the command
+  surface.
 
 ## Apps
 
 - `notes`, `calc`, and `sysinfo` are implemented in code.
 - Notes storage is standardized around the ChronoFS file named `notes`.
 - `apps` is a text-first launcher that routes to existing shell/app surfaces.
-- App launch, notes persistence, and app output still need runtime verification.
+- `apps`, the `notes` home screen, and `calc 6 - 7` were observed in QEMU on
+  2026-06-02.
+- `sysinfo`, notes read/write, notes persistence, and broader app output still
+  need runtime verification.
 
 ## Museum, Quest, And Product Layer
 
@@ -179,7 +250,8 @@ design, and what has actual verification evidence.
 - Status: partially implemented.
 - Era profiles, `era`, `travel`, `about`, and many product texts use the active
   era.
-- `help` remains mostly generic and can be made more era-aware later.
+- `help` now has category and topic pages, but deeper era-specific phrasing can
+  still be made richer later.
 
 ## Mini Desktop And App Launcher
 
@@ -205,17 +277,27 @@ design, and what has actual verification evidence.
 
 ## Keyboard And Mouse
 
-- Keyboard status: implemented in code, needs runtime verification.
-- Keyboard notes: IRQ1 buffering and polling fallback both exist.
-- Mouse status: implemented in code, needs runtime verification.
-- Mouse notes: PS/2 packet decoding and window interaction hooks exist, but
-  visual movement and drag/close behavior are not verified.
+- Keyboard status: implemented in code, verified in QEMU for narrow command
+  submission, needs broader runtime verification.
+- Keyboard notes: IRQ1 buffering and polling fallback both exist. QEMU monitor
+  `sendkey` successfully submitted `help`, `help start`, `apps`, `notes`, and
+  `calc 6 - 7`, but manual typing, Backspace, shifted keys, and polling fallback
+  still need verification. The Backspace attempt was not verified because the
+  observed command became `abouut`.
+- Mouse status: implemented in code, partially verified in QEMU, needs broader
+  runtime verification.
+- Mouse notes: PS/2 initialization appeared in the serial boot log, and a QEMU
+  monitor click generated `[CHRONO] mouse: click at 740,410`. Visual cursor
+  movement, drag, close, and reliable window interaction are not verified.
 
 ## Window Manager
 
 - Status: partially implemented.
 - Fixed-capacity windows, focus, drag, close, and notes/sysinfo window paths
   exist.
+- `open notes` was partially verified in QEMU: it spawned a notes task, logged
+  `wm: open notes`, and produced a visible window boundary. `open sysinfo`,
+  dragging, closing, and focus behavior are not verified.
 - Treat this as a teaching window layer, not a compositor.
 
 ## Heap Allocator
@@ -232,8 +314,9 @@ design, and what has actual verification evidence.
   verification.
 - SMP/AP startup status: partially implemented, risky, needs runtime
   verification.
-- The recorded two-core BIOS serial-only smoke did not reach boot complete, so
-  do not expand SMP until this is isolated.
+- The 2026-06-02 two-core BIOS serial-only smoke reached BSP startup but did not
+  show AP startup, `smp: 2 cores ready`, or boot complete, so do not expand SMP
+  until this is isolated.
 - Preemptive scheduling is roadmap/design-only.
 
 ## Ring 3, Syscalls, And ELF
@@ -247,8 +330,12 @@ design, and what has actual verification evidence.
 
 - Status: partially implemented.
 - RTL8139 discovery, static IPv4, ARP, UDP send, and polling receive paths exist.
-- Serial boot showed NIC discovery during the limited BIOS smoke, but ARP/UDP
-  behavior itself remains needs runtime verification.
+- Serial boot showed RTL8139 discovery and the expected MAC address during a
+  2026-06-02 single-core QEMU networking pass.
+- ARP/UDP behavior itself remains needs runtime verification because
+  `hostfwd=udp::9000-:9000` conflicted with the local UDP listener and QEMU
+  monitor input submitted garbled commands (`n7et`, `neett`) instead of clean
+  `net` commands.
 - DHCP, DNS, TCP, sockets, and broad hardware support are roadmap/design-only.
 
 ## Long-Term Systems 96-110
@@ -275,19 +362,20 @@ code and a progress-log entry records the change:
 ## Risky Areas
 
 - SMP/AP startup: currently high-risk because the two-core serial-only smoke did
-  not reach boot complete.
+  not show AP startup or boot complete.
 - Ring 3/syscalls/static ELF: low-level privilege transitions and loading paths
   are inherently fragile and still unverified.
 - ChronoFS repair/recovery: writes metadata during repair/recovery and must be
   tested only with controlled disk images.
 - Heap allocator: reusable allocator exists but needs stress/reuse checks.
-- Custom BIOS and UEFI boot: code-present paths require separate boot evidence.
-- Networking: keep limited to static IPv4 ARP/UDP until runtime evidence exists.
+- Custom BIOS and UEFI boot: code-present paths are currently blocked by build
+  issues or missing dependencies before runtime boot evidence.
+- Networking: keep limited to static IPv4 ARP/UDP; only RTL8139 init/MAC is
+  partially verified so far.
 
 ## Recommended Next Goal
 
-Run a visible BIOS QEMU verification pass: framebuffer text, shell prompt,
-keyboard input, `help`, `about`, `uptime`, `mem`, `ls`, `write`, `cat`, `rm`,
-`fsck`, `journal`, `apps`, `demo`, `tour`, `capsule`, `doctor`, `poster`, and
-one notes/calc/sysinfo flow. Record screenshots or serial logs in
-`docs/AI_PROGRESS_LOG.md` before upgrading any status labels.
+Fix the UEFI loader API mismatch or install NASM only as a targeted build-path
+task, then rerun one high-risk verification path at a time. For networking, use
+a more reliable shell input path before attempting `net arp` or `net send`
+again.
