@@ -17,6 +17,9 @@ test pass. `docs/status-audit.md` remains the Phase 2-specific risk snapshot.
 - [ ] Confirm the host-side package check passes with the host target, for example `cargo check -p chronosapien --target <host> --offline --locked`.
 - [ ] Confirm `pwsh` is available before using PowerShell helper scripts.
 - [ ] Confirm `qemu-system-x86_64` is available before runtime verification.
+- [ ] Confirm OVMF exists before UEFI QEMU verification, for example `/opt/homebrew/share/qemu/edk2-x86_64-code.fd`.
+- [ ] Confirm `nasm` is available before custom BIOS verification.
+- [ ] Confirm a UDP helper such as `nc` is available before ARP/UDP verification.
 - [ ] If `pwsh` or QEMU is unavailable, record runtime verification as blocked instead of checking runtime boxes.
 - [ ] If using `-display none`, record it as serial-only evidence and do not check framebuffer or visible shell-prompt boxes.
 
@@ -43,6 +46,8 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 - [ ] Build the UEFI image with `.\scripts\build-uefi.ps1`.
 - [ ] Boot it with `.\scripts\run-uefi.ps1`.
+- [ ] Prefer direct single-core QEMU for first verification if the helper script uses `-smp 2`.
+- [ ] If the UEFI loader fails to compile, record `blocked: build failure` and do not attempt QEMU boot.
 - [ ] Confirm the UEFI loader prints/logs loader start.
 - [ ] Confirm GOP framebuffer output reaches the kernel.
 - [ ] Confirm the ChronoOS shell prompt appears.
@@ -51,6 +56,8 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 ## 3. Custom BIOS Boot Path
 
 - [ ] Build the custom BIOS image with `.\scripts\build-custom.ps1`.
+- [ ] Confirm `nasm` is available before building this path.
+- [ ] If `nasm` is missing, record `blocked: build dependency missing` and stop.
 - [ ] Boot it with `.\scripts\run-custom.ps1`.
 - [ ] Confirm Stage 1 serial output appears.
 - [ ] Confirm the custom handoff reaches `chrono_custom_entry`.
@@ -67,13 +74,24 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 ## 5. Shell Commands
 
 - [ ] `help` lists the expected command groups.
+- [ ] `help start` explains `start`, `welcome`, `guide`, `demo`, and `tour`.
+- [ ] `help apps` explains `apps` versus `open`.
+- [ ] `help fs` explains file commands and warns about `fsck repair`.
+- [ ] `help system` points to `doctor`, `poster system`, and conservative status surfaces.
+- [ ] `help network` says networking is static IPv4 ARP/UDP only.
+- [ ] `help userspace` says userspace demos are partial and need runtime verification.
+- [ ] `help labs` groups risky/intentional verification commands.
+- [ ] `help roadmap` marks long-term systems as roadmap/design-only.
+- [ ] `help files`, `help net`, `help status`, `help verify`, and `help future` route to useful topic help.
 - [ ] `about` prints the current ChronoOS identity line.
 - [ ] `uptime` increases over time.
 - [ ] `clock` prints raw PIT ticks.
 - [ ] `mem` prints heap used/free/largest-free values.
 - [ ] `cores` prints online core/task counts.
 - [ ] `beep 440` plays or logs a tone without hanging.
-- [ ] Invalid commands return `unknown command`.
+- [ ] Invalid commands return `unknown command` plus `help` guidance.
+- [ ] Common confusions such as `status`, `verify`, `files`, `apps now`, and `net now` print helpful hints.
+- [ ] Unknown help topics such as `help coffee` print the valid topic list.
 
 ## 6. IRQ Keyboard With Polling Fallback
 
@@ -118,6 +136,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 ## 10. fsck And fsck repair
 
 - [ ] `fsck` on a clean disk reports clean or only expected warnings.
+- [ ] `fsck repair` prints a mutation warning before reporting repair results.
 - [ ] `fsck repair` on a clean disk does not damage files.
 - [ ] A controlled bitmap mismatch is reported by `fsck`.
 - [ ] `fsck repair` fixes only safe bitmap/stale-slot issues.
@@ -148,6 +167,17 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 13. Product Commands
 
+- [ ] `start` prints the first-run welcome screen.
+- [ ] `welcome` prints the same first-run welcome screen.
+- [ ] `guide` prints the guide topic menu.
+- [ ] `guide quick` prints the short first-demo path.
+- [ ] `guide full` prints the full demo route without executing risky commands.
+- [ ] `guide eras` points to era/travel/poster era commands.
+- [ ] `guide apps` points to the app launcher, notes, calc, sysinfo, and window paths.
+- [ ] `guide systems` points to museum and tour commands.
+- [ ] `guide status` points to `doctor`, `poster system`, `capsule current`, `quest status`, `fsck`, and `journal`.
+- [ ] `guide next` separates safe demo commands from intentional verification commands.
+- [ ] `guide nope` prints usage and does not fall through to `unknown command`.
 - [ ] `demo` prints the read-only demo guide.
 - [ ] `tour` prints the tour overview.
 - [ ] `tour boot`, `tour memory`, `tour files`, `tour apps`, `tour userspace`, and `tour future` work.
@@ -162,6 +192,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 14. Ring 3 Demo
 
+- [ ] `ring3` prints the userspace runtime-verification warning before running.
 - [ ] `ring3` enters the user-mode demo.
 - [ ] The privileged instruction fault is caught as expected.
 - [ ] The kernel logs the ring 3 transition and violation.
@@ -170,6 +201,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 15. Syscalls
 
+- [ ] `syshello` prints the userspace runtime-verification warning before running.
 - [ ] `syshello` enters ring 3.
 - [ ] `sys_write` prints hello text through the kernel dispatcher.
 - [ ] `sys_exit` reports or logs exit behavior.
@@ -181,6 +213,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 - [ ] Build and install `hello.elf` with `.\scripts\build-user.ps1`.
 - [ ] `ls` shows `hello.elf`.
+- [ ] `exec hello.elf` prints the userspace runtime-verification warning before loading.
 - [ ] `exec hello.elf` prints the user-space hello text.
 - [ ] The process exits back to the shell with an exit code.
 - [ ] Invalid or missing ELF files report a clean error.
@@ -189,14 +222,21 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 ## 17. ARP / UDP Networking
 
 - [ ] Boot with the RTL8139 QEMU device enabled.
+- [ ] If a host UDP listener conflicts with `hostfwd=udp::9000-:9000`, record the conflict and test guest-to-host send without claiming host-to-guest forwarding.
+- [ ] Confirm serial logs `net: rtl8139 found`.
+- [ ] Confirm serial logs the expected guest MAC.
 - [ ] `net` prints MAC, static IP, gateway state, and TX/RX counts.
+- [ ] `net arp` prints the ARP/UDP-only runtime-verification warning.
 - [ ] `net arp` sends an ARP request.
 - [ ] Gateway MAC becomes learned after an ARP reply.
+- [ ] `net send` prints the ARP/UDP-only runtime-verification warning.
 - [ ] `net send` sends the default UDP payload.
+- [ ] `net send <ip> <port> <text>` prints the ARP/UDP-only runtime-verification warning.
 - [ ] `net send <ip> <port> <text>` sends a custom UDP payload.
 - [ ] Incoming UDP packets are logged to serial when sent through QEMU forwarding.
 - [ ] Results are described as static IPv4 ARP/UDP only.
 - [ ] No TCP, DHCP, DNS, socket, or broad hardware support is implied.
+- [ ] If QEMU monitor key injection garbles `net` commands, record networking as partially verified at most.
 
 ## 18. Cooperative Scheduler And Task Lifecycle
 
@@ -214,9 +254,20 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 - [ ] Boot a multi-core QEMU config intentionally, such as `-smp 2`.
 - [ ] Serial output records ACPI MADT discovery or a clear fallback path.
 - [ ] Serial output records whether AP startup succeeded, failed, or was skipped.
+- [ ] Mark SMP/AP verified only if serial shows AP-online evidence such as `smp: core 1 online` and `smp: 2 cores ready`.
+- [ ] If the run reaches only `smp: BSP online (core 0)`, keep SMP/AP partially implemented and high-risk.
 - [ ] `cores` reports a result consistent with the serial log.
 - [ ] Scheduler task placement does not imply SMP success unless AP startup evidence exists.
 - [ ] SMP remains marked risky until repeated QEMU evidence is recorded.
+
+## 19a. Hardware Safety
+
+- [ ] Read `docs/hardware-testing.md` before writing any image to removable media.
+- [ ] Confirm Secure Boot is disabled or intentionally handled before UEFI boot.
+- [ ] Confirm the target machine has a safe serial logging path or a clear fallback observation method.
+- [ ] Confirm USB HID/storage/serial are not expected to work unless future drivers are implemented.
+- [ ] Confirm storage writes are isolated to a sacrificial test disk or removable media.
+- [ ] Record hardware status as `needs manual verification` until real evidence exists.
 
 ## 20. Window Manager And App Platform Boundaries
 
