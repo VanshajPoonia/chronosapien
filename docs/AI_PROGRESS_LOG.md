@@ -29,6 +29,16 @@ Each future entry should use this format:
 - New risks introduced:
 - Next recommended step:
 
+### 2026-06-02 — Add final verification evidence matrix
+- Prompt/task: Create one clear source of truth showing what actually works, what was tested, what is code-present only, and what remains unverified.
+- Files changed: `docs/VERIFICATION_MATRIX.md`, `README.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a compact evidence matrix covering boot paths, framebuffer/serial/input/UI, apps, storage, heap, scheduler/SMP, userspace, networking, product surfaces, screenshots/GIFs, roadmap-only ideas, and hardware; linked the matrix from the README; and recorded this documentation-only consolidation pass.
+- What was intentionally avoided: No new features, QEMU run, hardware test, screenshots, GIF capture, kernel/source-code edits, runtime status upgrade, TCP, DHCP, DNS, USB, dynamic linker, package manager, full compositor, or preemptive scheduler.
+- Runtime verified: no new runtime verification. The matrix only consolidates evidence already recorded in `docs/CURRENT_STATUS.md`, `docs/release-checklist.md`, `docs/screenshots.md`, and prior progress-log entries.
+- If not verified, what still needs verification: UEFI boot, custom BIOS boot, ChronoFS workflows, fsck/journal behavior, heap reuse, scheduler lifecycle, AP startup, Ring 3, syscalls, static ELF execution, ARP/UDP behavior, full onboarding/status/product command flows, GIF capture, and hardware.
+- New risks introduced: Low; documentation-only evidence consolidation.
+- Next recommended step: Fix the UEFI loader API mismatch or install NASM for a custom BIOS build pass, then verify one risky path at a time.
+
 ### 2026-06-02 — Slice ChronoOS progress into 10 commits
 - Prompt/task: Slice the current ChronoOS progress into exactly 10 intentional commits and push to GitHub.
 - Files changed: `docs/AI_PROGRESS_LOG.md`.

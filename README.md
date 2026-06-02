@@ -26,8 +26,14 @@ Release docs:
 - `docs/KNOWN_LIMITATIONS.md`: limitations and non-goals.
 - `docs/ROADMAP_AFTER_v0.1.md`: post-v0.1 roadmap.
 - `docs/CURRENT_STATUS.md`: source-truth status audit.
+- `docs/VERIFICATION_MATRIX.md`: compact evidence matrix for tested, blocked,
+  code-present, and roadmap-only systems.
 - `docs/demo-script.md`: demo paths.
 - `docs/screenshots.md`: screenshot/GIF capture checklist.
+
+For evidence-level detail, use `docs/VERIFICATION_MATRIX.md`. It supersedes the
+compact tables below when you need the exact proof level, command/log evidence,
+or blocked reason for a system.
 
 Quick v0.1 demo commands, after visible QEMU shell evidence exists:
 
@@ -48,16 +54,16 @@ doctor
 
 | Feature | Status | Verification | Notes |
 | --- | --- | --- | --- |
-| BIOS boot path | implemented in code | limited verified in QEMU | Single-core serial-only boot reached `[CHRONO] boot complete`; visible UI still needs verification. |
-| Serial logging | implemented in code | limited verified in QEMU | Boot-time serial logging was observed; shell-command serial output needs checks. |
-| Framebuffer shell | implemented in code | needs runtime verification | Text UI/top bar paths exist; no visible screenshot proof yet. |
-| Guided shell/product layer | implemented in code | needs runtime verification | `start`, `guide`, `help`, `demo`, `tour`, `capsule`, `doctor`, and `poster` exist. |
-| Apps and launcher | implemented in code | needs runtime verification | `apps`, `notes`, `calc`, and `sysinfo` exist. |
+| BIOS boot path | implemented in code | verified in QEMU | Single-core BIOS boot reached `[CHRONO] boot complete`; multi-core remains separate. |
+| Serial logging | implemented in code | verified in QEMU | Boot-time serial logging was observed; shell-command serial output is only partially observed. |
+| Framebuffer shell | implemented in code | verified in QEMU | QEMU screendumps show the top bar, boot text, and prompt. |
+| Guided shell/product layer | implemented in code | partially verified in QEMU | `help` / `help start` were observed; full `start`, `guide`, `demo`, `tour`, `capsule`, `doctor`, and `poster` flows still need checks. |
+| Apps and launcher | implemented in code | partially verified in QEMU | `apps`, notes home, and `calc 6 - 7` were observed; `sysinfo` and notes persistence still need checks. |
 | ChronoFS | implemented in code | needs runtime verification | `ls`, `write`, `cat`, `rm`, `fsck`, `fsck repair`, and `journal` exist. |
-| Mouse/windows | partially implemented | needs runtime verification | PS/2 mouse, small windows, and task wiring exist. |
+| Mouse/windows | partially implemented | partially verified in QEMU | Mouse click packet and partial `open notes` window path observed; movement, drag, close, and `open sysinfo` still need checks. |
 | Userspace/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths exist; not general userland. |
-| Networking | partially implemented | needs runtime verification | Static IPv4 ARP/UDP only; no TCP/DHCP/DNS. |
-| SMP/AP startup | partially implemented, risky | needs runtime verification | Two-core serial-only smoke exited before boot complete. |
+| Networking | partially implemented | partially verified in QEMU | RTL8139 init/MAC observed; ARP/UDP behavior still unverified. |
+| SMP/AP startup | partially implemented, risky | partially verified in QEMU | Two-core serial-only smoke reached BSP only; no AP startup evidence. |
 | USB/package manager/compositor/preemption | roadmap/design-only | not verified | Intentionally not part of v0.1. |
 
 ### Demo And Screenshots
@@ -119,11 +125,13 @@ windows, ChronoFS, `fsck`, a tiny journal, apps, museum/quest/product commands,
 a cooperative scheduler, SMP work, ARP/UDP networking, Ring 3 demos, syscalls,
 and static ELF execution.
 
-Verified so far is intentionally narrower: single-core BIOS serial-only QEMU
-reached `[CHRONO] boot complete`, and boot-time serial logging was observed
-through that point. Visual framebuffer output, shell interaction, apps,
-filesystem workflows, userspace, networking, mouse/windows, UEFI, custom BIOS,
-SMP/AP, and hardware still need dedicated verification.
+Verified so far is intentionally narrower: single-core BIOS QEMU reaches
+`[CHRONO] boot complete`; boot-time serial logging and framebuffer prompt
+screendumps exist; narrow keyboard input, `help`, `help start`, `about`, `apps`,
+notes home, `calc 6 - 7`, partial `open notes`, one mouse click packet, RTL8139
+init/MAC, and BSP-only SMP startup have evidence. Filesystem workflows,
+userspace, ARP/UDP behavior, broader mouse/windows, UEFI, custom BIOS, AP
+startup, GIFs, and hardware still need dedicated verification.
 
 Roadmap/design-only work includes TCP, DHCP, DNS, USB, a dynamic linker, package
 manager, full desktop compositor, and production-grade preemptive scheduler.
@@ -142,6 +150,7 @@ Portfolio/demo docs:
 - `docs/KNOWN_LIMITATIONS.md`: clear limits and non-goals.
 - `docs/ROADMAP_AFTER_v0.1.md`: first post-release engineering goals.
 - `docs/CURRENT_STATUS.md`: current source-truth audit.
+- `docs/VERIFICATION_MATRIX.md`: final verification evidence matrix.
 - `docs/demo-script.md`: 2-minute, 5-minute, and 10-minute demo paths.
 - `docs/screenshots.md`: screenshot and GIF capture checklist.
 - `docs/release-checklist.md`: release gate checklist.
