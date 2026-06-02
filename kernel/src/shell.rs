@@ -176,7 +176,9 @@ fn execute_command(command: &str) {
 
     match command {
         "" => {}
-        "help" => print_help(),
+        command if command == "help" || command.starts_with("help ") => run_help(command),
+        "start" | "welcome" => print_welcome(),
+        command if command == "guide" || command.starts_with("guide ") => run_guide(command),
         command if command == "demo" || command.starts_with("demo ") => run_demo(command),
         command if command == "tour" || command.starts_with("tour ") => run_tour(command),
         command if command == "capsule" || command.starts_with("capsule ") => run_capsule(command),
@@ -201,12 +203,14 @@ fn execute_command(command: &str) {
         "mem" => print_memory(),
         "cores" => print_cores(),
         command if command == "beep" || command.starts_with("beep ") => beep(command),
-        "ring3" => crate::ring3::run_demo(),
-        "syshello" => crate::ring3::run_syshello(),
+        "ring3" => run_ring3_with_warning(),
+        "syshello" => run_syshello_with_warning(),
         "ls" => list_files(),
         command if command == "cat" || command.starts_with("cat ") => cat_file(command),
         command if command == "write" || command.starts_with("write ") => write_file(command),
-        command if command == "exec" || command.starts_with("exec ") => exec_file(command),
+        command if command == "exec" || command.starts_with("exec ") => {
+            exec_file_with_warning(command)
+        }
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
         command if command == "fsck" || command.starts_with("fsck ") => run_fsck(command),
         command if command == "journal" || command.starts_with("journal ") => run_journal(command),
@@ -218,23 +222,342 @@ fn execute_command(command: &str) {
         command if museum::run(command) => {}
         command if quest::run(command) => {}
         command if apps::run(command) => {}
-        _ => println!("unknown command: {}", command),
+        _ => print_unknown_command(command),
+    }
+}
+
+fn run_help(command: &str) {
+    let topic = command.strip_prefix("help").unwrap_or("").trim();
+
+    match topic {
+        "" => print_help(),
+        "start" | "guide" => print_help_start(),
+        "apps" | "app" => print_help_apps(),
+        "fs" | "files" | "filesystem" => print_help_fs(),
+        "system" | "status" | "verify" => print_help_system(),
+        "network" | "net" => print_help_network(),
+        "userspace" | "user" | "elf" => print_help_userspace(),
+        "labs" | "lab" | "debug" => print_help_labs(),
+        "roadmap" | "future" | "next" => print_help_roadmap(),
+        _ => print_unknown_help_topic(topic),
     }
 }
 
 fn print_help() {
-    println!(
-        "Commands: help, demo, tour, capsule, doctor, poster, travel <year>, clear, about, reboot, era, uptime, clock, mem, cores, beep <hz>, ring3, syshello"
-    );
-    println!("Files: ls, cat <name>, write <name> <content>, rm <name>, exec <name>, fsck [repair], journal");
-    println!("Apps: apps [notes|calc|sysinfo|files|clock|museum|theme|tasks]");
-    println!("Notes: notes read, notes write <text>, notes clear, notes save, notes open");
-    println!("Windows: open notes, open sysinfo");
-    println!("Tasks: tasks, kill <id>");
-    println!("Network: net, net arp, net send [ip port text]");
-    println!("Museum: museum boot|kernel|memory|interrupts|keyboard|serial|era");
-    println!("Deep museum: museum disk|filesystem|userspace|syscalls|elf|networking|smp|scheduler");
-    println!("Quests: quest list, quest status, stats, inventory");
+    println!("ChronoOS help");
+    println!("Getting started : start, welcome, guide, demo, tour");
+    println!("Eras and themes : era, travel <year>, poster eras, apps theme");
+    println!("Apps            : apps, notes, calc, sysinfo, open notes, open sysinfo");
+    println!("Filesystem      : ls, cat, write, rm, fsck, journal");
+    println!("Museum/quests   : museum ..., quest list, quest status, stats, inventory");
+    println!("System status   : doctor, sysinfo, mem, cores, uptime, clock, poster system");
+    println!("Userspace       : ring3, syshello, exec <name> (needs verification)");
+    println!("Networking      : net, net arp, net send (static IPv4 ARP/UDP only)");
+    println!("Debug/lab       : beep <hz>, reboot, fsck repair, risky demos");
+    println!("Roadmap/future  : capsule next, poster roadmap, tour future");
+    println!();
+    println!("More help: help start|apps|fs|system|network|userspace|labs|roadmap");
+}
+
+fn print_help_start() {
+    println!("Help: getting started");
+    println!("- start / welcome : polished first-run ChronoOS screen");
+    println!("- guide           : topic menu for the guided shell path");
+    println!("- guide quick     : short first-demo route");
+    println!("- guide full      : longer route across product surfaces");
+    println!("- demo            : read-only preview of current features");
+    println!("- tour            : educational explanations by subsystem");
+    println!();
+    println!("Difference: guide orients you, demo previews, tour teaches.");
+    println!("Next: guide quick");
+}
+
+fn print_help_apps() {
+    println!("Help: apps");
+    println!("- apps            : text launcher and app map");
+    println!("- apps notes      : notes app route");
+    println!("- apps calc       : calculator route");
+    println!("- apps sysinfo    : system info route");
+    println!("- notes           : notes home screen");
+    println!("- calc 6 * 7      : integer calculator");
+    println!("- sysinfo         : compact status view");
+    println!("- open notes      : small notes window path");
+    println!("- open sysinfo    : small sysinfo window path");
+    println!();
+    println!("Note: apps are shell-first; open uses partially implemented windows.");
+    println!("Next: apps");
+}
+
+fn print_help_fs() {
+    println!("Help: filesystem");
+    println!("- ls                       : list ChronoFS files");
+    println!("- cat <name>               : print a text file");
+    println!("- write <name> <content>   : create or overwrite a file");
+    println!("- rm <name>                : remove a file");
+    println!("- fsck                     : read-only ChronoFS metadata check");
+    println!("- fsck repair              : conservative metadata repair");
+    println!("- journal                  : ChronoFS journal status");
+    println!();
+    println!("Warning: fsck repair mutates metadata; use it during intentional checks.");
+    println!("Next: tour files");
+}
+
+fn print_help_system() {
+    println!("Help: system status");
+    println!("- doctor          : conservative subsystem report");
+    println!("- poster system   : screenshot-friendly status card");
+    println!("- capsule current : current milestone snapshot");
+    println!("- quest status    : quest/progress status");
+    println!("- sysinfo         : era, uptime, memory summary");
+    println!("- mem             : heap and memory numbers");
+    println!("- cores           : online core/task counts");
+    println!("- uptime / clock  : timer-derived counters");
+    println!();
+    println!("These are status surfaces, not runtime certification.");
+    println!("Next: doctor");
+}
+
+fn print_help_network() {
+    println!("Help: networking");
+    println!("- net                         : RTL8139/static IPv4 status");
+    println!("- net arp                     : send ARP request for QEMU gateway");
+    println!("- net send                    : send default UDP payload");
+    println!("- net send <ip> <port> <text> : send custom UDP payload");
+    println!();
+    println!("Boundary: static IPv4 ARP/UDP only; no TCP, DHCP, or DNS.");
+    println!("Status: partially implemented, needs runtime verification.");
+    println!("Next: net");
+}
+
+fn print_help_userspace() {
+    println!("Help: userspace");
+    println!("- ring3       : opt-in ring 3 teaching demo");
+    println!("- syshello    : syscall-style hello demo");
+    println!("- exec <name> : run a static ELF64 file from ChronoFS");
+    println!();
+    println!("Boundary: no general userland, dynamic linker, argv/env, libc, or package model.");
+    println!("Status: partially implemented, needs runtime verification.");
+    println!("Next: tour userspace");
+}
+
+fn print_help_labs() {
+    println!("Help: debug/lab");
+    println!("- beep <hz>   : PC speaker tone path");
+    println!("- reboot      : immediate PS/2-controller reset request");
+    println!("- fsck repair : intentional ChronoFS repair verification");
+    println!("- ring3/syshello/exec <name> : userspace verification paths");
+    println!("- net arp / net send         : ARP/UDP verification paths");
+    println!();
+    println!("Future: crash lab is roadmap/design-only, not a current command.");
+    println!("Next: guide next");
+}
+
+fn print_help_roadmap() {
+    println!("Help: roadmap/future");
+    println!("- capsule next   : next recommended milestones");
+    println!("- poster roadmap : screenshot-friendly roadmap card");
+    println!("- tour future    : beginner-friendly future-work explanation");
+    println!();
+    println!("Roadmap/design-only: TCP, DHCP, DNS, USB, dynamic linker,");
+    println!("package manager, full compositor, and preemptive scheduler.");
+    println!("Next: capsule next");
+}
+
+fn print_unknown_help_topic(topic: &str) {
+    println!("Unknown help topic: {}", topic);
+    println!("Try: help start|apps|fs|system|network|userspace|labs|roadmap");
+}
+
+fn print_unknown_command(command: &str) {
+    println!("unknown command: {}", command);
+
+    if command.starts_with("status") || command.starts_with("verify") {
+        println!("Hint: use doctor or help system for conservative status.");
+    } else if command.starts_with("file") || command.starts_with("files") {
+        println!("Hint: use help fs for ls, cat, write, rm, fsck, and journal.");
+    } else if command.starts_with("app") {
+        println!("Hint: use apps or help apps.");
+    } else if command.starts_with("net") {
+        println!("Hint: use net or help network.");
+    } else if command.starts_with("guide") {
+        println!("Hint: use guide or help start.");
+    }
+
+    println!("Try: help");
+    println!("Topics: help start|apps|fs|system|network|userspace|labs|roadmap");
+}
+
+fn print_userspace_warning() {
+    println!("Warning: userspace demos are partially implemented and need runtime verification.");
+}
+
+fn run_ring3_with_warning() {
+    print_userspace_warning();
+    crate::ring3::run_demo();
+}
+
+fn run_syshello_with_warning() {
+    print_userspace_warning();
+    crate::ring3::run_syshello();
+}
+
+fn exec_file_with_warning(command: &str) {
+    if !command.strip_prefix("exec").unwrap_or("").trim().is_empty() {
+        print_userspace_warning();
+    }
+    exec_file(command);
+}
+
+fn print_welcome() {
+    let profile = theme::active_profile();
+
+    println!("ChronoOS first-run guide");
+    println!("Era lens: {}", profile.name);
+    println!("Prompt: {}", profile.screen_prompt);
+    println!();
+    println!("Welcome to a Rust no_std x86_64 teaching OS with eras,");
+    println!("museum pages, quests, tiny apps, ChronoFS, and honest status labels.");
+    println!();
+    println!("Start here:");
+    println!("- guide quick      : five safe commands for a first screenshot");
+    println!("- guide full       : the complete shell-first tour map");
+    println!("- apps             : text launcher for notes, calc, sysinfo, files");
+    println!("- museum boot      : learn how the machine wakes up");
+    println!("- doctor           : conservative subsystem status");
+    println!("- capsule current  : current build-in-public snapshot");
+    println!();
+    println!("Verification note: this screen is read-only and does not certify runtime behavior.");
+}
+
+fn run_guide(command: &str) {
+    let topic = command.strip_prefix("guide").unwrap_or("").trim();
+
+    match topic {
+        "" => guide_overview(),
+        "quick" => guide_quick(),
+        "full" => guide_full(),
+        "eras" => guide_eras(),
+        "apps" => guide_apps(),
+        "systems" => guide_systems(),
+        "status" => guide_status(),
+        "next" => guide_next(),
+        _ => print_guide_usage(),
+    }
+}
+
+fn print_guide_usage() {
+    println!("Usage: guide [quick|full|eras|apps|systems|status|next]");
+}
+
+fn guide_header(title: &str) {
+    let profile = theme::active_profile();
+
+    println!("ChronoOS guide: {}", title);
+    println!("Era lens: {}", profile.name);
+    println!();
+}
+
+fn guide_overview() {
+    guide_header("welcome map");
+    println!("This guide is read-only. It points to existing commands.");
+    println!();
+    println!("Topics:");
+    println!("- guide quick   : first five commands");
+    println!("- guide full    : full demo route");
+    println!("- guide eras    : time-travel themes");
+    println!("- guide apps    : launcher and tiny apps");
+    println!("- guide systems : museum and OS concepts");
+    println!("- guide status  : conservative verification/status surfaces");
+    println!("- guide next    : safe next steps and risky commands");
+}
+
+fn guide_quick() {
+    guide_header("quick start");
+    println!("Try this first:");
+    println!("1. about        - identify ChronoOS");
+    println!("2. era          - see available eras");
+    println!("3. apps         - open the text app launcher");
+    println!("4. museum boot  - learn the boot story");
+    println!("5. doctor       - read conservative subsystem status");
+    println!();
+    println!("Then try: guide full");
+}
+
+fn guide_full() {
+    guide_header("full route");
+    println!("Follow this shell-first path:");
+    println!("1. demo              - safe high-level preview");
+    println!("2. tour              - choose boot, memory, files, apps, userspace");
+    println!("3. capsule           - build-in-public timeline");
+    println!("4. poster            - screenshot-friendly cards");
+    println!("5. apps              - notes, calc, sysinfo, files, museum, theme");
+    println!("6. museum filesystem - deeper OS explanation");
+    println!("7. quest status      - RPG-style progress");
+    println!("8. fsck              - read-only filesystem check");
+    println!("9. journal           - ChronoFS journal status");
+}
+
+fn guide_eras() {
+    guide_header("eras");
+    println!("ChronoOS can shift presentation across computing eras.");
+    println!("Commands:");
+    println!("- era 1984 | era 1995 | era 2007 | era 2040");
+    println!("- travel 1987 | travel 1998 | travel 2004 | travel 2049");
+    println!("- poster eras");
+    println!();
+    println!("Era switching changes style and mood, not the underlying kernel.");
+}
+
+fn guide_apps() {
+    guide_header("apps");
+    println!("Apps are small shell-first workflows, not a full desktop.");
+    println!("Commands:");
+    println!("- apps");
+    println!("- notes | notes write <text> | notes read");
+    println!("- calc 6 * 7");
+    println!("- sysinfo");
+    println!("- open notes | open sysinfo");
+    println!();
+    println!("Window paths are partially implemented and need runtime verification.");
+}
+
+fn guide_systems() {
+    guide_header("systems");
+    println!("Use museum and tour commands to learn what each subsystem means.");
+    println!("Museum:");
+    println!("- museum boot|kernel|memory|interrupts|filesystem");
+    println!("- museum userspace|networking|scheduler");
+    println!("Tours:");
+    println!("- tour boot");
+    println!("- tour files");
+    println!("- tour userspace");
+}
+
+fn guide_status() {
+    guide_header("status");
+    println!("These commands show conservative status, not full certification:");
+    println!("- doctor          : subsystem report without live probes");
+    println!("- poster system   : screenshot-friendly status card");
+    println!("- capsule current : current milestone snapshot");
+    println!("- quest status    : next verification quest");
+    println!("- fsck            : read-only ChronoFS check");
+    println!("- journal         : ChronoFS journal status");
+    println!();
+    println!("Only QEMU or hardware evidence upgrades a feature to verified.");
+}
+
+fn guide_next() {
+    guide_header("next steps");
+    println!("Safe demo commands:");
+    println!("- guide quick | demo | tour | capsule | poster | apps");
+    println!("- museum boot | museum filesystem | quest list");
+    println!("- ls | fsck | journal");
+    println!();
+    println!("Intentional verification only:");
+    println!("- ring3 | syshello | exec <name>");
+    println!("- net arp | net send");
+    println!("- fsck repair");
+    println!("- SMP/multicore, UEFI, custom BIOS, crash/fault paths");
 }
 
 fn run_demo(command: &str) {
@@ -1328,6 +1651,11 @@ fn run_fsck(command: &str) {
             return;
         }
     };
+
+    if repair {
+        println!("Warning: fsck repair mutates ChronoFS metadata.");
+        println!("Use it only during intentional filesystem verification.");
+    }
 
     let report = fs::check(repair);
 

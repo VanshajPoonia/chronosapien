@@ -210,22 +210,30 @@ pub fn run(command: &str) -> bool {
     }
 
     if rest == "arp" {
+        print_network_warning();
         send_gateway_arp();
         return true;
     }
 
     if rest == "send" {
+        print_network_warning();
         send_udp(GATEWAY_IP, DEFAULT_UDP_PORT, DEFAULT_UDP_PAYLOAD);
         return true;
     }
 
     if let Some(args) = rest.strip_prefix("send ") {
+        print_network_warning();
         run_send_command(args);
         return true;
     }
 
     println!("Usage: net | net arp | net send [ip port text]");
     true
+}
+
+fn print_network_warning() {
+    println!("Warning: networking is ARP/UDP-only and needs runtime verification.");
+    println!("No TCP, DHCP, or DNS is implemented.");
 }
 
 fn run_send_command(args: &str) {
