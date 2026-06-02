@@ -11,6 +11,94 @@ internal names and should not be renamed casually.
 
 ChronoOS is not a Linux replacement. It is a small, readable teaching OS.
 
+## v0.1 Release Candidate
+
+Release story: **ChronoOS v0.1 RC - Time-Museum Shell**.
+
+v0.1 packages ChronoOS as a portfolio-ready teaching OS: a Rust `no_std`
+x86_64 kernel with a shell that doubles as the product surface. It highlights
+era themes, guided onboarding, museum pages, quests, tiny apps, ChronoFS tools,
+status screens, and release docs that keep verification claims honest.
+
+Release docs:
+
+- `docs/RELEASE_v0.1.md`: v0.1 RC release note and checklist.
+- `docs/KNOWN_LIMITATIONS.md`: limitations and non-goals.
+- `docs/ROADMAP_AFTER_v0.1.md`: post-v0.1 roadmap.
+- `docs/CURRENT_STATUS.md`: source-truth status audit.
+- `docs/demo-script.md`: demo paths.
+- `docs/screenshots.md`: screenshot/GIF capture checklist.
+
+Quick v0.1 demo commands, after visible QEMU shell evidence exists:
+
+```text
+start
+guide quick
+help start
+about
+era
+travel 1998
+demo
+poster
+help system
+doctor
+```
+
+### v0.1 Feature Table
+
+| Feature | Status | Verification | Notes |
+| --- | --- | --- | --- |
+| BIOS boot path | implemented in code | limited verified in QEMU | Single-core serial-only boot reached `[CHRONO] boot complete`; visible UI still needs verification. |
+| Serial logging | implemented in code | limited verified in QEMU | Boot-time serial logging was observed; shell-command serial output needs checks. |
+| Framebuffer shell | implemented in code | needs runtime verification | Text UI/top bar paths exist; no visible screenshot proof yet. |
+| Guided shell/product layer | implemented in code | needs runtime verification | `start`, `guide`, `help`, `demo`, `tour`, `capsule`, `doctor`, and `poster` exist. |
+| Apps and launcher | implemented in code | needs runtime verification | `apps`, `notes`, `calc`, and `sysinfo` exist. |
+| ChronoFS | implemented in code | needs runtime verification | `ls`, `write`, `cat`, `rm`, `fsck`, `fsck repair`, and `journal` exist. |
+| Mouse/windows | partially implemented | needs runtime verification | PS/2 mouse, small windows, and task wiring exist. |
+| Userspace/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths exist; not general userland. |
+| Networking | partially implemented | needs runtime verification | Static IPv4 ARP/UDP only; no TCP/DHCP/DNS. |
+| SMP/AP startup | partially implemented, risky | needs runtime verification | Two-core serial-only smoke exited before boot complete. |
+| USB/package manager/compositor/preemption | roadmap/design-only | not verified | Intentionally not part of v0.1. |
+
+### Demo And Screenshots
+
+- Demo script: `docs/demo-script.md`.
+- Screenshot/GIF checklist: `docs/screenshots.md`.
+- Release checklist: `docs/release-checklist.md`.
+- v0.1 release checklist: `docs/RELEASE_v0.1.md`.
+
+Screenshots and GIFs should be captured only after visible QEMU or hardware
+evidence exists. Serial-only boot evidence is useful, but it does not prove the
+framebuffer shell.
+
+### Architecture Overview
+
+- Boot and platform: BIOS path, optional custom BIOS handoff, optional UEFI
+  loader, GDT/IDT/PIC/PIT setup, and serial/framebuffer output paths.
+- Input and UI: IRQ keyboard buffering with polling fallback, PS/2 mouse path,
+  framebuffer console, top bar, and small windows.
+- Storage and memory: memory map helpers, free-list heap, ATA PIO, ChronoFS,
+  `fsck`, repair, and journal support.
+- Product shell: categorized help, onboarding, eras, apps, museum pages, quests,
+  status screens, demos, and posters.
+- Advanced teaching paths: cooperative scheduler, early SMP work, Ring 3,
+  syscalls, static ELF, and static IPv4 ARP/UDP.
+
+### Roadmap After v0.1
+
+The first post-v0.1 goal is verification, not expansion: visible BIOS QEMU
+evidence for framebuffer, shell prompt, keyboard input, `help`, onboarding,
+ChronoFS basics, apps, product commands, and screenshots. After that, work moves
+through filesystem hardening, userspace/process cleanup, networking checks,
+UI/window polish, and careful hardware/USB exploration. See
+`docs/ROADMAP_AFTER_v0.1.md`.
+
+### Learning Goals
+
+ChronoOS is built to show how boot, memory, interrupts, timers, input,
+framebuffer output, storage, filesystems, scheduling, userspace, networking, and
+product storytelling connect inside one small OS.
+
 ## Portfolio Snapshot
 
 ChronoOS exists to make low-level systems work understandable and memorable. It
@@ -50,6 +138,9 @@ What this project teaches:
 
 Portfolio/demo docs:
 
+- `docs/RELEASE_v0.1.md`: v0.1 release candidate story.
+- `docs/KNOWN_LIMITATIONS.md`: clear limits and non-goals.
+- `docs/ROADMAP_AFTER_v0.1.md`: first post-release engineering goals.
 - `docs/CURRENT_STATUS.md`: current source-truth audit.
 - `docs/demo-script.md`: 2-minute, 5-minute, and 10-minute demo paths.
 - `docs/screenshots.md`: screenshot and GIF capture checklist.
@@ -233,8 +324,10 @@ current source shape.
 
 Highlights:
 
-- Core: `help`, `clear`, `about`, `reboot`, `uptime`, `clock`, `mem`, `cores`, `beep <hz>`.
-- Era/product: `era`, `travel <year>`, `demo`, `tour`, `capsule`, `doctor`, `poster`.
+- Core: `help`, `help start`, `help apps`, `help fs`, `help system`,
+  `help network`, `help userspace`, `help labs`, `help roadmap`, `clear`,
+  `about`, `reboot`, `uptime`, `clock`, `mem`, `cores`, `beep <hz>`.
+- Era/product: `start`, `welcome`, `guide`, `era`, `travel <year>`, `demo`, `tour`, `capsule`, `doctor`, `poster`.
 - Filesystem: `ls`, `cat`, `write`, `rm`, `fsck`, `fsck repair`, `journal`.
 - Apps: `apps`, `notes`, `calc`, `sysinfo`.
 - Windows/tasks: `open notes`, `open sysinfo`, `tasks`, `kill <id>`.
