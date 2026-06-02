@@ -36,6 +36,63 @@ chronoos-2026-06-01-era-1995-planned.png
 chronoos-2026-06-01-filesystem-write-cat-flow.gif
 ```
 
+## v0.1 Capture Set
+
+Capture these after visible QEMU or hardware evidence exists:
+
+- [ ] Boot: BIOS boot screen and first shell prompt.
+- [ ] Onboarding: `start`, `guide quick`, `help start`.
+- [ ] Command map: `help`, `help apps`, `help fs`, `help system`.
+- [ ] Era: `era`, `travel 1998`, `poster eras`.
+- [ ] Status: `doctor`, `capsule current`, `poster system`.
+- [ ] Apps: `apps`, `notes write <text>`, `notes read`, `calc 6 * 7`, `sysinfo`.
+- [ ] Filesystem: `ls`, `write demo.txt <content>`, `cat demo.txt`, `fsck`, `journal`.
+- [ ] Showcase: `demo`, `tour`, `poster`, `poster roadmap`.
+
+Do not label any v0.1 screenshot `verified-qemu` or `verified-hardware` unless
+the behavior was actually observed and recorded in `docs/AI_PROGRESS_LOG.md`.
+
+## 2026-06-02 Captured Evidence
+
+These files were captured during the UI/input QEMU verification pass and are
+recorded in `docs/AI_PROGRESS_LOG.md`.
+
+| File | Status | Evidence |
+| --- | --- | --- |
+| `/private/tmp/chronoos-ui-input-20260602-150049-boot.png` | verified-qemu | Visible framebuffer shell, top bar, prompt, and cursor. |
+| `/private/tmp/chronoos-ui-input-20260602-150049-apps.png` | verified-qemu | `apps` launcher screen. |
+| `/private/tmp/chronoos-ui-input-20260602-150049-notes-attempt.png` | verified-qemu | Notes home screen. |
+| `/private/tmp/chronoos-ui-input-20260602-150049-calc.png` | verified-qemu | `calc 6 - 7` result. |
+| `/private/tmp/chronoos-ui-input-20260602-150049-open-notes-window.png` | verified-qemu | Partial `open notes` window/task path. |
+| `/private/tmp/chronoos-ui-input-20260602-150049-mouse-move.png` | planned | Captured after a mouse move attempt, but cursor movement was not clearly verified. |
+| `/private/tmp/chronoos-ui-input-20260602-150049-drag-attempt.png` | planned | Captured after a drag attempt, but drag/close behavior was not clearly verified. |
+
+The matching serial log is
+`/private/tmp/chronoos-ui-input-20260602-150049.serial.log`. It includes
+`[CHRONO] boot complete`, `cmd: apps`, `cmd: notes`, `cmd: calc 6 - 7`,
+`app: calc launched`, `cmd: open notes`, `wm: open notes`, and
+`mouse: click at 740,410`.
+
+## Manual GIF Capture Steps
+
+Animated GIF capture still needs manual verification. During the 2026-06-02
+UI/input pass, QEMU `screendump` PNG capture worked, but `ffmpeg`, ImageMagick
+`magick`, and `gifsicle` were not available on PATH.
+
+For a future GIF pass:
+
+1. Run the visible single-core BIOS QEMU path with a monitor socket and serial
+   log, as described in `docs/release-checklist.md`.
+2. Capture the visible QEMU window with a trusted local screen recorder or
+   install a GIF/video encoder before the pass.
+3. Record short flows only: boot to prompt, `start`, `help`, `apps`, `notes`,
+   `calc`, `open notes`, and an intentional mouse/window interaction test.
+4. Save files with the naming pattern
+   `chronoos-YYYY-MM-DD-area-flow-verified-qemu.gif` only after the behavior is
+   actually observed.
+5. Add the exact command path, tool used, output file, and limitations to
+   `docs/AI_PROGRESS_LOG.md` before using the GIF in portfolio material.
+
 ## Boot Screen Screenshot Checklist
 
 - [ ] BIOS boot banner visible.
