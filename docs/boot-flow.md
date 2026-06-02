@@ -6,7 +6,8 @@ hardware evidence is recorded.
 
 ## BIOS Path
 
-Status: implemented in code, needs runtime verification.
+Status: implemented in code, verified in QEMU for the normal single-core BIOS
+path; custom, UEFI, and SMP/multi-core paths still need separate verification.
 
 1. `.\scripts\build.ps1` builds the `kernel` crate for `x86_64-unknown-none`.
 2. The `bootloader` 0.11 BIOS builder wraps that kernel into a disk image.
@@ -41,16 +42,19 @@ Expected serial flow should only be treated as verified after an actual run:
 
 ## Custom BIOS Path
 
-Status: partially implemented, needs runtime verification.
+Status: partially implemented, blocked: build dependency missing.
 
 The optional custom path starts from `boot/stage1/stage1.asm`, loads stage 2,
 builds a ChronoOS v1 handoff, enters long mode, and jumps to
 `chrono_custom_entry`. This path keeps the normal BIOS image as the fallback and
 uses the `chronosapien-custom.img` generated image name.
 
+The 2026-06-02 custom BIOS preflight found that `nasm` was not available on
+PATH, so `scripts/build-custom.ps1` and `scripts/run-custom.ps1` were not run.
+
 ## UEFI Path
 
-Status: implemented in code, needs runtime verification.
+Status: implemented in code, blocked: build failure.
 
 The UEFI build creates a GPT/FAT32 image with:
 
@@ -63,6 +67,12 @@ The Rust UEFI loader reads the kernel ELF, allocates load segments, configures
 GOP framebuffer output, reads the ACPI RSDP, exits Boot Services, writes the
 ChronoOS v2 handoff, loads the new page table, and jumps to
 `chrono_custom_entry`.
+
+The 2026-06-02 UEFI build preflight found OVMF at
+`/opt/homebrew/share/qemu/edk2-x86_64-code.fd`, but
+`scripts/build-uefi.ps1` failed while compiling `uefi-loader` because
+`uefi::boot::MemoryMap` no longer exists in the current `uefi` crate API. No
+UEFI QEMU boot was attempted after that build failure.
 
 ## Startup Notes
 

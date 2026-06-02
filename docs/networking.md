@@ -1,6 +1,6 @@
 # ChronoOS Networking
 
-Status: partially implemented, needs runtime verification.
+Status: partially implemented, partially verified in QEMU.
 
 ChronoOS contains code for QEMU's RTL8139 PCI network card. The first network
 milestone is intentionally small:
@@ -11,6 +11,19 @@ milestone is intentionally small:
 - ARP and UDP only
 - polling receive path
 - no DHCP, TCP, DNS, or real-hardware support yet
+
+2026-06-02 QEMU evidence:
+
+- `qemu-system-x86_64` booted single-core with RTL8139 attached.
+- Serial log `/private/tmp/chronoos-net-20260602-162000.serial.log` reached
+  `[CHRONO] boot complete`.
+- Serial log showed `net: rtl8139 found bus=0 device=3 function=0 io=0xc000`
+  and MAC `52:54:00:12:34:56`.
+- ARP and UDP behavior were not verified. `hostfwd=udp::9000-:9000` conflicted
+  with the host UDP listener, and later QEMU monitor key injection submitted
+  `n7et` and `neett` instead of clean `net` commands.
+- Host UDP log `/private/tmp/chronoos-net-20260602-162000.host-udp.log` remained
+  0 bytes.
 
 Run scripts add an RTL8139 device with a fixed MAC:
 
@@ -136,6 +149,10 @@ Start a UDP listener on the host:
 ncat -ul 9000
 ```
 
+On macOS without `ncat`, `/usr/bin/nc -ul 9000` is enough for a guest-to-host
+listener. Do not run the listener on the same host port as a QEMU `hostfwd`
+binding unless you have confirmed the bind order works on that host.
+
 Boot ChronoOS with `.\scripts\run.ps1` or `.\scripts\run-custom.ps1`, then run:
 
 ```text
@@ -149,3 +166,6 @@ MAC has been learned.
 To send from host to guest, use the run-script UDP forward on host port `9000`.
 The shell polls the RTL8139 receive ring once per timer tick, so receive logs
 appear during normal shell idle time.
+
+Keep DHCP, DNS, TCP, sockets, and broad hardware networking as
+roadmap/design-only until ARP/UDP has clean packet evidence.
