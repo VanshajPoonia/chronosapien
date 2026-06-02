@@ -10,9 +10,10 @@ This case study is intentionally conservative. Features are described as
 `roadmap/design-only` instead of claiming runtime success that has not been
 verified.
 
-For the current post-Phase-4 audit, use `docs/CURRENT_STATUS.md`. For demo and
-release packaging, use `docs/demo-script.md`, `docs/screenshots.md`, and
-`docs/release-checklist.md`.
+For the current post-Phase-4 audit, use `docs/CURRENT_STATUS.md`. For v0.1
+release packaging, use `docs/RELEASE_v0.1.md`, `docs/KNOWN_LIMITATIONS.md`,
+and `docs/ROADMAP_AFTER_v0.1.md`. For demos and captures, use
+`docs/demo-script.md`, `docs/screenshots.md`, and `docs/release-checklist.md`.
 
 ## Project Concept
 
@@ -89,8 +90,23 @@ captured. The intended path is:
   museum, poster, userspace, and networking evidence with accurate status tags.
 - Use `docs/release-checklist.md` before publishing a README update, showcase
   post, or demo build.
+- Use `docs/RELEASE_v0.1.md` for the v0.1 RC story, checklist, and known-risk
+  summary.
 - Keep `docs/CURRENT_STATUS.md` as the final word on which claims are verified,
   partial, or roadmap/design-only.
+
+## v0.1 Release Candidate
+
+ChronoOS v0.1 RC is the "Time-Museum Shell" package: a clean portfolio release
+story around the terminal-first product layer. It is ready to explain and show
+as a systems project, but visible screenshots and shell interaction should wait
+for recorded QEMU or hardware evidence.
+
+Use:
+
+- `docs/RELEASE_v0.1.md` for release notes.
+- `docs/KNOWN_LIMITATIONS.md` for explicit boundaries.
+- `docs/ROADMAP_AFTER_v0.1.md` for the first post-release engineering goals.
 
 ## Build-In-Public Story
 

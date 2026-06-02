@@ -4,6 +4,11 @@ Use this script for portfolio walkthroughs, build-in-public clips, and live
 demos. It lists good paths through ChronoOS without implying that every command
 has already been runtime-verified.
 
+For the v0.1 release candidate, treat these as planned demo paths until visible
+QEMU or hardware evidence records the framebuffer shell, keyboard input, and the
+commands being shown. See `docs/RELEASE_v0.1.md` for the release story and
+`docs/KNOWN_LIMITATIONS.md` for boundaries.
+
 Current verification boundary: single-core BIOS serial-only QEMU reached
 `[CHRONO] boot complete`. Visible framebuffer output, shell interaction, apps,
 filesystem workflows, userspace, networking, mouse/windows, UEFI, custom BIOS,
@@ -26,6 +31,9 @@ Goal: show identity, product feel, and a conservative status surface.
 
 1. Start from a visible BIOS QEMU boot and first shell prompt.
 2. Show identity:
+   - `start`
+   - `guide quick`
+   - `help start`
    - `about`
    - `help`
 3. Show era/product flavor:
@@ -35,6 +43,7 @@ Goal: show identity, product feel, and a conservative status surface.
    - `demo`
    - `poster`
 5. Close with status honesty:
+   - `help system`
    - `doctor`
 
 Suggested narration:
@@ -50,8 +59,11 @@ Suggested narration:
 Goal: show ChronoOS as both a systems project and an indie educational product.
 
 1. Identity and shell:
+   - `welcome`
+   - `guide full`
    - `about`
    - `help`
+   - `help apps`
    - `uptime`
    - `mem`
 2. Era switching:
@@ -72,6 +84,7 @@ Goal: show ChronoOS as both a systems project and an indie educational product.
    - `calc 6 * 7`
    - `sysinfo`
 5. Filesystem:
+   - `help fs`
    - `ls`
    - `write demo.txt ChronoOS has a tiny filesystem`
    - `cat demo.txt`
@@ -86,8 +99,12 @@ Goal: show ChronoOS as both a systems project and an indie educational product.
 Goal: show the full current surface without expanding into risky systems.
 
 1. Boot and identity:
+   - `start`
+   - `guide`
+   - `guide full`
    - `about`
    - `help`
+   - `help start`
    - `clock`
    - `uptime`
    - `mem`
@@ -135,10 +152,12 @@ Goal: show the full current surface without expanding into risky systems.
    - `tasks`
    - `kill <id>`
 8. Optional userspace if intentionally verifying risky paths:
+   - `help userspace`
    - `ring3`
    - `syshello`
    - `exec hello.elf`
 9. Optional networking if intentionally verifying ARP/UDP:
+   - `help network`
    - `net`
    - `net arp`
    - `net send`
@@ -150,6 +169,9 @@ Goal: show the full current surface without expanding into risky systems.
 
 - `about`
 - `help`
+- `start`
+- `welcome`
+- `guide quick`
 - `demo`
 - `capsule current`
 - `poster system`
