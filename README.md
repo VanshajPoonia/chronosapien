@@ -59,9 +59,9 @@ doctor
 | Framebuffer shell | implemented in code | verified in QEMU | QEMU screendumps show the top bar, boot text, and prompt. |
 | Guided shell/product layer | implemented in code | partially verified in QEMU | `help` / `help start` were observed; full `start`, `guide`, `demo`, `tour`, `capsule`, `doctor`, and `poster` flows still need checks. |
 | Apps and launcher | implemented in code | partially verified in QEMU | `apps`, notes home, and `calc 6 - 7` were observed; `sysinfo` and notes persistence still need checks. |
-| ChronoFS | implemented in code | needs runtime verification | `ls`, `write`, `cat`, `rm`, `fsck`, `fsck repair`, and `journal` exist. |
+| ChronoFS | implemented in code | needs runtime verification | `fs` inspection, `ls`, `write`, `cat`, `rm`, `fsck`, `fsck repair`, and `journal` exist. |
 | Mouse/windows | partially implemented | partially verified in QEMU | Mouse click packet and partial `open notes` window path observed; movement, drag, close, and `open sysinfo` still need checks. |
-| Userspace/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths exist; not general userland. |
+| Userspace/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths and `userspace` inspection exist; not general userland. |
 | Networking | partially implemented | partially verified in QEMU | RTL8139 init/MAC observed; ARP/UDP behavior still unverified. |
 | SMP/AP startup | partially implemented, risky | partially verified in QEMU | Two-core serial-only smoke reached BSP only; no AP startup evidence. |
 | USB/package manager/compositor/preemption | roadmap/design-only | not verified | Intentionally not part of v0.1. |
@@ -196,12 +196,14 @@ Implemented in code, needs broader or first runtime verification:
 - GDT, IDT, PIC, PIT timer, exceptions, and PC speaker tones.
 - Boot memory map handling, page mapping helpers, and a 1 MiB free-list heap.
 - ATA PIO storage and ChronoFS.
-- ChronoFS `fsck`, conservative `fsck repair`, and a tiny one-record journal.
+- ChronoFS inspection commands, `fsck`, conservative `fsck repair`, and a tiny
+  one-record journal.
 - Built-in apps and product commands.
 - Museum pages, quests, stats, and inventory.
 - Cooperative scheduler and early SMP work.
 - RTL8139 ARP/UDP networking.
-- Ring 3 demo, syscall layer, and static ELF execution.
+- Ring 3 demo, syscall layer, static ELF execution, and read-only userspace
+  status commands.
 
 Partially implemented:
 
@@ -337,10 +339,12 @@ Highlights:
   `help network`, `help userspace`, `help labs`, `help roadmap`, `clear`,
   `about`, `reboot`, `uptime`, `clock`, `mem`, `cores`, `beep <hz>`.
 - Era/product: `start`, `welcome`, `guide`, `era`, `travel <year>`, `demo`, `tour`, `capsule`, `doctor`, `poster`.
-- Filesystem: `ls`, `cat`, `write`, `rm`, `fsck`, `fsck repair`, `journal`.
+- Filesystem: `fs`, `fs status`, `fs info`, `fs check`, `fs journal`, `ls`,
+  `cat`, `write`, `rm`, `fsck`, `fsck repair`, `journal`.
 - Apps: `apps`, `notes`, `calc`, `sysinfo`.
 - Windows/tasks: `open notes`, `open sysinfo`, `tasks`, `kill <id>`.
-- Userspace: `ring3`, `syshello`, `exec <name>`.
+- Userspace: `userspace`, `userspace syscalls`, `userspace elf`,
+  `userspace roadmap`, `ring3`, `syshello`, `exec <name>`.
 - Networking: `net`, `net arp`, `net send`.
 - Museum/quest: `museum ...`, `quest list`, `quest status`, `stats`, `inventory`.
 
@@ -350,9 +354,10 @@ ChronoOS uses a small educational filesystem named ChronoFS on a second QEMU IDE
 disk. The layout is intentionally simple: superblock, file table, allocation
 bitmap, and contiguous file data.
 
-`fsck`, `fsck repair`, and a tiny journal are implemented in code. Repair and
-recovery are conservative and still need runtime verification under controlled
-disk states.
+`fs`, `fs status`, `fs info`, `fs check`, and `fs journal` are read-only
+inspection commands. `fsck`, `fsck repair`, and a tiny journal are implemented
+in code. Repair and recovery are conservative and still need runtime
+verification under controlled disk states.
 
 ## Memory In Plain Language
 
