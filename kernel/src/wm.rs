@@ -34,6 +34,7 @@ impl WindowKind {
 
 #[derive(Clone, Copy)]
 pub struct Window {
+    pub id: u32,
     pub x: usize,
     pub y: usize,
     pub width: usize,
@@ -49,6 +50,7 @@ pub struct Window {
 impl Window {
     const fn empty() -> Self {
         Self {
+            id: 0,
             x: 0,
             y: 0,
             width: 0,
@@ -72,6 +74,7 @@ struct DragState {
 struct WindowManager {
     windows: [Window; MAX_WINDOWS],
     count: usize,
+    next_id: u32,
     drag: Option<DragState>,
 }
 
@@ -80,6 +83,7 @@ impl WindowManager {
         Self {
             windows: [Window::empty(); MAX_WINDOWS],
             count: 0,
+            next_id: 1,
             drag: None,
         }
     }
@@ -91,6 +95,7 @@ impl WindowManager {
 
         let (screen_width, screen_height) = framebuffer::screen_size().unwrap_or((640, 480));
         let index = self.count;
+        let id = self.allocate_id();
         let width = 360.min(screen_width.saturating_sub(32)).max(160);
         let height = match kind {
             WindowKind::Notes => 152,
@@ -106,6 +111,7 @@ impl WindowManager {
         );
 
         self.windows[index] = Window {
+            id,
             x,
             y,
             width,
@@ -121,6 +127,16 @@ impl WindowManager {
 
         crate::serial_println!("[CHRONO] wm: open {}", kind.log_name());
         true
+    }
+
+    fn allocate_id(&mut self) -> u32 {
+        let id = self.next_id;
+        self.next_id = if self.next_id == u32::MAX {
+            1
+        } else {
+            self.next_id + 1
+        };
+        id
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent) {
@@ -217,6 +233,29 @@ impl WindowManager {
         }
 
         crate::serial_println!("[CHRONO] wm: close {}", kind.log_name());
+    }
+
+    fn close_by_id(&mut self, id: u32) -> bool {
+        for index in 0..self.count {
+            if self.windows[index].id == id {
+                self.close(index);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn focus_by_id(&mut self, id: u32) -> bool {
+        for index in 0..self.count {
+            if self.windows[index].id == id {
+                self.bring_to_front(index);
+                self.redraw();
+                return true;
+            }
+        }
+
+        false
     }
 
     fn bring_to_front(&mut self, index: usize) -> usize {
@@ -323,6 +362,44 @@ pub fn close_for_task(task_id: u8) {
             }
         }
     });
+}
+
+pub fn for_each_window(mut visit: impl FnMut(u32, &str, u8, usize, usize, usize, usize, bool)) {
+    with_manager(|manager| {
+        for index in 0..manager.count {
+            let window = manager.windows[index];
+            visit(
+                window.id,
+                window.title,
+                window.task_id,
+                window.x,
+                window.y,
+                window.width,
+                window.height,
+                index + 1 == manager.count,
+            );
+        }
+    });
+}
+
+pub fn window_count() -> usize {
+    with_manager(|manager| manager.count)
+}
+
+pub const fn window_capacity() -> usize {
+    MAX_WINDOWS
+}
+
+pub fn is_dragging() -> bool {
+    with_manager(|manager| manager.drag.is_some())
+}
+
+pub fn focus_by_id(id: u32) -> bool {
+    with_manager(|manager| manager.focus_by_id(id))
+}
+
+pub fn close_by_id(id: u32) -> bool {
+    with_manager(|manager| manager.close_by_id(id))
 }
 
 pub fn redraw_if_open() {
