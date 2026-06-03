@@ -8,6 +8,7 @@ use crate::memory;
 use crate::mouse;
 use crate::museum;
 use crate::net;
+use crate::process;
 use crate::quest;
 use crate::sched;
 use crate::theme::{self, Era};
@@ -203,6 +204,9 @@ fn execute_command(command: &str) {
         "mem" => print_memory(),
         "cores" => print_cores(),
         command if command == "beep" || command.starts_with("beep ") => beep(command),
+        command if command == "userspace" || command.starts_with("userspace ") => {
+            run_userspace_command(command)
+        }
         "ring3" => run_ring3_with_warning(),
         "syshello" => run_syshello_with_warning(),
         "ls" => list_files(),
@@ -212,6 +216,7 @@ fn execute_command(command: &str) {
             exec_file_with_warning(command)
         }
         command if command == "rm" || command.starts_with("rm ") => remove_file(command),
+        command if command == "fs" || command.starts_with("fs ") => run_fs_command(command),
         command if command == "fsck" || command.starts_with("fsck ") => run_fsck(command),
         command if command == "journal" || command.starts_with("journal ") => run_journal(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
@@ -248,7 +253,7 @@ fn print_help() {
     println!("Getting started : start, welcome, guide, demo, tour");
     println!("Eras and themes : era, travel <year>, poster eras, apps theme");
     println!("Apps            : apps, notes, calc, sysinfo, open notes, open sysinfo");
-    println!("Filesystem      : ls, cat, write, rm, fsck, journal");
+    println!("Filesystem      : fs, ls, cat, write, rm, fsck, journal");
     println!("Museum/quests   : museum ..., quest list, quest status, stats, inventory");
     println!("System status   : doctor, sysinfo, mem, cores, uptime, clock, poster system");
     println!("Userspace       : ring3, syshello, exec <name> (needs verification)");
@@ -290,6 +295,10 @@ fn print_help_apps() {
 
 fn print_help_fs() {
     println!("Help: filesystem");
+    println!("- fs                       : ChronoFS status summary");
+    println!("- fs info                  : layout, limits, and journal reservation");
+    println!("- fs check                 : read-only fsck summary");
+    println!("- fs journal               : journal status");
     println!("- ls                       : list ChronoFS files");
     println!("- cat <name>               : print a text file");
     println!("- write <name> <content>   : create or overwrite a file");
@@ -298,7 +307,7 @@ fn print_help_fs() {
     println!("- fsck repair              : conservative metadata repair");
     println!("- journal                  : ChronoFS journal status");
     println!();
-    println!("Warning: fsck repair mutates metadata; use it during intentional checks.");
+    println!("Warning: fsck repair mutates metadata; fs commands are read-only.");
     println!("Next: tour files");
 }
 
@@ -331,13 +340,17 @@ fn print_help_network() {
 
 fn print_help_userspace() {
     println!("Help: userspace");
+    println!("- userspace status   : current user-space boundary");
+    println!("- userspace syscalls : tiny syscall ABI table");
+    println!("- userspace elf      : static ELF support boundary");
+    println!("- userspace roadmap  : future process work");
     println!("- ring3       : opt-in ring 3 teaching demo");
     println!("- syshello    : syscall-style hello demo");
     println!("- exec <name> : run a static ELF64 file from ChronoFS");
     println!();
     println!("Boundary: no general userland, dynamic linker, argv/env, libc, or package model.");
     println!("Status: partially implemented, needs runtime verification.");
-    println!("Next: tour userspace");
+    println!("Next: userspace status");
 }
 
 fn print_help_labs() {
@@ -389,6 +402,76 @@ fn print_unknown_command(command: &str) {
 
 fn print_userspace_warning() {
     println!("Warning: userspace demos are partially implemented and need runtime verification.");
+    println!("For the current boundary, run: userspace status");
+}
+
+fn run_userspace_command(command: &str) {
+    let mode = command.strip_prefix("userspace").unwrap_or("").trim();
+
+    match mode {
+        "" | "status" => print_userspace_status(),
+        "syscalls" => print_userspace_syscalls(),
+        "elf" => print_userspace_elf(),
+        "roadmap" => print_userspace_roadmap(),
+        "help" => print_userspace_namespace_help(),
+        _ => {
+            println!("Usage: userspace [status|syscalls|elf|roadmap|help]");
+            println!("Risky demos: ring3, syshello, exec <name>");
+        }
+    }
+}
+
+fn print_userspace_status() {
+    println!("ChronoOS userspace status");
+    println!("Ring 3 demo: implemented in code, not verified");
+    println!("Syscalls: write/read/exit/uptime, not verified");
+    println!("Static ELF exec: foreground only, not verified");
+    println!(
+        "Active ELF process: {}",
+        if process::is_active() { "yes" } else { "no" }
+    );
+    println!("Scheduler boundary: cooperative kernel/app tasks, not preemptive user processes");
+    println!("Not supported: fork, argv/env, dynamic linker, package manager, libc");
+    println!("Next: userspace syscalls");
+}
+
+fn print_userspace_syscalls() {
+    println!("ChronoOS syscall table");
+    println!("No  Name       Inputs                 Outputs              Status");
+    println!("1   write      fd, buffer, len        bytes or error       code-present");
+    println!("2   read       fd, buffer, len        bytes or error       code-present");
+    println!("3   exit       code                   returns/parks        code-present");
+    println!("4   uptime     none                   PIT ticks            code-present");
+    println!("Verification: implemented in code, not verified in recorded QEMU passes.");
+    println!("ABI: rax=number, rdi/rsi/rdx=args, rax=return.");
+}
+
+fn print_userspace_elf() {
+    println!("Static ELF support");
+    println!("Supported: ELF64 little-endian ET_EXEC for x86_64 with PT_LOAD segments.");
+    println!("Memory: user ELF window starts at 0x0000008000000000.");
+    println!("Stack: a small mapped user stack is created for the foreground program.");
+    println!("Command: exec <name> reads bytes from ChronoFS and enters the ELF entry.");
+    println!("Not supported: dynamic linking, relocations, argv/env, libc, packages.");
+    println!("Status: implemented in code, not verified.");
+}
+
+fn print_userspace_roadmap() {
+    println!("Userspace roadmap");
+    println!("- Verify ring3, syshello, and exec hello.elf one at a time");
+    println!("- Add clearer process status only after runtime evidence");
+    println!("- Future: argv/env, process table, app loading, safer lifecycle");
+    println!("- Roadmap/design-only: dynamic linker, package manager, preemptive scheduler");
+}
+
+fn print_userspace_namespace_help() {
+    println!("Userspace inspection commands");
+    println!("- userspace / userspace status : current boundary and active state");
+    println!("- userspace syscalls           : syscall ABI table");
+    println!("- userspace elf                : static ELF support boundary");
+    println!("- userspace roadmap            : future process work");
+    println!("- ring3, syshello, exec <name> : risky verification demos");
+    println!("The userspace namespace is read-only.");
 }
 
 fn run_ring3_with_warning() {
@@ -1624,6 +1707,100 @@ fn remove_file(command: &str) {
     }
 }
 
+fn run_fs_command(command: &str) {
+    let mode = command.strip_prefix("fs").unwrap_or("").trim();
+
+    match mode {
+        "" | "status" => print_fs_status(),
+        "info" => print_fs_info(),
+        "check" => {
+            let report = fs::check(false);
+            print_fsck_report(&report, false);
+        }
+        "journal" => print_journal_status(fs::journal_status()),
+        "help" => print_fs_namespace_help(),
+        "repair" | "check repair" => {
+            println!("fs repair is read-only by design.");
+            println!("Use `fsck repair` intentionally with a controlled disk image.");
+        }
+        _ => {
+            println!("Usage: fs [status|info|check|journal|help]");
+            println!("Repair is explicit: fsck repair");
+        }
+    }
+}
+
+fn print_fs_status() {
+    let status = fs::status();
+
+    println!("ChronoFS status");
+    println!(
+        "Mode: {}",
+        if status.persistent {
+            "persistent ATA disk"
+        } else {
+            "heap fallback"
+        }
+    );
+    println!(
+        "Disk: {}",
+        if status.disk_available {
+            "available"
+        } else {
+            "unavailable"
+        }
+    );
+    println!(
+        "Files: visible={} cache={} disk={}",
+        status.visible_file_count, status.cache_file_count, status.disk_file_count
+    );
+    println!(
+        "Slots: used={} free={} max={}",
+        status.used_file_slots, status.free_file_slots, status.max_files
+    );
+    println!(
+        "Journal: {} / {}",
+        if status.journal_present {
+            "reserved"
+        } else {
+            "not reserved"
+        },
+        status.journal.state
+    );
+    println!("Next: fs info, fs check, fs journal");
+}
+
+fn print_fs_info() {
+    let status = fs::status();
+
+    println!("ChronoFS info");
+    println!("Format: CHRONFS1 v1, fixed educational layout");
+    println!("Total sectors: {} (512-byte sectors)", status.total_sectors);
+    println!("Data starts at sector: {}", status.data_start_sector);
+    println!("File slots: {}", status.max_files);
+    println!("Max file bytes: {}", status.max_file_bytes);
+    println!(
+        "Journal slot: {}",
+        if status.journal_present {
+            "hidden __chronofs_journal file"
+        } else {
+            "not available"
+        }
+    );
+    println!("No directories, permissions, timestamps, or POSIX compatibility.");
+}
+
+fn print_fs_namespace_help() {
+    println!("ChronoFS inspection commands");
+    println!("- fs / fs status   : mode, disk, file, slot, and journal summary");
+    println!("- fs info          : layout and limits");
+    println!("- fs check         : read-only fsck summary");
+    println!("- fs journal       : one-record journal status");
+    println!("- ls/cat/write/rm  : normal shell file commands");
+    println!("- fsck repair      : explicit mutating repair path");
+    println!("The fs namespace is read-only; it does not repair or rewrite metadata.");
+}
+
 fn exec_file(command: &str) {
     let name = command.strip_prefix("exec").unwrap_or("").trim();
 
@@ -1654,28 +1831,45 @@ fn run_fsck(command: &str) {
 
     if repair {
         println!("Warning: fsck repair mutates ChronoFS metadata.");
-        println!("Use it only during intentional filesystem verification.");
+        println!("Use a controlled disk image and record before/after evidence.");
+        println!("It refuses untrusted geometry, duplicate ownership, and unsafe errors.");
     }
 
     let report = fs::check(repair);
+    print_fsck_report(&report, repair);
+}
 
+fn print_fsck_report(report: &fs::FsckReport, repair: bool) {
     println!("ChronoFS check: {}", report.status_label());
+    println!("Checked: superblock, file table, extents, bitmap, duplicate sectors");
+    println!("Entries: checked={} live={}", report.checked_entries, report.live_entries);
     println!(
-        "Entries: checked={} live={} invalid={}",
-        report.checked_entries, report.live_entries, report.invalid_entries
+        "Suspicious: warnings={} errors={} invalid={} bitmap={} duplicates={}",
+        report.warnings,
+        report.errors,
+        report.invalid_entries,
+        report.bitmap_mismatches,
+        report.duplicate_sectors
     );
-    println!(
-        "Bitmap mismatches: {} | duplicate sectors: {} | repaired: {}",
-        report.bitmap_mismatches, report.duplicate_sectors, report.repaired_items
-    );
-    println!("Warnings: {} | errors: {}", report.warnings, report.errors);
+    println!("Repaired: {} item(s)", report.repaired_items);
+
+    if !report.disk_available {
+        println!("Not repaired: persistent disk unavailable; heap fallback is not fsck-able.");
+    } else if !repair {
+        println!("Not repaired: read-only check. Use fsck repair only intentionally.");
+    } else if report.errors > 0 {
+        println!("Not repaired: unsafe errors require manual investigation.");
+    } else if report.repaired_items == 0 {
+        println!("Not repaired: no safe repair was needed.");
+    }
 
     if report.findings.is_empty() {
-        println!("No problems found.");
+        println!("Clean: no problems found by current checks.");
         return;
     }
 
-    for finding in report.findings {
+    println!("Findings:");
+    for finding in &report.findings {
         println!("- {}", finding);
     }
 }
@@ -1687,7 +1881,10 @@ fn run_journal(command: &str) {
         return;
     }
 
-    let status = fs::journal_status();
+    print_journal_status(fs::journal_status());
+}
+
+fn print_journal_status(status: fs::JournalStatus) {
     println!("ChronoFS journal: {}", status.state);
     println!("Available: {}", if status.available { "yes" } else { "no" });
     println!("Clean: {}", if status.clean { "yes" } else { "no" });
@@ -1696,6 +1893,7 @@ fn run_journal(command: &str) {
         println!("Target: {}", status.target);
     }
     println!("{}", status.message);
+    println!("Note: clean means no pending journal record, not full runtime proof.");
 }
 
 fn open_window(command: &str) {
