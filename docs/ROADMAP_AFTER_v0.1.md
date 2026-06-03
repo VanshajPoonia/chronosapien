@@ -36,7 +36,8 @@ to verify and harden what already exists before adding large new systems.
 
 ## 4. Networking Expansion
 
-- Verify `net`, `net arp`, and `net send` with a recorded QEMU RTL8139 setup.
+- Verify `net status`, `net config`, `net arp`, `net log`, and `net send` with
+  a recorded QEMU RTL8139 setup.
 - Add packet-observation notes before adding protocols.
 - Keep current scope to static IPv4 ARP/UDP until it is runtime-proven.
 - DHCP, DNS, TCP, sockets, and broader hardware support remain future work.

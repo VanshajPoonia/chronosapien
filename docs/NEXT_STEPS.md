@@ -24,7 +24,9 @@
 - Graphics shell: partially implemented; framebuffer console, mouse cursor, and small draggable windows exist, but there is no full desktop/compositor.
 - Process model: partially implemented; ring 3, syscalls, static ELF execution, and read-only `userspace` inspection exist, but there is no dynamic linker, argv/env, or general multiprocess model.
 - Scheduler: partially implemented; cooperative task scheduling exists, while preemption and production-grade scheduling are roadmap/design-only.
-- Networking: partially implemented; ARP/UDP over RTL8139 exists in code, while DHCP, DNS, TCP, sockets, and broad hardware support are roadmap/design-only.
+- Networking: partially implemented; ARP/UDP over RTL8139 plus read-only
+  observability commands exist in code, while DHCP, DNS, TCP, sockets, packet
+  capture, and broad hardware support are roadmap/design-only.
 - Real hardware/USB: partially implemented through the UEFI boot path; USB HID, USB storage, USB serial, and broad hardware support are roadmap/design-only.
 
 ## Phase 2 Verification Order
@@ -34,7 +36,7 @@
 3. Storage smoke pass: `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, controlled `fsck repair`, and `journal`.
 4. Product/app pass: `demo`, `tour`, `capsule`, `doctor`, `poster`, `travel <year>`, `apps`, `notes`, `calc`, and `sysinfo`.
 5. Window/input pass: PS/2 mouse, cursor, `open notes`, `open sysinfo`, drag, focus, close, `tasks`, and `kill`.
-6. Risky systems last: custom BIOS path, UEFI path, SMP/AP startup, `userspace status`, ring 3, syscalls, static ELF execution, and ARP/UDP networking.
+6. Risky systems last: custom BIOS path, UEFI path, SMP/AP startup, `userspace status`, ring 3, syscalls, static ELF execution, and ARP/UDP networking via `net status`, `net config`, `net arp`, `net log`, and `net send`.
 
 ## Product / Indie Features
 

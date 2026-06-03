@@ -34,7 +34,8 @@ hardware behavior.
 ## Networking Limitations
 
 - Current networking is static IPv4 ARP/UDP over RTL8139 teaching code.
-- `net`, `net arp`, and `net send` exist in code but need runtime verification.
+- `net status`, `net config`, `net arp`, `net udp`, `net send`, `net log`,
+  `net demo`, and `net roadmap` exist in code but need runtime verification.
 - DHCP, DNS, TCP, sockets, and a full network stack are roadmap/design-only.
 - Networking commands should not be presented as broad hardware or internet
   connectivity.

@@ -46,8 +46,8 @@ matching code and real verification evidence.
 ### Track A: Networking
 
 - Current boundary: static IPv4 ARP/UDP over RTL8139 is partially implemented.
-- Next safe work: verify `net`, `net arp`, and `net send` in QEMU before adding
-  protocols.
+- Next safe work: verify `net status`, `net config`, `net arp`, `net log`, and
+  `net send` in QEMU before adding protocols.
 - Later ideas: DHCP, DNS, TCP, a small socket-like API, and better packet
   observability.
 - Do not overbuild yet: no TCP/DHCP/DNS work before ARP/UDP is runtime-proven.
