@@ -152,10 +152,21 @@ Portfolio/demo docs:
 - `docs/ROADMAP_AFTER_v0.1.md`: first post-release engineering goals.
 - `docs/CURRENT_STATUS.md`: current source-truth audit.
 - `docs/VERIFICATION_MATRIX.md`: final verification evidence matrix.
+- `docs/portfolio-kit.md`: reusable pitches, portfolio framing, and demo story.
+- `docs/build-in-public-posts.md`: X/Twitter, LinkedIn, demo, and progress post ideas.
+- `docs/resume-bullets.md`: resume bullets and short project summaries.
 - `docs/demo-script.md`: 2-minute, 5-minute, and 10-minute demo paths.
 - `docs/screenshots.md`: screenshot and GIF capture checklist.
 - `docs/release-checklist.md`: release gate checklist.
 - `docs/showcase.md`: portfolio case-study narrative.
+
+### Build-In-Public And Portfolio Kit
+
+ChronoOS now includes a compact content kit for explaining the project without
+overclaiming it. Use `docs/portfolio-kit.md` for pitches and case-study framing,
+`docs/build-in-public-posts.md` for public update ideas, and
+`docs/resume-bullets.md` for career-facing summaries. Each should be read beside
+`docs/VERIFICATION_MATRIX.md` before publishing a runtime claim.
 
 ## Status Labels
 
