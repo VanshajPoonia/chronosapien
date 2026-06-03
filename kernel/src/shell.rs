@@ -220,6 +220,9 @@ fn execute_command(command: &str) {
         command if command == "fsck" || command.starts_with("fsck ") => run_fsck(command),
         command if command == "journal" || command.starts_with("journal ") => run_journal(command),
         command if command == "era" || command.starts_with("era ") => run_era_command(command),
+        command if command == "windows" || command.starts_with("windows ") => {
+            run_windows_command(command)
+        }
         command if command == "open" || command.starts_with("open ") => open_window(command),
         "tasks" => list_tasks(),
         command if command == "kill" || command.starts_with("kill ") => kill_task(command),
@@ -253,11 +256,12 @@ fn print_help() {
     println!("Getting started : start, welcome, guide, demo, tour");
     println!("Eras and themes : era, travel <year>, poster eras, apps theme");
     println!("Apps            : apps, notes, calc, sysinfo, open notes, open sysinfo");
+    println!("Windows/tasks   : windows, open notes, open sysinfo, tasks, kill <id>");
     println!("Filesystem      : fs, ls, cat, write, rm, fsck, journal");
     println!("Museum/quests   : museum ..., quest list, quest status, stats, inventory");
     println!("System status   : doctor, sysinfo, mem, cores, uptime, clock, poster system");
     println!("Userspace       : ring3, syshello, exec <name> (needs verification)");
-    println!("Networking      : net, net arp, net send (static IPv4 ARP/UDP only)");
+    println!("Networking      : net status, net config, net arp, net udp, net log");
     println!("Debug/lab       : beep <hz>, reboot, fsck repair, risky demos");
     println!("Roadmap/future  : capsule next, poster roadmap, tour future");
     println!();
@@ -279,15 +283,18 @@ fn print_help_start() {
 
 fn print_help_apps() {
     println!("Help: apps");
-    println!("- apps            : text launcher and app map");
-    println!("- apps notes      : notes app route");
-    println!("- apps calc       : calculator route");
-    println!("- apps sysinfo    : system info route");
+    println!("- apps / apps list       : static app registry");
+    println!("- apps info <name>       : app manifest details");
+    println!("- apps launch <name>     : run safe launch command if available");
+    println!("- apps verified          : app entries with partial QEMU evidence");
+    println!("- apps roadmap           : future app ideas");
+    println!("- apps notes|calc|sysinfo: legacy direct routes");
     println!("- notes           : notes home screen");
     println!("- calc 6 * 7      : integer calculator");
     println!("- sysinfo         : compact status view");
     println!("- open notes      : small notes window path");
     println!("- open sysinfo    : small sysinfo window path");
+    println!("- windows         : list/status/focus/close small windows");
     println!();
     println!("Note: apps are shell-first; open uses partially implemented windows.");
     println!("Next: apps");
@@ -328,14 +335,19 @@ fn print_help_system() {
 
 fn print_help_network() {
     println!("Help: networking");
-    println!("- net                         : RTL8139/static IPv4 status");
-    println!("- net arp                     : send ARP request for QEMU gateway");
+    println!("- net / net status            : RTL8139/static IPv4 status");
+    println!("- net config                  : static IP, gateway, and limits");
+    println!("- net arp                     : explain and send gateway ARP");
+    println!("- net udp                     : explain UDP send boundary");
     println!("- net send                    : send default UDP payload");
     println!("- net send <ip> <port> <text> : send custom UDP payload");
+    println!("- net log                     : counters and last event/error");
+    println!("- net demo                    : read-only walkthrough");
+    println!("- net roadmap                 : future protocol boundaries");
     println!();
-    println!("Boundary: static IPv4 ARP/UDP only; no TCP, DHCP, or DNS.");
+    println!("Boundary: static IPv4 ARP/UDP only; no TCP, DHCP, DNS, or sockets.");
     println!("Status: partially implemented, needs runtime verification.");
-    println!("Next: net");
+    println!("Next: net status");
 }
 
 fn print_help_userspace() {
@@ -1191,7 +1203,12 @@ fn run_apps_launcher(command: &str) {
     let app = command.strip_prefix("apps").unwrap_or("").trim();
 
     match app {
-        "" => print_apps_launcher(),
+        "" | "list" => print_apps_launcher(),
+        "verified" => print_apps_verified(),
+        "roadmap" => print_apps_roadmap(),
+        "help" => print_apps_usage(),
+        app if app.starts_with("info ") => apps_info(app),
+        app if app.starts_with("launch ") => apps_launch(app),
         "notes" => launch_existing_app("notes"),
         "calc" => launch_existing_app("calc"),
         "sysinfo" => launch_existing_app("sysinfo"),
@@ -1205,7 +1222,8 @@ fn run_apps_launcher(command: &str) {
 }
 
 fn print_apps_usage() {
-    println!("Usage: apps [notes|calc|sysinfo|files|clock|museum|theme|tasks]");
+    println!("Usage: apps [list|info <name>|launch <name>|verified|roadmap]");
+    println!("Aliases: apps notes|calc|sysinfo|files|clock|museum|theme|tasks");
 }
 
 fn apps_style_for_era(name: &str) -> (&'static str, &'static str, &'static str) {
@@ -1230,27 +1248,97 @@ fn print_apps_launcher() {
     println!("Era lens: {}", profile.name);
     println!("Prompt style: {}", profile.screen_prompt);
     println!();
-    println!("Launch with: apps <name>");
+    println!("Launch with: apps launch <name> or apps <name>");
+    println!("Inspect with: apps info <name>");
     println!();
-    print_app_entry(marker, "notes", "Write and review simple notes", "apps notes");
-    print_app_entry(marker, "calc", "Open the built-in calculator", "apps calc");
-    print_app_entry(marker, "sysinfo", "Show system information", "apps sysinfo");
-    print_app_entry(marker, "files", "Browse file commands and ChronoFS tools", "apps files");
-    print_app_entry(marker, "clock", "Show current clock information", "apps clock");
-    print_app_entry(marker, "museum", "Explore educational OS exhibits", "apps museum");
-    print_app_entry(marker, "theme", "Preview era/theme switching commands", "apps theme");
-    print_app_entry(marker, "tasks", "Inspect task and scheduler commands", "apps tasks");
+
+    for app in apps::registry() {
+        print_app_entry(marker, app);
+    }
+
     println!();
-    println!("This is a text launcher, not a desktop. It reuses existing commands where safe.");
+    println!("This is a static registry, not a package manager or dynamic loader.");
+    println!("Legacy alias: apps clock");
 }
 
-fn print_app_entry(marker: &str, name: &str, summary: &str, command: &str) {
-    println!("{} {:8} - {} ({})", marker, name, summary, command);
+fn print_app_entry(marker: &str, app: &apps::AppManifest) {
+    println!(
+        "{} {:9} - {} [{}]",
+        marker,
+        app.name,
+        app.description,
+        app.status.label()
+    );
 }
 
 fn launch_existing_app(command: &str) {
     println!("Launching existing command: {}", command);
     execute_command(command);
+}
+
+fn apps_info(command: &str) {
+    let name = command.strip_prefix("info").unwrap_or("").trim();
+    if name.is_empty() {
+        println!("Usage: apps info <name>");
+        return;
+    }
+
+    let Some(app) = apps::find_manifest(name) else {
+        println!("No app manifest named '{}'.", name);
+        println!("Try: apps list");
+        return;
+    };
+
+    println!("App: {}", app.name);
+    println!("Category: {}", app.category);
+    println!("Description: {}", app.description);
+    println!("Launch command: {}", if app.launch_command.is_empty() { "(none)" } else { app.launch_command });
+    println!("Status: {}", app.status.label());
+    println!("Verification: {}", app.verification.label());
+    println!("Risk: {}", app.risk.label());
+}
+
+fn apps_launch(command: &str) {
+    let name = command.strip_prefix("launch").unwrap_or("").trim();
+    if name.is_empty() {
+        println!("Usage: apps launch <name>");
+        return;
+    }
+
+    let Some(app) = apps::find_manifest(name) else {
+        println!("No app manifest named '{}'.", name);
+        println!("Try: apps list");
+        return;
+    };
+
+    if app.status == apps::AppStatus::Roadmap || app.launch_command.is_empty() {
+        println!("{} is {}.", app.name, app.status.label());
+        println!("No runtime launch command is available yet.");
+        return;
+    }
+
+    println!("Launching from registry: {}", app.launch_command);
+    execute_command(app.launch_command);
+}
+
+fn print_apps_verified() {
+    println!("Apps with recorded QEMU evidence");
+    for app in apps::registry() {
+        if app.verification == apps::VerificationStatus::PartiallyVerifiedQemu {
+            println!("- {}: {}", app.name, app.verification.label());
+        }
+    }
+    println!("Note: partial QEMU evidence is not full app verification.");
+}
+
+fn print_apps_roadmap() {
+    println!("Roadmap/design-only app ideas");
+    for app in apps::registry() {
+        if app.status == apps::AppStatus::Roadmap {
+            println!("- {}: {}", app.name, app.description);
+        }
+    }
+    println!("No package manager, dynamic linker, or dynamic app loading exists.");
 }
 
 fn print_files_app_card() {
@@ -1900,26 +1988,116 @@ fn open_window(command: &str) {
     let name = command.strip_prefix("open").unwrap_or("").trim();
 
     match name {
-        "notes" => {
-            // Spawn the task first so we can hand its ID to the window.
-            let task_id = sched::spawn("notes", apps::notes_task_entry).unwrap_or(0xFF);
-            if !wm::open_notes(task_id) {
-                // Window failed to open — roll back the task slot.
-                sched::kill(task_id);
-                println!("too many windows open");
-            }
-        }
-        "sysinfo" => {
-            let task_id = sched::spawn("sysinfo", apps::sysinfo_task_entry).unwrap_or(0xFF);
-            if !wm::open_sysinfo(task_id) {
-                sched::kill(task_id);
-                println!("too many windows open");
-            }
+        "notes" => open_windowed_app("notes", apps::notes_task_entry, wm::open_notes),
+        "sysinfo" => open_windowed_app("sysinfo", apps::sysinfo_task_entry, wm::open_sysinfo),
+        "paint" => {
+            println!("open paint: paint is roadmap/design-only.");
+            println!("Try: apps info paint");
         }
         _ => {
             println!("Usage: open notes|sysinfo");
+            println!("Window mode is limited; shell apps remain available.");
         }
     }
+}
+
+fn open_windowed_app(name: &str, entry: fn() -> !, open: fn(u8) -> bool) {
+    let Some(task_id) = sched::spawn(name, entry) else {
+        println!("open {}: no free task slot", name);
+        println!("Try: tasks");
+        return;
+    };
+
+    if !open(task_id) {
+        sched::kill(task_id);
+        println!("open {}: too many windows open", name);
+        println!("Try: windows list or windows close <id>");
+    }
+}
+
+fn run_windows_command(command: &str) {
+    let mode = command.strip_prefix("windows").unwrap_or("").trim();
+
+    match mode {
+        "" | "list" => list_windows(),
+        "status" => print_windows_status(),
+        "help" => print_windows_usage(),
+        mode if mode.starts_with("focus ") => focus_window(mode),
+        mode if mode.starts_with("close ") => close_window(mode),
+        _ => print_windows_usage(),
+    }
+}
+
+fn list_windows() {
+    if wm::window_count() == 0 {
+        println!("No windows open.");
+        println!("Try: open notes or open sysinfo");
+        return;
+    }
+
+    println!("ID  TITLE    TASK POS       SIZE      FOCUS");
+    wm::for_each_window(|id, title, task_id, x, y, width, height, focused| {
+        let marker = if focused { "*" } else { "" };
+        println!(
+            "{:<3} {:<8} {:<4} {:>3},{:<3} {:>3}x{:<3} {}",
+            id, title, task_id, x, y, width, height, marker
+        );
+    });
+}
+
+fn print_windows_status() {
+    println!("ChronoOS windows");
+    println!("Open: {}/{}", wm::window_count(), wm::window_capacity());
+    println!("Dragging: {}", if wm::is_dragging() { "yes" } else { "no" });
+    println!("Supported window apps: notes, sysinfo");
+    println!("Shell fallbacks: notes, sysinfo, apps launch notes, apps launch sysinfo");
+    println!("Status: partially implemented, needs runtime verification.");
+    println!("Boundary: fixed-capacity teaching windows, not a compositor.");
+}
+
+fn focus_window(command: &str) {
+    let id = match parse_window_id(command.strip_prefix("focus").unwrap_or("").trim()) {
+        Some(id) => id,
+        None => {
+            println!("Usage: windows focus <id>");
+            return;
+        }
+    };
+
+    if wm::focus_by_id(id) {
+        println!("Focused window {}", id);
+    } else {
+        println!("windows: no window {}", id);
+    }
+}
+
+fn close_window(command: &str) {
+    let id = match parse_window_id(command.strip_prefix("close").unwrap_or("").trim()) {
+        Some(id) => id,
+        None => {
+            println!("Usage: windows close <id>");
+            return;
+        }
+    };
+
+    if wm::close_by_id(id) {
+        println!("Closed window {}", id);
+    } else {
+        println!("windows: no window {}", id);
+    }
+}
+
+fn parse_window_id(text: &str) -> Option<u32> {
+    if text.is_empty() || text.contains(' ') {
+        return None;
+    }
+
+    text.parse().ok()
+}
+
+fn print_windows_usage() {
+    println!("Usage: windows [list|status|focus <id>|close <id>|help]");
+    println!("Open windows with: open notes | open sysinfo");
 }
 
 fn list_tasks() {
