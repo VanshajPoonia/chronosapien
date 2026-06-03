@@ -125,7 +125,7 @@ design, and what has actual verification evidence.
 | Heap allocator | implemented in code | needs runtime verification | Free-list allocator with splitting, reinsertion, and coalescing exists; reuse/corruption behavior needs testing. |
 | Cooperative scheduler | implemented in code | needs runtime verification | Fixed task slots and spawn/kill/yield paths exist. |
 | SMP/AP startup | partially implemented | partially verified in QEMU, high-risk, needs runtime verification | Two-core serial smoke reached BSP startup only; no AP-online or two-core-ready evidence. |
-| Ring 3/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths exist; no general userland, dynamic linker, argv/env, libc, or package model. |
+| Ring 3/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths and read-only `userspace` inspection exist; no general userland, dynamic linker, argv/env, libc, or package model. |
 | Networking | partially implemented | partially verified in QEMU | RTL8139 discovery and MAC were observed; ARP/UDP commands were not verified because QEMU input garbled `net` commands and host UDP saw 0 bytes. No DHCP, DNS, TCP, or socket stack. |
 | Long-term systems 96-110 | roadmap/design-only | needs runtime verification | See the long-term section below; current repo should not imply these are built. |
 
@@ -322,7 +322,8 @@ design, and what has actual verification evidence.
 ## Ring 3, Syscalls, And ELF
 
 - Status: partially implemented, risky.
-- Ring 3 demo, tiny syscall ABI, and static ELF execution paths exist.
+- Ring 3 demo, tiny syscall ABI, static ELF execution paths, and read-only
+  `userspace status|syscalls|elf|roadmap` inspection commands exist.
 - This is not general userland: no dynamic linker, package model, argv/env,
   libc, permissions model, or robust multi-process lifecycle is implemented.
 
