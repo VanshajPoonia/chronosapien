@@ -13,10 +13,11 @@ command is handled by `kernel/src/shell.rs`; window mode reads the same file.
 - `help`: list categorized command groups.
 - `help start`: explain `start`, `welcome`, `guide`, `demo`, and `tour`.
 - `help apps`: explain the app launcher and window paths.
-- `help fs`: explain `ls`, `cat`, `write`, `rm`, `fsck`, and `journal`.
+- `help fs`: explain `fs`, `ls`, `cat`, `write`, `rm`, `fsck`, and `journal`.
 - `help system`: explain conservative status surfaces.
 - `help network`: explain static IPv4 ARP/UDP networking boundaries.
-- `help userspace`: explain `ring3`, `syshello`, and `exec <name>`.
+- `help userspace`: explain the `userspace` inspection namespace plus
+  `ring3`, `syshello`, and `exec <name>`.
 - `help labs`: explain risky/intentional verification commands.
 - `help roadmap`: explain roadmap/design-only systems.
 - `help files`, `help net`, `help status`, `help verify`, and `help future`: beginner-friendly topic aliases.
@@ -53,8 +54,9 @@ The shell intentionally distinguishes overlapping product concepts:
   `verify` command.
 - `apps` is the text launcher; `open` is the partially implemented small-window
   path.
-- `ls`, `cat`, `write`, `rm`, `fsck`, and `journal` are the actual filesystem
-  commands; `apps files` points users toward them.
+- `fs` is the read-only inspection namespace; `ls`, `cat`, `write`, `rm`,
+  `fsck`, and `journal` are the direct filesystem commands; `apps files` points
+  users toward them.
 - `museum` teaches concepts; `quest` shows progress and next goals.
 
 ## Era And Product Commands
@@ -89,6 +91,13 @@ The shell intentionally distinguishes overlapping product concepts:
 
 ## Filesystem
 
+- `fs` / `fs status`: print a read-only ChronoFS mode, disk, file-slot, and
+  journal summary.
+- `fs info`: print fixed layout limits and journal reservation details.
+- `fs check`: run a read-only fsck summary without repairing metadata.
+- `fs journal`: print ChronoFS journal status.
+- `fs help`: print the ChronoFS inspection command map.
+- `fs repair` / `fs check repair`: refuse to mutate and point to `fsck repair`.
 - `ls`: list files.
 - `cat <name>`: print a file as UTF-8 text.
 - `write <name> <content>`: create or overwrite a file.
@@ -99,6 +108,9 @@ The shell intentionally distinguishes overlapping product concepts:
   verification.
 - `journal`: print ChronoFS journal status.
 
+The `fs` namespace is intentionally inspection-only. `fsck repair` remains the
+only filesystem repair command.
+
 ## Windows And Tasks
 
 - `open notes`: open the notes window and spawn its cooperative task.
@@ -108,12 +120,21 @@ The shell intentionally distinguishes overlapping product concepts:
 
 ## Userspace And Process Demos
 
+- `userspace` / `userspace status`: summarize the current Ring 3, syscall,
+  static ELF, scheduler, and active-ELF boundary.
+- `userspace syscalls`: print the tiny syscall ABI table.
+- `userspace elf`: explain the supported static ELF64 subset.
+- `userspace roadmap`: list future process-model work as roadmap/design-only.
+- `userspace help`: print the userspace inspection command map.
 - `ring3`: enter the opt-in ring 3 privilege demo. Prints a warning because the
   path is partially implemented and needs runtime verification.
 - `syshello`: enter ring 3 and print through `sys_write`. Prints the same
   userspace warning.
 - `exec <name>`: load and run a static ELF64 file from ChronoFS. Prints the same
   userspace warning.
+
+The `userspace` namespace is read-only. It does not create processes, run user
+programs, or change scheduler behavior.
 
 ## Networking
 
