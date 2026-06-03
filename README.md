@@ -30,6 +30,7 @@ Release docs:
   code-present, and roadmap-only systems.
 - `docs/demo-script.md`: demo paths.
 - `docs/screenshots.md`: screenshot/GIF capture checklist.
+- `docs/apps.md`: static app registry and app boundary notes.
 
 For evidence-level detail, use `docs/VERIFICATION_MATRIX.md`. It supersedes the
 compact tables below when you need the exact proof level, command/log evidence,
@@ -58,7 +59,7 @@ doctor
 | Serial logging | implemented in code | verified in QEMU | Boot-time serial logging was observed; shell-command serial output is only partially observed. |
 | Framebuffer shell | implemented in code | verified in QEMU | QEMU screendumps show the top bar, boot text, and prompt. |
 | Guided shell/product layer | implemented in code | partially verified in QEMU | `help` / `help start` were observed; full `start`, `guide`, `demo`, `tour`, `capsule`, `doctor`, and `poster` flows still need checks. |
-| Apps and launcher | implemented in code | partially verified in QEMU | `apps`, notes home, and `calc 6 - 7` were observed; `sysinfo` and notes persistence still need checks. |
+| Apps and launcher | implemented in code | partially verified in QEMU | Static app registry exists; `apps`, notes home, and `calc 6 - 7` were observed; registry subcommands, `sysinfo`, and notes persistence still need checks. |
 | ChronoFS | implemented in code | needs runtime verification | `fs` inspection, `ls`, `write`, `cat`, `rm`, `fsck`, `fsck repair`, and `journal` exist. |
 | Mouse/windows | partially implemented | partially verified in QEMU | Mouse click packet and partial `open notes` window path observed; movement, drag, close, and `open sysinfo` still need checks. |
 | Userspace/syscalls/ELF | partially implemented | needs runtime verification | Teaching paths and `userspace` inspection exist; not general userland. |
@@ -198,7 +199,7 @@ Implemented in code, needs broader or first runtime verification:
 - ATA PIO storage and ChronoFS.
 - ChronoFS inspection commands, `fsck`, conservative `fsck repair`, and a tiny
   one-record journal.
-- Built-in apps and product commands.
+- Built-in apps, static app registry, and product commands.
 - Museum pages, quests, stats, and inventory.
 - Cooperative scheduler and early SMP work.
 - RTL8139 ARP/UDP networking.
@@ -341,11 +342,14 @@ Highlights:
 - Era/product: `start`, `welcome`, `guide`, `era`, `travel <year>`, `demo`, `tour`, `capsule`, `doctor`, `poster`.
 - Filesystem: `fs`, `fs status`, `fs info`, `fs check`, `fs journal`, `ls`,
   `cat`, `write`, `rm`, `fsck`, `fsck repair`, `journal`.
-- Apps: `apps`, `notes`, `calc`, `sysinfo`.
-- Windows/tasks: `open notes`, `open sysinfo`, `tasks`, `kill <id>`.
+- Apps: `apps`, `apps list`, `apps info <name>`, `apps launch <name>`,
+  `apps verified`, `apps roadmap`, `notes`, `calc`, `sysinfo`.
+- Windows/tasks: `windows`, `windows status`, `windows focus <id>`,
+  `windows close <id>`, `open notes`, `open sysinfo`, `tasks`, `kill <id>`.
 - Userspace: `userspace`, `userspace syscalls`, `userspace elf`,
   `userspace roadmap`, `ring3`, `syshello`, `exec <name>`.
-- Networking: `net`, `net arp`, `net send`.
+- Networking: `net status`, `net config`, `net arp`, `net udp`, `net send`,
+  `net log`, `net demo`, `net roadmap`.
 - Museum/quest: `museum ...`, `quest list`, `quest status`, `stats`, `inventory`.
 
 ## Storage In Plain Language
