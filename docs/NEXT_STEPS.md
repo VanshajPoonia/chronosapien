@@ -4,10 +4,20 @@
 
 1. Preserve build sanity: `cargo check -p kernel --offline --locked` and the host-target `chronosapien` check now pass with no warnings.
 2. Preserve runtime tooling: QEMU 11.0.1 and PowerShell 7.6.2 are installed and available on PATH.
-3. Use `docs/CURRENT_STATUS.md` as the post-Phase-4 source of truth; keep `docs/status-audit.md` as the Phase 2 risk/audit snapshot.
-4. Continue staged manual verification from `docs/manual-testing.md`, starting with hardened ChronoFS inspection, then the user-space inspection/demo path.
-5. Record any successful QEMU or hardware evidence in `docs/AI_PROGRESS_LOG.md` before upgrading status labels from "needs runtime verification".
-6. Keep source/docs aligned as small systems are verified; do not start large new feature tracks yet.
+3. Use `docs/ROADMAP_v0.2.md` as the v0.2 product roadmap and milestone planner.
+4. Use `docs/CURRENT_STATUS.md` as the current source-truth handoff; keep `docs/status-audit.md` as the Phase 2 risk/audit snapshot.
+5. Start v0.2 with Reliability And Verification: visible single-core BIOS QEMU proof for framebuffer shell, keyboard input, demo-safe commands, status/safe-mode surfaces, and screenshots.
+6. Use ChronoFS Hardening as the secondary v0.2 track: controlled QEMU checks for `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, `journal`, and controlled repair only on throwaway images.
+7. Record any successful QEMU or hardware evidence in `docs/AI_PROGRESS_LOG.md` before upgrading status labels from "needs runtime verification".
+8. Keep source/docs aligned as small systems are verified; do not start large new feature tracks yet.
+
+## v0.2 Planning Note
+
+`docs/ROADMAP_v0.2.md` recommends Reliability And Verification as the primary
+v0.2 track and ChronoFS Hardening as the secondary track. User-space, learning
+experience, and UI/app shell polish remain useful follow-up tracks, but
+networking expansion, USB, dynamic linking, package management, full
+compositing, and preemptive scheduling are intentionally not v0.2 primary work.
 
 ## Repository Workflow
 

@@ -29,6 +29,46 @@ Each future entry should use this format:
 - New risks introduced:
 - Next recommended step:
 
+### 2026-06-03 — Add v0.2 product roadmap and milestone planner
+- Prompt/task: Create a v0.2 product roadmap and milestone planner that organizes the next release around reliability, learning value, and one serious technical track without adding features.
+- Files changed: `docs/ROADMAP_v0.2.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a v0.2 roadmap with five possible goals: Reliability And Verification, ChronoFS Hardening, User-Space Foundation, Product Learning Experience, and UI/App Shell Polish; documented why each matters, user/product value, technical value, risk level, dependencies, suggested Codex prompt order, acceptance criteria, verification method, and what not to build yet; recommended Reliability And Verification as the primary v0.2 track and ChronoFS Hardening as the secondary track; and updated the priority queue to point to the new planner.
+- What was intentionally avoided: No kernel features, source behavior changes, QEMU run, hardware test, runtime verification upgrade, networking expansion, TCP, DHCP, DNS, USB, dynamic linker, package manager, full compositor, preemptive scheduler, or broad risky-system scheduling.
+- Runtime verified: no. This was a documentation/planning-only pass.
+- If not verified, what still needs verification: The v0.2 plan still needs execution evidence for visible BIOS QEMU shell behavior, keyboard input, demo-safe commands, screenshots/GIF status, ChronoFS workflows, controlled repair, userspace, app/window behavior, networking, SMP/AP, UEFI, custom BIOS, and hardware according to `docs/VERIFICATION_MATRIX.md`.
+- New risks introduced: Low; the main risk is treating roadmap text as proof. The roadmap explicitly routes verification before expansion.
+- Next recommended step: Run the v0.2 primary-track prompt: "Implement the v0.2 primary track: Reliability and Verification, starting with visible single-core BIOS QEMU proof for framebuffer shell, keyboard input, safe/demo commands, screenshots, and release-checklist updates. Do not add features."
+
+### 2026-06-03 — Add build-in-public and portfolio content kit
+- Prompt/task: Create reusable public-facing ChronoOS portfolio, build-in-public, and resume content without adding kernel features or overstating verification.
+- Files changed: `docs/portfolio-kit.md`, `docs/build-in-public-posts.md`, `docs/resume-bullets.md`, `README.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added reusable 1-sentence, 2-sentence, and case-study pitches; added problem, build, technical highlight, product highlight, learning outcome, limitation, screenshot, and demo-flow framing; added X/Twitter, LinkedIn, demo caption, deep-dive, learning, and honest limitation post ideas; added concise, technical, and product-minded resume bullets plus short project summaries; and linked the kit from README.
+- What was intentionally avoided: No kernel features, runtime behavior changes, QEMU run, hardware test, screenshot fabrication, broad verification claim, TCP, DHCP, DNS, USB, dynamic linker, package manager, full compositor, or preemptive scheduler work.
+- Runtime verified: no. This was a documentation/content packaging pass only.
+- If not verified, what still needs verification: The content kit should be reviewed against the latest `docs/VERIFICATION_MATRIX.md` before publishing any runtime claim; ChronoFS workflows, userspace/syscalls/ELF, ARP/UDP behavior, broad app/window behavior, UEFI, custom BIOS, SMP/AP, GIFs, and hardware remain limited to their recorded evidence levels.
+- New risks introduced: Low; the main risk is stale public copy if verification status changes and the kit is not refreshed.
+- Next recommended step: Capture or refresh verified screenshots/logs, then choose one short build-in-public post and one portfolio-card summary from the kit.
+
+### 2026-06-03 — Add reliability and safe mode
+- Prompt/task: Add a shell-level reliability/safe-mode concept that separates demo-safe, verification, and experimental paths without changing boot architecture or blocking commands.
+- Files changed: `kernel/src/shell.rs`, `kernel/src/net.rs`, `docs/safe-mode.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/CURRENT_STATUS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added in-memory `safe`, `demo`, and `experimental` modes; added `mode`, `mode status`, `mode safe`, `mode demo`, `mode experimental`, `safe`, `safe status`, `safe on`, and `safe off`; threaded mode-aware warnings into userspace demos, ChronoFS repair, ARP/UDP send paths, and reboot; and documented safe/demo/experimental command categories.
+- What was intentionally avoided: No boot rewrite, config persistence, command blocking, security sandbox, crash lab, SMP controls, hardware behavior, QEMU run, hardware test, or runtime verification upgrade.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: All `mode` and `safe` commands, warning text in each mode, risky command warnings, framebuffer fit, screenshots, and controlled QEMU shell behavior.
+- New risks introduced: Low; this is warning-only shell state. It can clarify demo risk but does not enforce policy.
+- Next recommended step: Run a visible single-core BIOS QEMU walkthrough for `mode status`, `mode safe`, `safe off`, `mode experimental`, and representative risky warnings.
+
+### 2026-06-03 — Add structured learning paths
+- Prompt/task: Add shell-first ChronoOS learning paths that connect museum, quest, tour, guide, status, apps, filesystem, userspace, networking, scheduler, eras, and roadmap surfaces without adding risky kernel features.
+- Files changed: `kernel/src/shell.rs`, `docs/learning-paths.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/CURRENT_STATUS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `learn`, `learn boot`, `learn memory`, `learn interrupts`, `learn filesystem`, `learn gui`, `learn userspace`, `learn networking`, `learn scheduler`, `learn eras`, `learn roadmap`, and `learn next`; added beginner-friendly aliases such as `learn fs`, `learn apps`, `learn net`, `learn smp`, and `learn future`; updated help/discoverability; and documented the learning-path curriculum.
+- What was intentionally avoided: No risky kernel features, subsystem rewrites, runtime probes, QEMU run, hardware test, runtime verification upgrade, or large duplicated museum/tour text.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: All `learn` screens, aliases, help output, guide routing, framebuffer fit, screenshots, and the linked subsystem commands during a controlled QEMU shell walkthrough.
+- New risks introduced: Low; the learning paths are read-only shell text and route to existing commands.
+- Next recommended step: Run a visible single-core BIOS QEMU walkthrough for `learn`, `learn boot`, `learn filesystem`, `learn gui`, `learn networking`, `learn roadmap`, and `learn next`.
+
 ### 2026-06-03 — Add networking observability before protocol expansion
 - Prompt/task: Improve observability around the existing RTL8139/static IPv4/ARP/UDP stack before adding DHCP, DNS, TCP, sockets, or broader networking features.
 - Files changed: `kernel/src/net.rs`, `kernel/src/shell.rs`, `README.md`, `docs/networking.md`, `docs/shell-commands.md`, `docs/manual-testing.md`, `docs/demo-script.md`, `docs/VERIFICATION_MATRIX.md`, `docs/CURRENT_STATUS.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/ROADMAP_AFTER_v0.1.md`, `docs/roadmap.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
