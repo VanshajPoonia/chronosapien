@@ -41,6 +41,20 @@ Current limits:
 - there are 64 file slots
 - there are no directories, permissions, timestamps, or POSIX compatibility
 
+## Inspection Commands
+
+ChronoOS now has a read-only `fs` inspection namespace:
+
+- `fs` / `fs status`: print mode, disk availability, file counts, slot usage,
+  and journal state.
+- `fs info`: print the fixed layout, limits, and journal reservation.
+- `fs check`: run a read-only `fsck` summary.
+- `fs journal`: print the same journal status as `journal`.
+- `fs help`: show the ChronoFS inspection command map.
+
+The `fs` namespace does not repair or rewrite metadata. Mutating repair remains
+explicit through `fsck repair`.
+
 ## fsck And Repair
 
 `fsck` is implemented in code as a conservative checker. It inspects the
@@ -51,6 +65,11 @@ duplicate sector claims.
 clear stale metadata in unused file table slots. It refuses ambiguous damage,
 duplicate-sector ownership, untrusted superblocks, and cases where guessing
 would risk user data.
+
+The shell output groups what was checked, what looks suspicious, what was
+repaired, and what was intentionally not repaired. `fsck repair` prints a
+mutation warning and should be used only with controlled disk images and
+before/after evidence.
 
 Status: implemented in code, needs runtime verification.
 
@@ -67,6 +86,14 @@ reported through serial logs.
 
 Status: implemented in code, needs runtime verification. Crash recovery has not
 been proven in QEMU or on hardware in this repo.
+
+A clean journal means there is no pending one-record journal operation. It does
+not prove full filesystem runtime verification.
+
+## Hardening Notes
+
+See `docs/chronofs-hardening.md` for the current design, risks, inspection
+commands, repair boundaries, and recommended verification path.
 
 ## QEMU Smoke Test Target
 
