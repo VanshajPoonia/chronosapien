@@ -147,8 +147,12 @@ Goal: show the full current surface without expanding into risky systems.
    - `fsck`
    - `journal`
 7. Optional windows if visual input is being verified:
+   - `windows status`
    - `open notes`
+   - `windows list`
    - `open sysinfo`
+   - `windows focus <id>`
+   - `windows close <id>`
    - `tasks`
    - `kill <id>`
 8. Optional userspace if intentionally verifying risky paths:
@@ -158,8 +162,12 @@ Goal: show the full current surface without expanding into risky systems.
    - `exec hello.elf`
 9. Optional networking if intentionally verifying ARP/UDP:
    - `help network`
-   - `net`
+   - `net status`
+   - `net config`
+   - `net log`
+   - `net demo`
    - `net arp`
+   - `net udp`
    - `net send`
 10. Wrap:
    - `poster roadmap`
@@ -211,6 +219,11 @@ Goal: show the full current surface without expanding into risky systems.
 ## Commands To Show Apps
 
 - `apps`
+- `apps list`
+- `apps info notes`
+- `apps launch calc`
+- `apps verified`
+- `apps roadmap`
 - `apps notes`
 - `notes write <text>`
 - `notes read`
@@ -262,21 +275,27 @@ path.
 Networking is currently static IPv4 ARP/UDP only. There is no DHCP, DNS, TCP, or
 socket stack.
 
-- `net`
+- `net status`
+- `net config`
+- `net log`
+- `net demo`
 - `net arp`
+- `net udp`
 - `net send`
 - `net send <ip> <port> <text>`
+- `net roadmap`
 
-Only run `net arp` and `net send` during intentional ARP/UDP verification with a
-known QEMU network setup.
+Use `net status`, `net config`, `net log`, `net demo`, `net udp`, and
+`net roadmap` for read-only explanation. Only run `net arp` and `net send`
+during intentional ARP/UDP verification with a known QEMU network setup.
 
 ## Commands And Paths To Avoid Unless Testing Risk
 
 - `ring3`, `syshello`, and `exec <name>` unless verifying userspace paths.
 - `net arp`, `net send`, and custom UDP sends unless verifying ARP/UDP.
 - `fsck repair` unless using a controlled disk image.
-- `open notes`, `open sysinfo`, mouse drag, and close behavior unless verifying
-  the visual window/input layer.
+- `open notes`, `open sysinfo`, `windows focus <id>`, `windows close <id>`,
+  mouse drag, and close behavior unless verifying the visual window/input layer.
 - Multi-core QEMU / SMP testing unless investigating AP startup.
 - Custom BIOS and UEFI boot paths unless testing those boot flows explicitly.
 - Crash/fault demos unless a future crash lab is implemented and documented.
