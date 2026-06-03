@@ -29,6 +29,26 @@ Each future entry should use this format:
 - New risks introduced:
 - Next recommended step:
 
+### 2026-06-03 — Clarify user-space and process foundation
+- Prompt/task: Strengthen the user-space/process foundation by clarifying Ring 3, syscalls, static ELF execution, and future process-model boundaries without implementing a full process model.
+- Files changed: `kernel/src/shell.rs`, `README.md`, `docs/userspace-model.md`, `docs/ring3.md`, `docs/syscalls.md`, `docs/elf.md`, `docs/manual-testing.md`, `docs/VERIFICATION_MATRIX.md`, `docs/shell-commands.md`, `docs/CURRENT_STATUS.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a read-only `userspace` namespace with `userspace status`, `userspace syscalls`, `userspace elf`, `userspace roadmap`, and `userspace help`; kept `ring3`, `syshello`, and `exec <name>` behavior unchanged while making their warning point to the current boundary; added `docs/userspace-model.md`; and updated syscall/ELF/Ring 3 docs with the current teaching-path limits.
+- What was intentionally avoided: No full process model, preemptive scheduler, dynamic linker, package manager, argv/env, fork/exec semantics, file descriptor table, scheduler rewrite, QEMU run, hardware test, or runtime verification upgrade.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: `userspace status`, `userspace syscalls`, `userspace elf`, `userspace roadmap`, `ring3`, `syshello`, `exec hello.elf`, invalid ELF handling, syscall return/error behavior, foreground ELF return-to-shell behavior, and scheduler interactions during user-space tests.
+- New risks introduced: Low; the new `userspace` commands are read-only status/documentation surfaces and do not alter process, syscall, ELF, or scheduler behavior.
+- Next recommended step: Run a controlled single-core BIOS QEMU user-space verification pass after installing `hello.elf` with `scripts/build-user.ps1`.
+
+### 2026-06-03 — Harden ChronoFS inspection and diagnostics
+- Prompt/task: Add conservative ChronoFS hardening focused on inspection commands, clearer fsck/journal reporting, safer repair wording, and updated verification docs.
+- Files changed: `kernel/src/fs.rs`, `kernel/src/shell.rs`, `README.md`, `docs/chronofs-hardening.md`, `docs/storage.md`, `docs/manual-testing.md`, `docs/shell-commands.md`, `docs/VERIFICATION_MATRIX.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a read-only `fs` namespace with `fs status`, `fs info`, `fs check`, `fs journal`, and `fs help`; added an `FsStatus` source summary; improved fsck output so checked, suspicious, repaired, and not-repaired information is clearer; strengthened `fsck repair` warning text; clarified journal status wording; and documented current ChronoFS design, risks, repair boundaries, and verification path.
+- What was intentionally avoided: No disk-format change, directories, permissions, large-file support, complex journaling, POSIX behavior, filesystem rewrite, QEMU run, hardware test, or runtime verification upgrade.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: ChronoFS shell workflows (`fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, `fsck repair`, `journal`), persistence after reboot, controlled repair behavior, journal recovery states, heap fallback behavior, and cache/disk behavior after disk errors.
+- New risks introduced: Low; the new `fs` commands are read-only. The new status output exposes more internal counts but does not mutate filesystem metadata.
+- Next recommended step: Run a controlled single-core BIOS QEMU filesystem verification pass with a disposable data disk and record serial/screenshot evidence before upgrading ChronoFS rows.
+
 ### 2026-06-02 — Add final verification evidence matrix
 - Prompt/task: Create one clear source of truth showing what actually works, what was tested, what is code-present only, and what remains unverified.
 - Files changed: `docs/VERIFICATION_MATRIX.md`, `README.md`, `docs/AI_PROGRESS_LOG.md`.
