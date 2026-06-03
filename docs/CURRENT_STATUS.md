@@ -103,7 +103,7 @@ design, and what has actual verification evidence.
 | Serial logging | implemented in code | verified in QEMU, needs broader runtime verification | Boot-time serial logging reached boot complete in single-core QEMU; shell-command serial output is only partially observed. |
 | Shell command surface | implemented in code | verified in QEMU, needs broader runtime verification | `help`, `help start`, and `about` were observed through visible QEMU; most commands still need staged checks. |
 | Command and UX polish | implemented in code | verified in QEMU, needs broader runtime verification | Grouped `help` and `help start` were observed; other topic pages, unknown hints, and risky warnings still need checks. |
-| Apps | implemented in code | partially verified in QEMU, needs broader runtime verification | `apps`, `notes`, and `calc 6 - 7` were observed; `sysinfo`, notes read/write, and persistence still need checks. |
+| Apps | implemented in code | partially verified in QEMU, needs broader runtime verification | Static app registry and `apps` launcher exist; `apps`, `notes`, and `calc 6 - 7` were observed; registry subcommands, `sysinfo`, notes read/write, and persistence still need checks. |
 | Guided onboarding | implemented in code | needs runtime verification | `start`, `welcome`, and `guide` topic pages route first-run users toward existing safe commands. |
 | Museum/quest/product layer | implemented in code | needs runtime verification | `demo`, `tour`, `capsule`, `doctor`, `poster`, `travel`, museum pages, quests, stats, and inventory exist. |
 | Theme studio | roadmap/design-only | needs runtime verification | Current `apps theme` is a text preview, not a studio. |
@@ -111,7 +111,7 @@ design, and what has actual verification evidence.
 | Tiny paint | roadmap/design-only | needs runtime verification | No paint app is implemented. |
 | File explorer | roadmap/design-only | needs runtime verification | Current `apps files` points to shell file commands; no windowed explorer exists. |
 | Boot chime selector | roadmap/design-only | needs runtime verification | Era tones exist; no user-facing selector exists. |
-| Network demo mode | roadmap/design-only | needs runtime verification | Current networking surface is `net`, `net arp`, and `net send`. |
+| Network demo mode | roadmap/design-only | needs runtime verification | Current networking surface is static IPv4 ARP/UDP with read-only observability commands such as `net status`, `net config`, `net log`, `net demo`, and `net roadmap`; no verified packet-demo app exists. |
 | User-space showcase | partially implemented | needs runtime verification | `ring3`, `syshello`, `exec`, and museum/tour pages exist; no polished showcase app exists. |
 | Visual boot timeline | partially implemented | needs runtime verification | `capsule` and `poster boot` are text surfaces; no visual timeline is implemented. |
 | Era-specific help/about | partially implemented | needs runtime verification | `about`, `era`, `travel`, product text, and category help exist; deeper era-specific help remains future polish. |
@@ -120,7 +120,7 @@ design, and what has actual verification evidence.
 | fsck and journal | implemented in code | needs runtime verification | Conservative `fsck`, `fsck repair`, one-record journal, and mount recovery exist; crash states need controlled tests. |
 | Keyboard | implemented in code | verified in QEMU, needs broader runtime verification | QEMU monitor `sendkey` submitted shell commands; manual typing, Backspace, Shift, and polling fallback still need checks. |
 | Mouse | implemented in code | partially verified in QEMU, needs broader runtime verification | Serial log showed PS/2 initialization and one click at `740,410`; cursor movement, drag, and close are not verified. |
-| Window manager | partially implemented | partially verified in QEMU, needs broader runtime verification | `open notes` spawned a task and logged `wm: open notes`; `open sysinfo`, drag, close, and focus behavior are not verified. |
+| Window manager | partially implemented | partially verified in QEMU, needs broader runtime verification | `open notes` spawned a task and logged `wm: open notes`; shell lifecycle commands exist; `open sysinfo`, `windows` commands, drag, close, and focus behavior are not verified. |
 | Screenshot/GIF evidence | partially implemented | partially verified in QEMU, needs manual verification | QEMU `screendump` PNG capture works; animated GIF capture still needs manual tooling/evidence. |
 | Heap allocator | implemented in code | needs runtime verification | Free-list allocator with splitting, reinsertion, and coalescing exists; reuse/corruption behavior needs testing. |
 | Cooperative scheduler | implemented in code | needs runtime verification | Fixed task slots and spawn/kill/yield paths exist. |
@@ -171,8 +171,9 @@ design, and what has actual verification evidence.
   `fsck`, `fsck repair`, and `journal`.
 - Userspace commands are implemented in code: `ring3`, `syshello`, and
   `exec <name>`.
-- Networking commands are implemented in code: `net`, `net arp`, and
-  `net send [ip port text]`.
+- Networking commands are implemented in code: `net status`, `net config`,
+  `net arp`, `net udp`, `net send [ip port text]`, `net log`, `net demo`,
+  `net roadmap`, and `net help`.
 - Museum and quest commands are implemented in code; see
   `docs/shell-commands.md` for the command reference.
 - Runtime evidence is still narrow but growing: `help`, `help start`, `about`,
@@ -293,11 +294,11 @@ design, and what has actual verification evidence.
 ## Window Manager
 
 - Status: partially implemented.
-- Fixed-capacity windows, focus, drag, close, and notes/sysinfo window paths
-  exist.
+- Fixed-capacity windows, focus, drag, close, notes/sysinfo window paths, and
+  shell lifecycle commands exist.
 - `open notes` was partially verified in QEMU: it spawned a notes task, logged
   `wm: open notes`, and produced a visible window boundary. `open sysinfo`,
-  dragging, closing, and focus behavior are not verified.
+  `windows` commands, dragging, closing, and focus behavior are not verified.
 - Treat this as a teaching window layer, not a compositor.
 
 ## Heap Allocator
