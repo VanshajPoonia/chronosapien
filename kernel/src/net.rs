@@ -60,6 +60,13 @@ struct NetState {
     gateway_mac: Option<[u8; 6]>,
     tx_packets: u64,
     rx_packets: u64,
+    arp_requests_sent: u64,
+    arp_replies_received: u64,
+    udp_packets_sent: u64,
+    udp_packets_received: u64,
+    malformed_rx_packets: u64,
+    last_event: NetEvent,
+    last_error: NetError,
 }
 
 impl NetState {
@@ -70,6 +77,59 @@ impl NetState {
             gateway_mac: None,
             tx_packets: 0,
             rx_packets: 0,
+            arp_requests_sent: 0,
+            arp_replies_received: 0,
+            udp_packets_sent: 0,
+            udp_packets_received: 0,
+            malformed_rx_packets: 0,
+            last_event: NetEvent::None,
+            last_error: NetError::None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum NetEvent {
+    None,
+    NicInitialized,
+    ArpRequestSent,
+    ArpReplyReceived,
+    UdpPacketSent,
+    UdpPacketReceived,
+}
+
+impl NetEvent {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::NicInitialized => "rtl8139 initialized",
+            Self::ArpRequestSent => "ARP request sent",
+            Self::ArpReplyReceived => "ARP reply received",
+            Self::UdpPacketSent => "UDP packet sent",
+            Self::UdpPacketReceived => "UDP packet received",
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum NetError {
+    None,
+    Rtl8139NotFound,
+    InvalidBar,
+    NicUnavailable,
+    GatewayUnresolved,
+    MalformedRxPacket,
+}
+
+impl NetError {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Rtl8139NotFound => "rtl8139 not found",
+            Self::InvalidBar => "rtl8139 BAR0 is not an I/O BAR",
+            Self::NicUnavailable => "rtl8139 not initialized",
+            Self::GatewayUnresolved => "gateway MAC unresolved",
+            Self::MalformedRxPacket => "malformed RX packet",
         }
     }
 }
@@ -85,6 +145,13 @@ pub struct Snapshot {
     pub gateway_mac: Option<[u8; 6]>,
     pub tx_packets: u64,
     pub rx_packets: u64,
+    pub arp_requests_sent: u64,
+    pub arp_replies_received: u64,
+    pub udp_packets_sent: u64,
+    pub udp_packets_received: u64,
+    pub malformed_rx_packets: u64,
+    pub last_event: NetEvent,
+    pub last_error: NetError,
 }
 
 #[repr(align(4))]
@@ -116,12 +183,14 @@ static TX_BUFFERS: GlobalTx = GlobalTx(UnsafeCell::new(TxBuffers {
 pub fn init() {
     let Some(device) = pci::find_device(RTL8139_VENDOR_ID, RTL8139_DEVICE_ID) else {
         crate::serial_println!("[CHRONO] net: rtl8139 not found");
+        record_error(NetError::Rtl8139NotFound);
         return;
     };
 
     let bar0 = device.bar0();
     if bar0 & 1 == 0 {
         crate::serial_println!("[CHRONO] net: rtl8139 BAR0 is not an I/O BAR");
+        record_error(NetError::InvalidBar);
         return;
     }
 
@@ -172,6 +241,13 @@ pub fn init() {
         state.gateway_mac = None;
         state.tx_packets = 0;
         state.rx_packets = 0;
+        state.arp_requests_sent = 0;
+        state.arp_replies_received = 0;
+        state.udp_packets_sent = 0;
+        state.udp_packets_received = 0;
+        state.malformed_rx_packets = 0;
+        state.last_event = NetEvent::NicInitialized;
+        state.last_error = NetError::None;
     });
 
     crate::serial_println!(
@@ -204,14 +280,25 @@ pub fn run(command: &str) -> bool {
     }
 
     let rest = command.strip_prefix("net").unwrap_or("").trim_start();
-    if rest.is_empty() {
+    if rest.is_empty() || rest == "status" {
         print_status();
         return true;
     }
 
+    if rest == "config" {
+        print_config();
+        return true;
+    }
+
     if rest == "arp" {
+        print_arp_intro();
         print_network_warning();
         send_gateway_arp();
+        return true;
+    }
+
+    if rest == "udp" {
+        print_udp_intro();
         return true;
     }
 
@@ -227,13 +314,33 @@ pub fn run(command: &str) -> bool {
         return true;
     }
 
-    println!("Usage: net | net arp | net send [ip port text]");
+    if rest == "log" {
+        print_log();
+        return true;
+    }
+
+    if rest == "demo" {
+        print_demo();
+        return true;
+    }
+
+    if rest == "roadmap" {
+        print_roadmap();
+        return true;
+    }
+
+    if rest == "help" {
+        print_usage();
+        return true;
+    }
+
+    print_usage();
     true
 }
 
 fn print_network_warning() {
     println!("Warning: networking is ARP/UDP-only and needs runtime verification.");
-    println!("No TCP, DHCP, or DNS is implemented.");
+    println!("No TCP, DHCP, DNS, or sockets are implemented.");
 }
 
 fn run_send_command(args: &str) {
@@ -262,6 +369,15 @@ fn run_send_command(args: &str) {
 fn print_status() {
     let snapshot = snapshot();
 
+    println!("ChronoOS network status");
+    println!(
+        "NIC: {}",
+        if snapshot.initialized {
+            "rtl8139 initialized"
+        } else {
+            "not initialized"
+        }
+    );
     match snapshot.mac {
         Some(mac) => println!(
             "MAC: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
@@ -291,6 +407,119 @@ fn print_status() {
     );
     println!("TX:  {} packets", snapshot.tx_packets);
     println!("RX:  {} packets", snapshot.rx_packets);
+    println!(
+        "ARP: {} requests sent, {} replies received",
+        snapshot.arp_requests_sent, snapshot.arp_replies_received
+    );
+    println!(
+        "UDP: {} sent, {} received",
+        snapshot.udp_packets_sent, snapshot.udp_packets_received
+    );
+    println!("Malformed RX: {}", snapshot.malformed_rx_packets);
+    println!("Last event: {}", snapshot.last_event.label());
+    println!("Last error: {}", snapshot.last_error.label());
+    println!("Status: partially implemented; ARP/UDP still need runtime verification.");
+}
+
+fn print_config() {
+    println!("ChronoOS network config");
+    println!(
+        "Local IP: {}.{}.{}.{} (static)",
+        LOCAL_IP[0], LOCAL_IP[1], LOCAL_IP[2], LOCAL_IP[3]
+    );
+    println!(
+        "Netmask:  {}.{}.{}.{}",
+        NETMASK[0], NETMASK[1], NETMASK[2], NETMASK[3]
+    );
+    println!(
+        "Gateway:  {}.{}.{}.{} (QEMU user-mode gateway)",
+        GATEWAY_IP[0], GATEWAY_IP[1], GATEWAY_IP[2], GATEWAY_IP[3]
+    );
+    println!("Default UDP: port {} payload \"hello from ChronoOS\"", DEFAULT_UDP_PORT);
+    println!("Boundary: static IPv4, ARP, and UDP only.");
+    println!("No DHCP, DNS, TCP, sockets, or packet capture.");
+}
+
+fn print_arp_intro() {
+    let snapshot = snapshot();
+    println!("ARP maps the gateway IP to an Ethernet MAC address.");
+    println!(
+        "Gateway {}.{}.{}.{} is {}.",
+        snapshot.gateway_ip[0],
+        snapshot.gateway_ip[1],
+        snapshot.gateway_ip[2],
+        snapshot.gateway_ip[3],
+        if snapshot.gateway_mac.is_some() {
+            "learned"
+        } else {
+            "unresolved"
+        }
+    );
+}
+
+fn print_udp_intro() {
+    let snapshot = snapshot();
+    println!("UDP is the tiny transport ChronoOS can build for this milestone.");
+    println!("Current send command: net send [ip port text]");
+    println!(
+        "Default target: {}.{}.{}.{}:{}",
+        snapshot.gateway_ip[0],
+        snapshot.gateway_ip[1],
+        snapshot.gateway_ip[2],
+        snapshot.gateway_ip[3],
+        DEFAULT_UDP_PORT
+    );
+    println!(
+        "Gateway MAC: {}",
+        if snapshot.gateway_mac.is_some() {
+            "learned; UDP send can attempt transmit"
+        } else {
+            "unresolved; run net arp first"
+        }
+    );
+    println!("UDP checksum is zero for this educational IPv4-only stack.");
+    println!("No TCP, sockets, DNS names, or DHCP leases are implemented.");
+}
+
+fn print_log() {
+    let snapshot = snapshot();
+    println!("ChronoOS network log");
+    println!("Last event: {}", snapshot.last_event.label());
+    println!("Last error: {}", snapshot.last_error.label());
+    println!("TX/RX: {}/{} Ethernet packets", snapshot.tx_packets, snapshot.rx_packets);
+    println!(
+        "ARP: {} requests, {} replies",
+        snapshot.arp_requests_sent, snapshot.arp_replies_received
+    );
+    println!(
+        "UDP: {} sent, {} received",
+        snapshot.udp_packets_sent, snapshot.udp_packets_received
+    );
+    println!("Malformed RX packets: {}", snapshot.malformed_rx_packets);
+    println!("Note: this is a compact counter view, not packet capture.");
+}
+
+fn print_demo() {
+    println!("ChronoOS network demo guide");
+    println!("1. net status  - inspect NIC, MAC, counters, and last event");
+    println!("2. net config  - see static IP and QEMU gateway settings");
+    println!("3. net arp     - intentionally ask for the gateway MAC");
+    println!("4. net udp     - learn the UDP send boundary");
+    println!("5. net send    - only during an ARP/UDP verification run");
+    println!("This guide is read-only; it does not transmit packets.");
+}
+
+fn print_roadmap() {
+    println!("ChronoOS networking roadmap");
+    println!("Current: RTL8139, static IPv4, ARP, UDP, polling RX.");
+    println!("Next safe step: QEMU evidence for ARP reply and UDP send/receive.");
+    println!("Future/design-only: DHCP, DNS, TCP, sockets, broader hardware drivers.");
+}
+
+fn print_usage() {
+    println!("Usage: net [status|config|arp|udp|send|log|demo|roadmap|help]");
+    println!("Send:  net send [ip port text]");
+    println!("Boundary: static IPv4 ARP/UDP only.");
 }
 
 fn snapshot() -> Snapshot {
@@ -306,6 +535,13 @@ fn snapshot() -> Snapshot {
             gateway_mac: state.gateway_mac,
             tx_packets: state.tx_packets,
             rx_packets: state.rx_packets,
+            arp_requests_sent: state.arp_requests_sent,
+            arp_replies_received: state.arp_replies_received,
+            udp_packets_sent: state.udp_packets_sent,
+            udp_packets_received: state.udp_packets_received,
+            malformed_rx_packets: state.malformed_rx_packets,
+            last_event: state.last_event,
+            last_error: state.last_error,
         }
     })
 }
@@ -314,6 +550,7 @@ fn send_gateway_arp() {
     let mut frame = [0u8; 64];
     let Some((mac, _)) = local_link_info() else {
         println!("net: rtl8139 not initialized");
+        record_error(NetError::NicUnavailable);
         return;
     };
 
@@ -326,7 +563,9 @@ fn send_gateway_arp() {
         [0; 6],
         GATEWAY_IP,
     );
-    transmit(&frame[..ETHERNET_HEADER_LEN + ARP_PACKET_LEN]);
+    if transmit(&frame[..ETHERNET_HEADER_LEN + ARP_PACKET_LEN]) {
+        record_arp_request_sent();
+    }
     crate::serial_println!(
         "[CHRONO] net: ARP request for {}.{}.{}.{}",
         GATEWAY_IP[0],
@@ -339,11 +578,13 @@ fn send_gateway_arp() {
 fn send_udp(dest_ip: [u8; 4], dest_port: u16, payload: &[u8]) {
     let Some((mac, gateway_mac)) = local_link_info() else {
         println!("net: rtl8139 not initialized");
+        record_error(NetError::NicUnavailable);
         return;
     };
 
     let Some(dest_mac) = gateway_mac else {
         println!("net: gateway unresolved; sending ARP first");
+        record_error(NetError::GatewayUnresolved);
         send_gateway_arp();
         return;
     };
@@ -371,7 +612,9 @@ fn send_udp(dest_ip: [u8; 4], dest_port: u16, payload: &[u8]) {
     frame[ETHERNET_HEADER_LEN + IPV4_HEADER_LEN + UDP_HEADER_LEN..frame_len]
         .copy_from_slice(&payload[..payload_len]);
 
-    transmit(&frame[..frame_len]);
+    if transmit(&frame[..frame_len]) {
+        record_udp_packet_sent();
+    }
     crate::serial_println!(
         "[CHRONO] net: UDP tx {} bytes to {}.{}.{}.{}:{}",
         payload_len,
@@ -390,11 +633,12 @@ fn local_link_info() -> Option<([u8; 6], Option<[u8; 6]>)> {
     })
 }
 
-fn transmit(frame: &[u8]) {
+fn transmit(frame: &[u8]) -> bool {
     x86_64::instructions::interrupts::without_interrupts(|| unsafe {
         let state = &mut *NET.0.get();
         let Some(mut nic) = state.nic else {
-            return;
+            state.last_error = NetError::NicUnavailable;
+            return false;
         };
 
         let index = nic.tx_index % TX_BUFFER_COUNT;
@@ -409,7 +653,8 @@ fn transmit(frame: &[u8]) {
         nic.tx_index = (nic.tx_index + 1) % TX_BUFFER_COUNT;
         state.nic = Some(nic);
         state.tx_packets = state.tx_packets.saturating_add(1);
-    });
+        true
+    })
 }
 
 unsafe fn poll_rtl8139(state: &mut NetState, nic: &mut Rtl8139) {
@@ -425,6 +670,7 @@ unsafe fn poll_rtl8139(state: &mut NetState, nic: &mut Rtl8139) {
         let length = read_le_u16(rx_buffer, nic.rx_offset + 2) as usize;
 
         if status & RX_OK == 0 || length < 4 || length > 1600 {
+            record_malformed_rx(state);
             nic.rx_offset = 0;
             io::outw(nic.io_base + RX_BUF_PTR, 0);
             break;
@@ -437,6 +683,8 @@ unsafe fn poll_rtl8139(state: &mut NetState, nic: &mut Rtl8139) {
         if packet_end <= RX_BUFFER_LEN {
             handle_rx_packet(state, &rx_buffer[packet_start..packet_end]);
             state.rx_packets = state.rx_packets.saturating_add(1);
+        } else {
+            record_malformed_rx(state);
         }
 
         nic.rx_offset = (nic.rx_offset + length + 4 + 3) & !3;
@@ -455,19 +703,21 @@ unsafe fn poll_rtl8139(state: &mut NetState, nic: &mut Rtl8139) {
 
 fn handle_rx_packet(state: &mut NetState, packet: &[u8]) {
     if packet.len() < ETHERNET_HEADER_LEN {
+        record_malformed_rx(state);
         return;
     }
 
     let ether_type = be_u16(packet, 12);
     match ether_type {
         ETHER_TYPE_ARP => handle_arp(state, packet),
-        ETHER_TYPE_IPV4 => handle_ipv4(packet),
+        ETHER_TYPE_IPV4 => handle_ipv4(state, packet),
         _ => {}
     }
 }
 
 fn handle_arp(state: &mut NetState, packet: &[u8]) {
     if packet.len() < ETHERNET_HEADER_LEN + ARP_PACKET_LEN {
+        record_malformed_rx(state);
         return;
     }
 
@@ -479,6 +729,9 @@ fn handle_arp(state: &mut NetState, packet: &[u8]) {
 
     if opcode == 2 && sender_ip == GATEWAY_IP && target_ip == LOCAL_IP {
         state.gateway_mac = Some(sender_mac);
+        state.arp_replies_received = state.arp_replies_received.saturating_add(1);
+        state.last_event = NetEvent::ArpReplyReceived;
+        state.last_error = NetError::None;
         crate::serial_println!(
             "[CHRONO] net: ARP reply from {}.{}.{}.{}",
             sender_ip[0],
@@ -489,19 +742,24 @@ fn handle_arp(state: &mut NetState, packet: &[u8]) {
     }
 }
 
-fn handle_ipv4(packet: &[u8]) {
+fn handle_ipv4(state: &mut NetState, packet: &[u8]) {
     if packet.len() < ETHERNET_HEADER_LEN + IPV4_HEADER_LEN {
+        record_malformed_rx(state);
         return;
     }
 
     let ip = &packet[ETHERNET_HEADER_LEN..];
     let header_len = ((ip[0] & 0x0F) as usize) * 4;
     if header_len < IPV4_HEADER_LEN || ip.len() < header_len + UDP_HEADER_LEN {
+        record_malformed_rx(state);
         return;
     }
 
     let total_len = be_u16(ip, 2) as usize;
     if total_len > ip.len() || ip[9] != IP_PROTOCOL_UDP {
+        if total_len > ip.len() {
+            record_malformed_rx(state);
+        }
         return;
     }
 
@@ -513,6 +771,7 @@ fn handle_ipv4(packet: &[u8]) {
 
     let udp = &ip[header_len..total_len];
     if udp.len() < UDP_HEADER_LEN {
+        record_malformed_rx(state);
         return;
     }
 
@@ -520,10 +779,14 @@ fn handle_ipv4(packet: &[u8]) {
     let dest_port = be_u16(udp, 2);
     let udp_len = be_u16(udp, 4) as usize;
     if udp_len < UDP_HEADER_LEN || udp_len > udp.len() {
+        record_malformed_rx(state);
         return;
     }
 
     let payload = &udp[UDP_HEADER_LEN..udp_len];
+    state.udp_packets_received = state.udp_packets_received.saturating_add(1);
+    state.last_event = NetEvent::UdpPacketReceived;
+    state.last_error = NetError::None;
     crate::serial_print!(
         "[CHRONO] net: UDP rx {} bytes from {}.{}.{}.{}:{} -> {}: ",
         payload.len(),
@@ -543,6 +806,36 @@ fn handle_ipv4(packet: &[u8]) {
         crate::serial_print!("{}", printable as char);
     }
     crate::serial_println!("");
+}
+
+fn record_arp_request_sent() {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &mut *NET.0.get();
+        state.arp_requests_sent = state.arp_requests_sent.saturating_add(1);
+        state.last_event = NetEvent::ArpRequestSent;
+        state.last_error = NetError::None;
+    });
+}
+
+fn record_udp_packet_sent() {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &mut *NET.0.get();
+        state.udp_packets_sent = state.udp_packets_sent.saturating_add(1);
+        state.last_event = NetEvent::UdpPacketSent;
+        state.last_error = NetError::None;
+    });
+}
+
+fn record_error(error: NetError) {
+    x86_64::instructions::interrupts::without_interrupts(|| unsafe {
+        let state = &mut *NET.0.get();
+        state.last_error = error;
+    });
+}
+
+fn record_malformed_rx(state: &mut NetState) {
+    state.malformed_rx_packets = state.malformed_rx_packets.saturating_add(1);
+    state.last_error = NetError::MalformedRxPacket;
 }
 
 fn build_ethernet_header(frame: &mut [u8], dest: [u8; 6], source: [u8; 6], ether_type: u16) {
