@@ -10,7 +10,9 @@ milestone is intentionally small:
 - netmask: `255.255.255.0`
 - ARP and UDP only
 - polling receive path
-- no DHCP, TCP, DNS, or real-hardware support yet
+- compact observability counters for TX/RX, ARP, UDP, malformed RX, last event,
+  and last error
+- no DHCP, TCP, DNS, sockets, packet capture, or real-hardware support yet
 
 2026-06-02 QEMU evidence:
 
@@ -35,17 +37,44 @@ Run scripts add an RTL8139 device with a fixed MAC:
 Inside the shell:
 
 ```text
-CHRONO/84> net
+CHRONO/84> net status
+ChronoOS network status
+NIC: rtl8139 initialized
 MAC: 52:54:00:12:34:56
 IP:  10.0.2.15 (static)
 GW:  10.0.2.2 unresolved
 MASK: 255.255.255.0
 TX:  0 packets
 RX:  0 packets
+ARP: 0 requests sent, 0 replies received
+UDP: 0 sent, 0 received
+Malformed RX: 0
+Last event: rtl8139 initialized
+Last error: none
 ```
 
-Use `net arp` to ask for the gateway MAC and `net send` to send a default UDP
-packet to `10.0.2.2:9000`.
+Use `net config` to show the static QEMU setup, `net arp` to ask for the
+gateway MAC, and `net send` to send a default UDP packet to `10.0.2.2:9000`
+during an intentional verification run.
+
+## Shell Observability Commands
+
+- `net` / `net status`: current NIC, MAC, static IP, gateway, counters, last
+  event, last error, and conservative verification status.
+- `net config`: static address, gateway, netmask, default UDP payload, and
+  unsupported protocol boundary.
+- `net arp`: educational ARP explanation plus the existing gateway ARP request.
+- `net udp`: educational UDP explanation and send syntax without transmitting.
+- `net send [ip port text]`: transmit the existing default or custom UDP payload
+  after warning that ARP/UDP needs runtime verification.
+- `net log`: compact counters and last event/error only; not packet capture.
+- `net demo`: read-only walkthrough that routes the operator through status,
+  config, ARP, UDP, and intentional send commands.
+- `net roadmap`: future DHCP, DNS, TCP, sockets, and broader hardware work.
+
+These counters are real code-path counters, but they are small diagnostics, not a
+full network monitor. If a stat is zero, it means that path has not been observed
+since the driver initialized in the current boot.
 
 ## Ethernet Frames
 
@@ -156,8 +185,12 @@ binding unless you have confirmed the bind order works on that host.
 Boot ChronoOS with `.\scripts\run.ps1` or `.\scripts\run-custom.ps1`, then run:
 
 ```text
+net status
+net config
 net arp
+net log
 net send
+net log
 ```
 
 The host listener should receive the default ChronoOS payload after the gateway
@@ -167,5 +200,5 @@ To send from host to guest, use the run-script UDP forward on host port `9000`.
 The shell polls the RTL8139 receive ring once per timer tick, so receive logs
 appear during normal shell idle time.
 
-Keep DHCP, DNS, TCP, sockets, and broad hardware networking as
+Keep DHCP, DNS, TCP, sockets, packet capture, and broad hardware networking as
 roadmap/design-only until ARP/UDP has clean packet evidence.
