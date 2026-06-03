@@ -78,8 +78,14 @@ The shell intentionally distinguishes overlapping product concepts:
 
 ## Apps
 
-- `apps`: print the text app launcher.
-- `apps notes|calc|sysinfo|files|clock|museum|theme|tasks`: launch or describe the selected app area.
+- `apps` / `apps list`: print the static app registry.
+- `apps info <name>`: print one app manifest.
+- `apps launch <name>`: run the existing launch command when the app is
+  implemented and safe to route through the shell.
+- `apps verified`: list app entries with recorded partial QEMU evidence.
+- `apps roadmap`: list roadmap/design-only app ideas.
+- `apps notes|calc|sysinfo|files|clock|museum|theme|tasks`: legacy direct
+  aliases that launch or describe the selected app area.
 - `notes`: print the notes home screen.
 - `notes read`: read the `notes` ChronoFS file.
 - `notes write <text>`: save text to the `notes` ChronoFS file.
@@ -88,6 +94,9 @@ The shell intentionally distinguishes overlapping product concepts:
 - `notes open`: delegate to `open notes`.
 - `calc <int> +|-|*|/ <int>`: evaluate one integer operation.
 - `sysinfo`: print era, uptime, and memory information.
+
+The app registry is static metadata compiled into the kernel. It is not a
+package manager, dynamic linker, or dynamic app loader.
 
 ## Filesystem
 
@@ -113,10 +122,22 @@ only filesystem repair command.
 
 ## Windows And Tasks
 
+- `windows` / `windows list`: list open windows with id, title, task id,
+  position, size, and focused marker.
+- `windows status`: show count/capacity, drag state, supported window apps, and
+  conservative verification boundary.
+- `windows focus <id>`: bring a window to the front.
+- `windows close <id>`: close a window and terminate its owning cooperative
+  task.
+- `windows help`: show window command usage.
 - `open notes`: open the notes window and spawn its cooperative task.
 - `open sysinfo`: open the sysinfo window and spawn its cooperative task.
+- `open paint`: report that paint is roadmap/design-only.
 - `tasks`: list active cooperative tasks.
 - `kill <id>`: terminate a non-running task and close its associated window.
+
+Window mode is a fixed-capacity teaching layer, not a full compositor or GUI
+toolkit.
 
 ## Userspace And Process Demos
 
@@ -138,15 +159,25 @@ programs, or change scheduler behavior.
 
 ## Networking
 
-- `net`: print RTL8139/static IPv4 status.
-- `net arp`: send an ARP request for the QEMU gateway. Prints an ARP/UDP-only
-  runtime-verification warning.
+- `net` / `net status`: print RTL8139/static IPv4 status, counters, last
+  event, last error, and the verification caveat.
+- `net config`: show static IP, QEMU gateway, netmask, default UDP target, and
+  current protocol limits.
+- `net arp`: explain ARP, show gateway-MAC state, then send an ARP request for
+  the QEMU gateway. Prints an ARP/UDP-only runtime-verification warning.
+- `net udp`: explain UDP support and send syntax without transmitting.
 - `net send`: send the default UDP payload. Prints the same networking warning.
 - `net send <ip> <port> <text>`: send a custom UDP payload. Prints the same
   networking warning.
+- `net log`: print counters and the last event/error. This is not packet
+  capture.
+- `net demo`: read-only networking walkthrough.
+- `net roadmap`: explain DHCP, DNS, TCP, sockets, and hardware networking as
+  future work.
+- `net help`: print valid networking subcommands.
 
-Networking is static IPv4 ARP/UDP only. TCP, DHCP, and DNS remain
-roadmap/design-only.
+Networking is static IPv4 ARP/UDP only. TCP, DHCP, DNS, sockets, and packet
+capture remain roadmap/design-only.
 
 ## Museum And Quest
 
