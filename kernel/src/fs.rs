@@ -185,6 +185,22 @@ impl JournalStatus {
     }
 }
 
+pub struct FsStatus {
+    pub disk_available: bool,
+    pub persistent: bool,
+    pub cache_file_count: usize,
+    pub visible_file_count: usize,
+    pub disk_file_count: usize,
+    pub used_file_slots: usize,
+    pub free_file_slots: usize,
+    pub max_files: usize,
+    pub max_file_bytes: usize,
+    pub total_sectors: u32,
+    pub data_start_sector: u32,
+    pub journal_present: bool,
+    pub journal: JournalStatus,
+}
+
 #[derive(Clone, Copy)]
 struct DiskEntry {
     used: bool,
@@ -810,6 +826,59 @@ pub fn check(repair: bool) -> FsckReport {
     };
 
     check_disk(disk, repair)
+}
+
+pub fn status() -> FsStatus {
+    let state: &'static FsState = unsafe { &*FS.0.get() };
+    let cache_file_count = state.files.len();
+
+    let Some(disk) = state.disk.as_ref() else {
+        return FsStatus {
+            disk_available: false,
+            persistent: false,
+            cache_file_count,
+            visible_file_count: cache_file_count,
+            disk_file_count: 0,
+            used_file_slots: cache_file_count,
+            free_file_slots: MAX_FILES.saturating_sub(cache_file_count),
+            max_files: MAX_FILES,
+            max_file_bytes: MAX_FILE_BYTES,
+            total_sectors: TOTAL_SECTORS,
+            data_start_sector: DATA_START,
+            journal_present: false,
+            journal: JournalStatus::unavailable("persistent ChronoFS disk is unavailable"),
+        };
+    };
+
+    let used_file_slots = count_used_entries(&disk.entries);
+    let journal_present = disk.journal_entry().is_some();
+    let journal = match disk.read_journal_record() {
+        Ok(record) => JournalStatus::from_record(record),
+        Err(_) => JournalStatus {
+            available: journal_present,
+            clean: false,
+            state: "invalid",
+            operation: "unknown",
+            target: String::new(),
+            message: String::from("journal record is missing, corrupt, or has a bad checksum"),
+        },
+    };
+
+    FsStatus {
+        disk_available: true,
+        persistent: true,
+        cache_file_count,
+        visible_file_count: cache_file_count,
+        disk_file_count: disk.file_count as usize,
+        used_file_slots,
+        free_file_slots: MAX_FILES.saturating_sub(used_file_slots),
+        max_files: MAX_FILES,
+        max_file_bytes: MAX_FILE_BYTES,
+        total_sectors: TOTAL_SECTORS,
+        data_start_sector: DATA_START,
+        journal_present,
+        journal,
+    }
 }
 
 pub fn journal_status() -> JournalStatus {
