@@ -1,5 +1,7 @@
 //! Tiny line-based shell for the first interactive milestone.
 
+use core::sync::atomic::{AtomicU8, Ordering};
+
 use crate::apps;
 use crate::console;
 use crate::fs::{self, FsError};
@@ -19,6 +21,42 @@ use crate::{print, println, serial_println};
 const COMMAND_BUFFER_CAPACITY: usize = 80;
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
+const RELIABILITY_MODE_DEMO: u8 = 1;
+
+static RELIABILITY_MODE: AtomicU8 = AtomicU8::new(RELIABILITY_MODE_DEMO);
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ReliabilityMode {
+    Safe,
+    Demo,
+    Experimental,
+}
+
+impl ReliabilityMode {
+    const fn from_byte(value: u8) -> Self {
+        match value {
+            0 => Self::Safe,
+            2 => Self::Experimental,
+            _ => Self::Demo,
+        }
+    }
+
+    const fn as_byte(self) -> u8 {
+        match self {
+            Self::Safe => 0,
+            Self::Demo => 1,
+            Self::Experimental => 2,
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Safe => "safe",
+            Self::Demo => "demo",
+            Self::Experimental => "experimental",
+        }
+    }
+}
 
 pub fn run() -> ! {
     let mut buffer = CommandBuffer::new();
@@ -178,8 +216,11 @@ fn execute_command(command: &str) {
     match command {
         "" => {}
         command if command == "help" || command.starts_with("help ") => run_help(command),
+        command if command == "mode" || command.starts_with("mode ") => run_mode_command(command),
+        command if command == "safe" || command.starts_with("safe ") => run_safe_command(command),
         "start" | "welcome" => print_welcome(),
         command if command == "guide" || command.starts_with("guide ") => run_guide(command),
+        command if command == "learn" || command.starts_with("learn ") => run_learn(command),
         command if command == "demo" || command.starts_with("demo ") => run_demo(command),
         command if command == "tour" || command.starts_with("tour ") => run_tour(command),
         command if command == "capsule" || command.starts_with("capsule ") => run_capsule(command),
@@ -240,6 +281,8 @@ fn run_help(command: &str) {
     match topic {
         "" => print_help(),
         "start" | "guide" => print_help_start(),
+        "learn" | "learning" => print_help_learn(),
+        "mode" | "safe" | "reliability" => print_help_mode(),
         "apps" | "app" => print_help_apps(),
         "fs" | "files" | "filesystem" => print_help_fs(),
         "system" | "status" | "verify" => print_help_system(),
@@ -253,7 +296,9 @@ fn run_help(command: &str) {
 
 fn print_help() {
     println!("ChronoOS help");
-    println!("Getting started : start, welcome, guide, demo, tour");
+    println!("Getting started : start, welcome, guide, learn, demo, tour");
+    println!("Learning paths  : learn boot|memory|filesystem|userspace|networking");
+    println!("Reliability     : mode, mode safe|demo|experimental, safe on|off");
     println!("Eras and themes : era, travel <year>, poster eras, apps theme");
     println!("Apps            : apps, notes, calc, sysinfo, open notes, open sysinfo");
     println!("Windows/tasks   : windows, open notes, open sysinfo, tasks, kill <id>");
@@ -265,7 +310,7 @@ fn print_help() {
     println!("Debug/lab       : beep <hz>, reboot, fsck repair, risky demos");
     println!("Roadmap/future  : capsule next, poster roadmap, tour future");
     println!();
-    println!("More help: help start|apps|fs|system|network|userspace|labs|roadmap");
+    println!("More help: help start|learn|mode|apps|fs|system|network|userspace|labs|roadmap");
 }
 
 fn print_help_start() {
@@ -274,11 +319,42 @@ fn print_help_start() {
     println!("- guide           : topic menu for the guided shell path");
     println!("- guide quick     : short first-demo route");
     println!("- guide full      : longer route across product surfaces");
+    println!("- learn           : structured curriculum paths by subsystem");
     println!("- demo            : read-only preview of current features");
     println!("- tour            : educational explanations by subsystem");
     println!();
     println!("Difference: guide orients you, demo previews, tour teaches.");
-    println!("Next: guide quick");
+    println!("Next: guide quick or learn");
+}
+
+fn print_help_learn() {
+    println!("Help: learning paths");
+    println!("- learn              : curriculum overview");
+    println!("- learn boot         : firmware, bootloader, kernel handoff");
+    println!("- learn memory       : memory map, paging, heap");
+    println!("- learn interrupts   : IDT, timer, keyboard, mouse/input");
+    println!("- learn filesystem   : ChronoFS, fsck, journal");
+    println!("- learn gui          : apps, windows, shell-first UI");
+    println!("- learn userspace    : Ring 3, syscalls, static ELF");
+    println!("- learn networking   : RTL8139, static IPv4, ARP, UDP");
+    println!("- learn scheduler    : tasks, scheduler, SMP/AP boundary");
+    println!("- learn eras         : themes, travel, era identity");
+    println!("- learn roadmap      : future systems");
+    println!("- learn next         : safe next curriculum step");
+    println!("Each path is read-only and does not run probes.");
+}
+
+fn print_help_mode() {
+    println!("Help: reliability mode");
+    println!("- mode / mode status       : show current warning mode");
+    println!("- mode safe                : prefer read-only demo paths");
+    println!("- mode demo                : default portfolio/demo mode");
+    println!("- mode experimental        : intentional lab/verification mode");
+    println!("- safe / safe status       : alias for mode status");
+    println!("- safe on                  : alias for mode safe");
+    println!("- safe off                 : return to mode demo");
+    println!();
+    println!("This is warning-only; it does not block commands or provide security.");
 }
 
 fn print_help_apps() {
@@ -367,6 +443,7 @@ fn print_help_userspace() {
 
 fn print_help_labs() {
     println!("Help: debug/lab");
+    println!("- mode status : show safe/demo/experimental command categories");
     println!("- beep <hz>   : PC speaker tone path");
     println!("- reboot      : immediate PS/2-controller reset request");
     println!("- fsck repair : intentional ChronoFS repair verification");
@@ -374,6 +451,7 @@ fn print_help_labs() {
     println!("- net arp / net send         : ARP/UDP verification paths");
     println!();
     println!("Future: crash lab is roadmap/design-only, not a current command.");
+    println!("Safe mode is warning-only; it does not block commands.");
     println!("Next: guide next");
 }
 
@@ -385,12 +463,12 @@ fn print_help_roadmap() {
     println!();
     println!("Roadmap/design-only: TCP, DHCP, DNS, USB, dynamic linker,");
     println!("package manager, full compositor, and preemptive scheduler.");
-    println!("Next: capsule next");
+    println!("Next: capsule next or mode status");
 }
 
 fn print_unknown_help_topic(topic: &str) {
     println!("Unknown help topic: {}", topic);
-    println!("Try: help start|apps|fs|system|network|userspace|labs|roadmap");
+    println!("Try: help start|learn|mode|apps|fs|system|network|userspace|labs|roadmap");
 }
 
 fn print_unknown_command(command: &str) {
@@ -406,13 +484,122 @@ fn print_unknown_command(command: &str) {
         println!("Hint: use net or help network.");
     } else if command.starts_with("guide") {
         println!("Hint: use guide or help start.");
+    } else if command.starts_with("learn") {
+        println!("Hint: use learn or help learn.");
     }
 
     println!("Try: help");
-    println!("Topics: help start|apps|fs|system|network|userspace|labs|roadmap");
+    println!("Topics: help start|learn|mode|apps|fs|system|network|userspace|labs|roadmap");
+}
+
+fn run_mode_command(command: &str) {
+    let mode = command.strip_prefix("mode").unwrap_or("").trim();
+
+    match mode {
+        "" | "status" => print_reliability_status(),
+        "safe" => set_reliability_mode(ReliabilityMode::Safe),
+        "demo" => set_reliability_mode(ReliabilityMode::Demo),
+        "experimental" => set_reliability_mode(ReliabilityMode::Experimental),
+        "help" => print_mode_usage(),
+        _ => print_mode_usage(),
+    }
+}
+
+fn run_safe_command(command: &str) {
+    let mode = command.strip_prefix("safe").unwrap_or("").trim();
+
+    match mode {
+        "" | "status" => print_reliability_status(),
+        "on" => set_reliability_mode(ReliabilityMode::Safe),
+        "off" => set_reliability_mode(ReliabilityMode::Demo),
+        "help" => print_safe_usage(),
+        _ => print_safe_usage(),
+    }
+}
+
+fn current_reliability_mode() -> ReliabilityMode {
+    ReliabilityMode::from_byte(RELIABILITY_MODE.load(Ordering::Relaxed))
+}
+
+fn set_reliability_mode(mode: ReliabilityMode) {
+    RELIABILITY_MODE.store(mode.as_byte(), Ordering::Relaxed);
+    println!("Reliability mode: {}", mode.label());
+    match mode {
+        ReliabilityMode::Safe => {
+            println!("Safe mode prefers read-only demo paths and stronger warnings.");
+            println!("It does not block commands and is not a security sandbox.");
+        }
+        ReliabilityMode::Demo => {
+            println!("Demo mode is the default portfolio path.");
+            println!("Risky commands still warn before running.");
+        }
+        ReliabilityMode::Experimental => {
+            println!("Experimental mode is for intentional verification/lab paths.");
+            println!("Runtime evidence is still required before claiming success.");
+        }
+    }
+}
+
+fn print_reliability_status() {
+    let mode = current_reliability_mode();
+
+    println!("ChronoOS reliability mode");
+    println!("Current mode: {}", mode.label());
+    println!("Persistence: in-memory only; resets on reboot.");
+    println!("Policy: warning-only, no command blocking, not a sandbox.");
+    println!();
+    println!("Demo-safe/read-only:");
+    println!("- help, start, guide, learn, demo, tour, capsule, poster, doctor");
+    println!("- apps list/info, fs status/info/check/journal, journal");
+    println!("- net status/config/log/demo/roadmap, userspace status/syscalls/elf/roadmap");
+    println!("- windows status/list");
+    println!();
+    println!("Verification/controlled mutation:");
+    println!("- write, rm, notes write/clear, fsck repair");
+    println!("- net arp, net send, open notes/sysinfo, windows focus/close, kill");
+    println!();
+    println!("Experimental/risky:");
+    println!("- ring3, syshello, exec <name>, reboot, SMP/AP, UEFI/custom BIOS");
+    println!("- crash/fault paths and hardware tests");
+    println!();
+    println!("Next: guide next or learn roadmap");
+}
+
+fn print_mode_usage() {
+    println!("Usage: mode [status|safe|demo|experimental|help]");
+    println!("Aliases: safe, safe status, safe on, safe off");
+}
+
+fn print_safe_usage() {
+    println!("Usage: safe [status|on|off|help]");
+    println!("safe on -> mode safe; safe off -> mode demo");
+}
+
+pub fn print_reliability_warning(area: &str) {
+    match current_reliability_mode() {
+        ReliabilityMode::Safe => {
+            println!(
+                "Reliability mode: safe - {} is intentional verification, not the safe demo path.",
+                area
+            );
+        }
+        ReliabilityMode::Demo => {
+            println!(
+                "Reliability mode: demo - {} is outside the default demo-safe path.",
+                area
+            );
+        }
+        ReliabilityMode::Experimental => {
+            println!(
+                "Reliability mode: experimental - {} may run, but still needs evidence.",
+                area
+            );
+        }
+    }
 }
 
 fn print_userspace_warning() {
+    print_reliability_warning("userspace demos");
     println!("Warning: userspace demos are partially implemented and need runtime verification.");
     println!("For the current boundary, run: userspace status");
 }
@@ -516,6 +703,7 @@ fn print_welcome() {
     println!("Start here:");
     println!("- guide quick      : five safe commands for a first screenshot");
     println!("- guide full       : the complete shell-first tour map");
+    println!("- mode status      : safe/demo/experimental path guide");
     println!("- apps             : text launcher for notes, calc, sysinfo, files");
     println!("- museum boot      : learn how the machine wakes up");
     println!("- doctor           : conservative subsystem status");
@@ -590,6 +778,7 @@ fn guide_full() {
     println!("7. quest status      - RPG-style progress");
     println!("8. fsck              - read-only filesystem check");
     println!("9. journal           - ChronoFS journal status");
+    println!("10. learn next       - structured next curriculum step");
 }
 
 fn guide_eras() {
@@ -626,6 +815,8 @@ fn guide_systems() {
     println!("- tour boot");
     println!("- tour files");
     println!("- tour userspace");
+    println!("Curriculum:");
+    println!("- learn boot|memory|filesystem|userspace|networking");
 }
 
 fn guide_status() {
@@ -653,6 +844,181 @@ fn guide_next() {
     println!("- net arp | net send");
     println!("- fsck repair");
     println!("- SMP/multicore, UEFI, custom BIOS, crash/fault paths");
+    println!();
+    println!("Use mode status to separate safe, verification, and experimental paths.");
+}
+
+struct LearningPath {
+    key: &'static str,
+    title: &'static str,
+    summary: &'static str,
+    status: &'static str,
+    verification: &'static str,
+    commands: &'static [&'static str],
+    next: &'static str,
+}
+
+const LEARNING_PATHS: &[LearningPath] = &[
+    LearningPath {
+        key: "boot",
+        title: "Boot Path",
+        summary: "Learn how firmware, the bootloader, and the kernel hand control forward.",
+        status: "implemented in code",
+        verification: "single-core BIOS boot has QEMU evidence; UEFI/custom BIOS still need verification",
+        commands: &["museum boot", "museum kernel", "poster boot", "capsule current"],
+        next: "museum boot",
+    },
+    LearningPath {
+        key: "memory",
+        title: "Memory And Heap",
+        summary: "Learn how ChronoOS talks about RAM, pages, and the reusable heap.",
+        status: "implemented in code",
+        verification: "memory reporting builds; heap reuse still needs runtime verification",
+        commands: &["museum memory", "tour memory", "mem", "doctor"],
+        next: "mem",
+    },
+    LearningPath {
+        key: "interrupts",
+        title: "Interrupts And Input",
+        summary: "Learn how CPU events, timers, keyboard input, and mouse packets reach the kernel.",
+        status: "implemented in code",
+        verification: "narrow keyboard input has QEMU evidence; polling fallback and mouse/window behavior need more checks",
+        commands: &["museum interrupts", "museum keyboard", "help system", "doctor"],
+        next: "museum interrupts",
+    },
+    LearningPath {
+        key: "filesystem",
+        title: "Filesystem And ChronoFS",
+        summary: "Learn how tiny named files, fsck, repair boundaries, and the journal fit together.",
+        status: "implemented in code",
+        verification: "implemented in code, not runtime-verified for shell workflows",
+        commands: &["tour files", "museum filesystem", "fs status", "fs check", "journal"],
+        next: "fs status",
+    },
+    LearningPath {
+        key: "gui",
+        title: "Apps And Windowing",
+        summary: "Learn how shell apps, the static app registry, and tiny windows form a small UI layer.",
+        status: "partially implemented",
+        verification: "apps are partially verified; window lifecycle commands still need runtime verification",
+        commands: &["apps", "apps list", "open notes", "windows status", "tour apps"],
+        next: "apps",
+    },
+    LearningPath {
+        key: "userspace",
+        title: "Userspace, Syscalls, And ELF",
+        summary: "Learn the boundary between Ring 3 demos, tiny syscalls, and static ELF execution.",
+        status: "partially implemented",
+        verification: "implemented in code, not runtime-verified in recorded QEMU passes",
+        commands: &["userspace status", "userspace syscalls", "museum userspace", "tour userspace"],
+        next: "userspace status",
+    },
+    LearningPath {
+        key: "networking",
+        title: "Networking",
+        summary: "Learn the static IPv4, ARP, UDP, and RTL8139 teaching stack before future protocols.",
+        status: "partially implemented",
+        verification: "RTL8139 init/MAC has QEMU evidence; ARP/UDP behavior needs runtime verification",
+        commands: &["help network", "net status", "net config", "net log", "museum networking"],
+        next: "net status",
+    },
+    LearningPath {
+        key: "scheduler",
+        title: "Scheduler And SMP",
+        summary: "Learn how cooperative tasks differ from AP startup and future scheduling work.",
+        status: "partially implemented",
+        verification: "BSP-only SMP evidence exists; AP startup and task lifecycle still need checks",
+        commands: &["cores", "tasks", "museum scheduler", "museum smp", "capsule current"],
+        next: "cores",
+    },
+    LearningPath {
+        key: "eras",
+        title: "Themes And Eras",
+        summary: "Learn how ChronoOS changes presentation across computing eras without changing the kernel.",
+        status: "implemented in code",
+        verification: "era commands exist; full visual theme walkthrough still needs runtime verification",
+        commands: &["era", "travel <year>", "poster eras", "apps theme"],
+        next: "era",
+    },
+    LearningPath {
+        key: "roadmap",
+        title: "Roadmap And Future Systems",
+        summary: "Learn what is intentionally future work so ChronoOS stays honest and understandable.",
+        status: "roadmap/design-only",
+        verification: "not applicable; roadmap screens do not prove runtime behavior",
+        commands: &["mode status", "capsule next", "poster roadmap", "tour future", "apps roadmap", "net roadmap"],
+        next: "capsule next",
+    },
+];
+
+fn run_learn(command: &str) {
+    let topic = command.strip_prefix("learn").unwrap_or("").trim();
+
+    if topic.is_empty() {
+        print_learn_overview();
+        return;
+    }
+
+    if topic == "next" {
+        print_learn_next();
+        return;
+    }
+
+    let canonical = match topic {
+        "fs" | "files" => "filesystem",
+        "apps" | "windows" | "windowing" => "gui",
+        "network" | "net" => "networking",
+        "smp" | "tasks" => "scheduler",
+        "theme" | "themes" | "era" => "eras",
+        "future" => "roadmap",
+        other => other,
+    };
+
+    match LEARNING_PATHS.iter().find(|path| path.key == canonical) {
+        Some(path) => print_learning_path(path),
+        None => print_learn_usage(),
+    }
+}
+
+fn print_learn_overview() {
+    println!("ChronoOS learning paths");
+    println!("Pick a subsystem and follow the suggested commands.");
+    println!("These paths are read-only; they do not certify runtime behavior.");
+    println!();
+    for path in LEARNING_PATHS {
+        println!("- learn {:<11} : {}", path.key, path.title);
+    }
+    println!("- learn next        : safest next path");
+}
+
+fn print_learning_path(path: &LearningPath) {
+    println!("Learn: {}", path.title);
+    println!("{}", path.summary);
+    println!("Status: {}", path.status);
+    println!("Verification: {}", path.verification);
+    println!();
+    println!("Try:");
+    for command in path.commands {
+        println!("- {}", command);
+    }
+    println!();
+    println!("Safe next command: {}", path.next);
+}
+
+fn print_learn_next() {
+    println!("ChronoOS learning path: next");
+    println!("For a first curriculum pass, stay on read-only surfaces:");
+    println!("1. learn boot       - machine startup story");
+    println!("2. learn memory     - RAM, paging, heap");
+    println!("3. learn filesystem - ChronoFS status and fsck");
+    println!("4. learn gui        - apps and tiny windows");
+    println!("5. learn networking - ARP/UDP observability, no new protocols");
+    println!();
+    println!("Then check status with: doctor");
+}
+
+fn print_learn_usage() {
+    println!("Usage: learn [boot|memory|interrupts|filesystem|gui|userspace|networking|scheduler|eras|roadmap|next]");
 }
 
 fn run_demo(command: &str) {
@@ -1918,6 +2284,7 @@ fn run_fsck(command: &str) {
     };
 
     if repair {
+        print_reliability_warning("ChronoFS repair");
         println!("Warning: fsck repair mutates ChronoFS metadata.");
         println!("Use a controlled disk image and record before/after evidence.");
         println!("It refuses untrusted geometry, duplicate ownership, and unsafe errors.");
@@ -2224,6 +2591,7 @@ fn print_era_usage() {
 }
 
 fn reboot() -> ! {
+    print_reliability_warning("reboot");
     serial_println!("[CHRONO] reboot requested");
 
     // SAFETY: Port 0x64 is the PS/2 controller command port on the

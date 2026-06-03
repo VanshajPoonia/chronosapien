@@ -339,6 +339,7 @@ pub fn run(command: &str) -> bool {
 }
 
 fn print_network_warning() {
+    crate::shell::print_reliability_warning("ARP/UDP networking");
     println!("Warning: networking is ARP/UDP-only and needs runtime verification.");
     println!("No TCP, DHCP, DNS, or sockets are implemented.");
 }
