@@ -126,25 +126,34 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 9. ChronoFS Read / Write / Delete
 
+- [ ] `fs status` prints mode, disk availability, file counts, slots, and journal summary.
+- [ ] `fs info` prints the fixed layout and limits without mutating metadata.
 - [ ] `ls` works on a clean disk.
 - [ ] `write hello.txt Hi there` succeeds.
 - [ ] `cat hello.txt` prints `Hi there`.
+- [ ] `fs check` reports the same read-only status class as `fsck`.
 - [ ] `rm hello.txt` succeeds.
 - [ ] `cat hello.txt` reports file not found after removal.
 - [ ] A written file persists after reboot.
+- [ ] If ATA is unavailable, heap fallback is clearly reported as non-persistent.
 
 ## 10. fsck And fsck repair
 
 - [ ] `fsck` on a clean disk reports clean or only expected warnings.
+- [ ] `fs check` groups checked, suspicious, repaired, and not-repaired status.
 - [ ] `fsck repair` prints a mutation warning before reporting repair results.
+- [ ] `fs repair` and `fs check repair` refuse to mutate and point to `fsck repair`.
 - [ ] `fsck repair` on a clean disk does not damage files.
 - [ ] A controlled bitmap mismatch is reported by `fsck`.
 - [ ] `fsck repair` fixes only safe bitmap/stale-slot issues.
 - [ ] `fsck repair` refuses unsafe duplicate-sector or bad-superblock cases.
+- [ ] Any repair test records the disk image, serial log, and before/after command output.
 
 ## 11. Journal / Recovery Behavior
 
 - [ ] `journal` reports available and clean on a normal mounted disk.
+- [ ] `fs journal` reports the same journal state as `journal`.
+- [ ] Journal output says clean means no pending record, not full filesystem proof.
 - [ ] Writing a file leaves the journal clean after completion.
 - [ ] Removing a file leaves the journal clean after completion.
 - [ ] A controlled intent-state journal record rolls back safely on mount.
@@ -192,6 +201,8 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 14. Ring 3 Demo
 
+- [ ] `userspace status` reports Ring 3/syscall/ELF boundaries without running demos.
+- [ ] `userspace help` lists the read-only userspace inspection commands.
 - [ ] `ring3` prints the userspace runtime-verification warning before running.
 - [ ] `ring3` enters the user-mode demo.
 - [ ] The privileged instruction fault is caught as expected.
@@ -201,6 +212,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 15. Syscalls
 
+- [ ] `userspace syscalls` lists syscall numbers 1-4: write, read, exit, uptime.
 - [ ] `syshello` prints the userspace runtime-verification warning before running.
 - [ ] `syshello` enters ring 3.
 - [ ] `sys_write` prints hello text through the kernel dispatcher.
@@ -211,6 +223,8 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 16. Static ELF Exec
 
+- [ ] `userspace elf` explains the static ELF64 boundary without loading a program.
+- [ ] `userspace roadmap` marks argv/env, process table, dynamic linker, package manager, and preemptive scheduler as future work.
 - [ ] Build and install `hello.elf` with `.\scripts\build-user.ps1`.
 - [ ] `ls` shows `hello.elf`.
 - [ ] `exec hello.elf` prints the userspace runtime-verification warning before loading.
