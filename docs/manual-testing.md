@@ -106,8 +106,13 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 - [ ] Mouse initializes according to serial output.
 - [ ] Pointer/cursor movement is visible.
+- [ ] `windows status` reports count/capacity, drag state, and supported window apps.
 - [ ] `open notes` creates a window.
+- [ ] `windows list` shows the notes window with an ID and owning task ID.
 - [ ] `open sysinfo` creates a window.
+- [ ] `windows focus <id>` brings an existing window to the front.
+- [ ] `windows close <id>` closes a window and stops its owning task.
+- [ ] `open paint` reports roadmap/design-only instead of pretending paint exists.
 - [ ] Clicking a title bar focuses a window.
 - [ ] Dragging a title bar moves a window.
 - [ ] Clicking close removes the window and associated task.
@@ -239,8 +244,17 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 - [ ] If a host UDP listener conflicts with `hostfwd=udp::9000-:9000`, record the conflict and test guest-to-host send without claiming host-to-guest forwarding.
 - [ ] Confirm serial logs `net: rtl8139 found`.
 - [ ] Confirm serial logs the expected guest MAC.
-- [ ] `net` prints MAC, static IP, gateway state, and TX/RX counts.
-- [ ] `net arp` prints the ARP/UDP-only runtime-verification warning.
+- [ ] `net` and `net status` print NIC state, MAC, static IP, gateway state,
+      TX/RX counts, ARP/UDP counters, malformed RX, last event, and last error.
+- [ ] `net config` prints static IP, QEMU gateway, netmask, default UDP target,
+      and says there is no DHCP/DNS/TCP/socket support.
+- [ ] `net log` prints counters and last event/error without claiming packet
+      capture.
+- [ ] `net demo` is read-only and does not transmit packets.
+- [ ] `net roadmap` keeps DHCP, DNS, TCP, sockets, packet capture, and broader
+      hardware networking as roadmap/design-only.
+- [ ] `net udp` explains UDP send syntax without transmitting.
+- [ ] `net arp` explains ARP and prints the ARP/UDP-only runtime-verification warning.
 - [ ] `net arp` sends an ARP request.
 - [ ] Gateway MAC becomes learned after an ARP reply.
 - [ ] `net send` prints the ARP/UDP-only runtime-verification warning.
@@ -286,8 +300,15 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 ## 20. Window Manager And App Platform Boundaries
 
 - [ ] `apps` displays launcher entries without requiring graphics-only interaction.
+- [ ] `apps list` displays the same static registry surface.
+- [ ] `apps info notes` shows name, category, launch command, status, verification, and risk.
+- [ ] `apps launch calc` delegates to an existing shell command instead of dynamic loading.
+- [ ] `apps verified` lists only entries with recorded partial QEMU evidence.
+- [ ] `apps roadmap` lists roadmap/design-only app ideas without launching them.
 - [ ] `apps notes`, `apps calc`, and `apps sysinfo` route to existing app behavior.
 - [ ] `apps files`, `apps clock`, `apps museum`, `apps theme`, and `apps tasks` describe or route to existing shell areas.
+- [ ] Roadmap entries such as `paint`, `network`, and `crashlab` do not pretend to be installed runtime apps.
+- [ ] `windows`, `windows list`, `windows status`, `windows focus <id>`, `windows close <id>`, and `windows help` behave as documented.
 - [ ] `open notes` and `open sysinfo` are the only documented window app paths.
 - [ ] Window close, drag, and focus are checked with both mouse movement and shell task state.
 - [ ] Results are described as a small teaching app/window platform, not a full GUI toolkit.
@@ -300,7 +321,10 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 - [ ] Confirm `tiny paint` is documented as roadmap/design-only.
 - [ ] Confirm `file explorer window mode` is documented as roadmap/design-only, with `apps files` treated as a text card for file commands only.
 - [ ] Confirm `boot chime selector` is documented as roadmap/design-only, even though era tones exist.
-- [ ] Confirm `network demo mode` is documented as roadmap/design-only, with current networking limited to `net`, `net arp`, and `net send`.
+- [ ] Confirm `network demo mode` is documented as roadmap/design-only, while
+      current networking is limited to static IPv4 ARP/UDP commands such as
+      `net status`, `net config`, `net arp`, `net udp`, `net send`, `net log`,
+      `net demo`, and `net roadmap`.
 - [ ] Confirm `user-space showcase` is documented as partially implemented through `ring3`, `syshello`, `exec`, and guide pages.
 - [ ] Confirm `visual boot timeline` is documented as partially implemented through text-only `capsule` and `poster boot`.
 - [ ] Confirm the mini desktop/app launcher is documented as partially implemented, not a full desktop.
