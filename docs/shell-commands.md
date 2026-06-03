@@ -12,6 +12,8 @@ command is handled by `kernel/src/shell.rs`; window mode reads the same file.
 
 - `help`: list categorized command groups.
 - `help start`: explain `start`, `welcome`, `guide`, `demo`, and `tour`.
+- `help learn`: explain structured learning paths.
+- `help mode`: explain reliability/safe mode.
 - `help apps`: explain the app launcher and window paths.
 - `help fs`: explain `fs`, `ls`, `cat`, `write`, `rm`, `fsck`, and `journal`.
 - `help system`: explain conservative status surfaces.
@@ -29,12 +31,20 @@ command is handled by `kernel/src/shell.rs`; window mode reads the same file.
 - `mem`: print total memory and heap used/free/largest-free values.
 - `cores`: print online core count and task assignment counts.
 - `beep <hz>`: play a PC speaker tone for 500 ms.
+- `mode` / `mode status`: show the current safe/demo/experimental warning
+  mode.
+- `mode safe|demo|experimental`: set the shell reliability mode.
+- `safe` / `safe status`: alias for `mode status`.
+- `safe on`: alias for `mode safe`.
+- `safe off`: return to `mode demo`.
 
 ## Help Categories
 
 Top-level `help` groups commands by:
 
 - Getting started
+- Learning paths
+- Reliability mode
 - Eras and themes
 - Apps
 - Filesystem
@@ -48,6 +58,7 @@ Top-level `help` groups commands by:
 The shell intentionally distinguishes overlapping product concepts:
 
 - `guide` orients first-time users.
+- `learn` connects curriculum paths to existing commands.
 - `demo` previews the current surface without changing state.
 - `tour` teaches OS concepts by subsystem.
 - `doctor` is the conservative status surface; there is no separate `status` or
@@ -58,6 +69,7 @@ The shell intentionally distinguishes overlapping product concepts:
   `fsck`, and `journal` are the direct filesystem commands; `apps files` points
   users toward them.
 - `museum` teaches concepts; `quest` shows progress and next goals.
+- `mode` and `safe` categorize commands but do not block them.
 
 ## Era And Product Commands
 
@@ -65,9 +77,43 @@ The shell intentionally distinguishes overlapping product concepts:
 - `welcome`: alias for `start`.
 - `guide`: print the guided onboarding topic menu.
 - `guide quick|full|eras|apps|systems|status|next`: print focused first-run guide pages that route to existing commands.
+- `learn`: print the curriculum overview.
+- `learn boot|memory|interrupts|filesystem|gui|userspace|networking|scheduler|eras|roadmap|next`:
+  print structured subsystem learning paths.
 - `era 1984|1995|2007|2040`: switch the active era profile.
 - `travel <year>`: map a year to an era and switch through the existing `era` path.
 - `demo`: print a read-only guided demo.
+
+## Learning Paths
+
+- `learn`: list the curriculum paths.
+- `learn boot`: bootloader, kernel handoff, and boot evidence.
+- `learn memory`: memory map, paging, heap, and `mem`.
+- `learn interrupts`: IDT, timer, keyboard, mouse, and input status.
+- `learn filesystem`: ChronoFS, `fs status`, `fs check`, fsck, and journal.
+- `learn gui`: apps, the app registry, tiny windows, and window limits.
+- `learn userspace`: Ring 3, syscalls, static ELF, and process limits.
+- `learn networking`: RTL8139, static IPv4, ARP, UDP, and observability.
+- `learn scheduler`: cooperative tasks, SMP/AP boundary, and scheduler limits.
+- `learn eras`: era profiles, `travel <year>`, and `poster eras`.
+- `learn roadmap`: future systems marked roadmap/design-only.
+- `learn next`: a safe first curriculum route.
+
+Learning paths are read-only educational screens. They do not run probes or
+upgrade runtime verification labels.
+
+## Reliability And Safe Mode
+
+- `mode` / `mode status`: show the current mode, safe demo path, verification
+  paths, experimental paths, and caveats.
+- `mode safe`: prefer read-only demo paths with stronger warnings.
+- `mode demo`: default portfolio/demo mode.
+- `mode experimental`: intentional lab/verification mode.
+- `safe`, `safe status`, `safe on`, `safe off`: beginner-friendly aliases.
+
+Reliability mode is warning-only, in-memory, and not a security sandbox. It does
+not remove commands, block commands, persist across reboot, or upgrade runtime
+verification.
 - `tour`: print the tour overview.
 - `tour boot|memory|files|apps|userspace|future`: print a focused educational page.
 - `capsule`: print the build-in-public timeline overview.

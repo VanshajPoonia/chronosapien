@@ -13,6 +13,13 @@ operating system. It is a learning OS with a portfolio/product shell.
 Many systems are intentionally small teaching versions. They are useful for
 learning how an OS is shaped, but they are not hardened production subsystems.
 
+## Safe Mode Limitations
+
+- `mode safe` and `safe on` are shell-level warning modes.
+- Safe mode does not block commands, sandbox code, protect files, isolate
+  processes, or persist across reboot.
+- It is a demo/reliability UX layer, not an OS security boundary.
+
 ## Runtime Verification Is Incomplete
 
 The repo records limited QEMU evidence: single-core BIOS serial-only boot

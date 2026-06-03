@@ -103,8 +103,10 @@ design, and what has actual verification evidence.
 | Serial logging | implemented in code | verified in QEMU, needs broader runtime verification | Boot-time serial logging reached boot complete in single-core QEMU; shell-command serial output is only partially observed. |
 | Shell command surface | implemented in code | verified in QEMU, needs broader runtime verification | `help`, `help start`, and `about` were observed through visible QEMU; most commands still need staged checks. |
 | Command and UX polish | implemented in code | verified in QEMU, needs broader runtime verification | Grouped `help` and `help start` were observed; other topic pages, unknown hints, and risky warnings still need checks. |
+| Reliability/safe mode | implemented in code | needs runtime verification | `mode` and `safe` commands categorize demo-safe, verification, and experimental paths with warning-only behavior. |
 | Apps | implemented in code | partially verified in QEMU, needs broader runtime verification | Static app registry and `apps` launcher exist; `apps`, `notes`, and `calc 6 - 7` were observed; registry subcommands, `sysinfo`, notes read/write, and persistence still need checks. |
 | Guided onboarding | implemented in code | needs runtime verification | `start`, `welcome`, and `guide` topic pages route first-run users toward existing safe commands. |
+| Learning paths | implemented in code | needs runtime verification | `learn` curriculum pages connect museum, quest, tour, guide, status, app, filesystem, userspace, networking, and roadmap commands. |
 | Museum/quest/product layer | implemented in code | needs runtime verification | `demo`, `tour`, `capsule`, `doctor`, `poster`, `travel`, museum pages, quests, stats, and inventory exist. |
 | Theme studio | roadmap/design-only | needs runtime verification | Current `apps theme` is a text preview, not a studio. |
 | Crash lab | roadmap/design-only | needs runtime verification | Do not build before core runtime evidence is stronger. |
@@ -167,6 +169,13 @@ design, and what has actual verification evidence.
 - Guided onboarding commands are implemented in code: `start`, `welcome`,
   `guide`, `guide quick`, `guide full`, `guide eras`, `guide apps`,
   `guide systems`, `guide status`, and `guide next`.
+- Learning path commands are implemented in code: `learn`, `learn boot`,
+  `learn memory`, `learn interrupts`, `learn filesystem`, `learn gui`,
+  `learn userspace`, `learn networking`, `learn scheduler`, `learn eras`,
+  `learn roadmap`, and `learn next`.
+- Reliability mode commands are implemented in code: `mode`, `mode status`,
+  `mode safe`, `mode demo`, `mode experimental`, `safe`, `safe status`,
+  `safe on`, and `safe off`. They warn only; they do not block commands.
 - Filesystem commands are implemented in code: `ls`, `cat`, `write`, `rm`,
   `fsck`, `fsck repair`, and `journal`.
 - Userspace commands are implemented in code: `ring3`, `syshello`, and

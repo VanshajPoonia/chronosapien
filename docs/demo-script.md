@@ -30,21 +30,27 @@ recorded in `docs/AI_PROGRESS_LOG.md`.
 Goal: show identity, product feel, and a conservative status surface.
 
 1. Start from a visible BIOS QEMU boot and first shell prompt.
-2. Show identity:
+2. Set the demo safety frame:
+   - `mode status`
+   - `mode safe`
+3. Show identity:
    - `start`
    - `guide quick`
+   - `learn`
    - `help start`
    - `about`
    - `help`
-3. Show era/product flavor:
+4. Show era/product flavor:
    - `era`
    - `travel 1998`
-4. Show the guided product layer:
+5. Show the guided product layer:
+   - `learn boot`
    - `demo`
    - `poster`
-5. Close with status honesty:
+6. Close with status honesty:
    - `help system`
    - `doctor`
+   - `safe off`
 
 Suggested narration:
 
@@ -61,6 +67,7 @@ Goal: show ChronoOS as both a systems project and an indie educational product.
 1. Identity and shell:
    - `welcome`
    - `guide full`
+   - `learn next`
    - `about`
    - `help`
    - `help apps`
@@ -71,6 +78,8 @@ Goal: show ChronoOS as both a systems project and an indie educational product.
    - `travel 2004`
    - `poster eras`
 3. Museum and quest layer:
+   - `learn boot`
+   - `learn filesystem`
    - `museum boot`
    - `museum filesystem`
    - `quest list`
@@ -116,6 +125,7 @@ Goal: show the full current surface without expanding into risky systems.
    - `travel 1987`
    - `travel 2049`
 3. Guided product surfaces:
+   - `learn gui`
    - `demo`
    - `tour`
    - `tour boot`
@@ -290,6 +300,9 @@ Use `net status`, `net config`, `net log`, `net demo`, `net udp`, and
 during intentional ARP/UDP verification with a known QEMU network setup.
 
 ## Commands And Paths To Avoid Unless Testing Risk
+
+Run `mode status` before the risky section, and use `mode experimental` only for
+intentional verification. Safe mode is warning-only; it does not block commands.
 
 - `ring3`, `syshello`, and `exec <name>` unless verifying userspace paths.
 - `net arp`, `net send`, and custom UDP sends unless verifying ARP/UDP.

@@ -75,6 +75,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 - [ ] `help` lists the expected command groups.
 - [ ] `help start` explains `start`, `welcome`, `guide`, `demo`, and `tour`.
+- [ ] `help mode` explains reliability/safe mode.
 - [ ] `help apps` explains `apps` versus `open`.
 - [ ] `help fs` explains file commands and warns about `fsck repair`.
 - [ ] `help system` points to `doctor`, `poster system`, and conservative status surfaces.
@@ -92,6 +93,23 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 - [ ] Invalid commands return `unknown command` plus `help` guidance.
 - [ ] Common confusions such as `status`, `verify`, `files`, `apps now`, and `net now` print helpful hints.
 - [ ] Unknown help topics such as `help coffee` print the valid topic list.
+
+## 5A. Reliability And Safe Mode
+
+- [ ] `mode` and `mode status` show the current mode, command categories,
+      warning-only policy, no persistence, and no sandbox claim.
+- [ ] `mode safe` sets safe mode and says commands are not blocked.
+- [ ] `mode demo` returns to the default portfolio/demo mode.
+- [ ] `mode experimental` marks intentional lab/verification mode without
+      claiming runtime verification.
+- [ ] `safe`, `safe status`, `safe on`, and `safe off` route correctly.
+- [ ] `safe off` returns to `mode demo`, not `mode experimental`.
+- [ ] Unknown `mode now` and `safe maybe` forms print usage.
+- [ ] In safe mode, `ring3`, `syshello`, `exec <name>`, `fsck repair`,
+      `net arp`, `net send`, and `reboot` print mode-aware warnings before
+      continuing.
+- [ ] In experimental mode, the same commands say evidence is still required.
+- [ ] Safe mode does not claim security isolation or runtime verification.
 
 ## 6. IRQ Keyboard With Polling Fallback
 
