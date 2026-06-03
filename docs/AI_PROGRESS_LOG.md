@@ -29,6 +29,36 @@ Each future entry should use this format:
 - New risks introduced:
 - Next recommended step:
 
+### 2026-06-03 — Add networking observability before protocol expansion
+- Prompt/task: Improve observability around the existing RTL8139/static IPv4/ARP/UDP stack before adding DHCP, DNS, TCP, sockets, or broader networking features.
+- Files changed: `kernel/src/net.rs`, `kernel/src/shell.rs`, `README.md`, `docs/networking.md`, `docs/shell-commands.md`, `docs/manual-testing.md`, `docs/demo-script.md`, `docs/VERIFICATION_MATRIX.md`, `docs/CURRENT_STATUS.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/ROADMAP_AFTER_v0.1.md`, `docs/roadmap.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added real no-alloc networking counters for ARP requests, ARP replies, UDP sent, UDP received, malformed RX packets, last event, and last error; expanded `net` into `net status`, `net config`, `net arp`, `net udp`, `net send`, `net log`, `net demo`, `net roadmap`, and `net help`; updated `help network`; and documented that `net log` is a counter view, not packet capture.
+- What was intentionally avoided: No DHCP, DNS, TCP, sockets, packet capture, package model, dynamic networking API, networking architecture rewrite, QEMU run, hardware test, or runtime verification upgrade.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: `net status`, `net config`, `net arp`, `net udp`, `net send`, `net log`, `net demo`, `net roadmap`, ARP reply learning, UDP guest-to-host send, UDP host-to-guest receive, malformed packet counters, serial logs, screenshots, and hardware.
+- New risks introduced: Low; counters are tied to existing code paths, but they still need runtime checks to confirm the observed values match QEMU packet behavior.
+- Next recommended step: Run a controlled single-core BIOS QEMU networking pass using reliable shell input, a non-conflicting UDP listener setup, `net status`, `net arp`, `net log`, `net send`, and recorded serial/host UDP evidence.
+
+### 2026-06-03 — Polish window and app lifecycle surface
+- Prompt/task: Add small shell-visible window lifecycle commands and document the tiny educational window layer without building a full compositor or GUI toolkit.
+- Files changed: `kernel/src/wm.rs`, `kernel/src/shell.rs`, `README.md`, `docs/windowing.md`, `docs/shell-commands.md`, `docs/manual-testing.md`, `docs/demo-script.md`, `docs/VERIFICATION_MATRIX.md`, `docs/CURRENT_STATUS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added stable shell-facing window IDs; added read-only window inspection helpers plus focus/close-by-ID helpers; added `windows`, `windows list`, `windows status`, `windows focus <id>`, `windows close <id>`, and `windows help`; improved `open notes`/`open sysinfo` failure messages; made `open paint` report roadmap/design-only; and documented window lifecycle behavior and limits.
+- What was intentionally avoided: No full compositor, GUI toolkit, animations, GPU acceleration, framebuffer renderer rewrite, complex event-loop rewrite, risky multitasking expansion, QEMU run, hardware test, or runtime verification upgrade.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: `windows list`, `windows status`, `windows focus <id>`, `windows close <id>`, `open sysinfo`, `open paint` messaging, mouse cursor movement, drag, close button behavior, focus order, task/window cleanup, screenshots, and hardware.
+- New risks introduced: Low to moderate; `windows close <id>` now exposes existing close behavior from the shell and may terminate the owning cooperative task, matching the close-button behavior.
+- Next recommended step: Run a controlled visible QEMU window pass for `open notes`, `windows list`, `open sysinfo`, `windows focus <id>`, `windows close <id>`, `tasks`, and mouse drag/close.
+
+### 2026-06-03 — Add static app registry foundation
+- Prompt/task: Create a lightweight app manifest and app registry foundation for ChronoOS without adding a package manager, dynamic linker, or dynamic app loading.
+- Files changed: `kernel/src/apps/mod.rs`, `kernel/src/shell.rs`, `README.md`, `docs/apps.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/VERIFICATION_MATRIX.md`, `docs/CURRENT_STATUS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added static app metadata for notes, calc, sysinfo, files, museum, theme, tasks, paint, network, userspace, timeline, crashlab, and doctor; added `apps list`, `apps info <name>`, `apps launch <name>`, `apps verified`, and `apps roadmap`; preserved existing direct app aliases; and documented app status, verification, risk, and future app-loading boundaries.
+- What was intentionally avoided: No package manager, dynamic linker, dynamic app loading, app architecture rewrite, new runtime apps, new GUI system, QEMU run, hardware test, or runtime verification upgrade.
+- Runtime verified: no. This pass used source/build/documentation checks only unless separately recorded below.
+- If not verified, what still needs verification: `apps list`, `apps info notes`, `apps launch calc`, `apps verified`, `apps roadmap`, direct app aliases, roadmap app refusal behavior, `sysinfo`, notes read/write persistence, app/window launch paths, and screenshots.
+- New risks introduced: Low; the registry is static metadata and `apps launch` delegates only to existing shell commands for implemented or partial entries.
+- Next recommended step: Run a controlled single-core BIOS QEMU app-registry pass for `apps`, `apps list`, `apps info notes`, `apps launch calc`, `apps verified`, `apps roadmap`, and legacy aliases.
+
 ### 2026-06-03 — Clarify user-space and process foundation
 - Prompt/task: Strengthen the user-space/process foundation by clarifying Ring 3, syscalls, static ELF execution, and future process-model boundaries without implementing a full process model.
 - Files changed: `kernel/src/shell.rs`, `README.md`, `docs/userspace-model.md`, `docs/ring3.md`, `docs/syscalls.md`, `docs/elf.md`, `docs/manual-testing.md`, `docs/VERIFICATION_MATRIX.md`, `docs/shell-commands.md`, `docs/CURRENT_STATUS.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
