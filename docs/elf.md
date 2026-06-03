@@ -5,7 +5,8 @@ Status: partially implemented, risky, needs runtime verification.
 ChronoOS contains code to run one foreground static ELF64 program with
 `exec <filename>`. The file is read from ChronoFS as bytes, parsed in the
 kernel, mapped into a new user address space, and entered at its ELF entry
-point.
+point. This is a teaching path for one foreground program, not a complete
+process model.
 
 ## ELF Header
 
@@ -80,3 +81,8 @@ The serial log should include lines like:
 [CHRONO] elf: PT_LOAD vaddr=...
 [CHRONO] syscall: write fd=1 len=23
 ```
+
+`exec <name>` can return to the shell through `SYS_EXIT` when a foreground ELF
+process is active. This does not imply support for fork/exec semantics, argv,
+environment variables, dynamic linking, packages, or a general process table.
+See `docs/userspace-model.md` for the current boundary.

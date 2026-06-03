@@ -3,9 +3,10 @@
 Status: partially implemented, risky, needs runtime verification.
 
 ChronoOS contains a tiny system call path for ring 3 code. This is not a full
-process model yet: the demo program still runs in the same address space as the
-kernel, and `sys_exit` parks the CPU instead of returning to the shell. The goal
-is to prove the controlled transition from user code into kernel services.
+process model yet. The fixed `syshello` demo uses the older demo user page and
+parks after `sys_exit`, while the foreground static ELF path can return to the
+shell through a saved kernel context. The goal is to prove controlled
+transitions from user code into kernel services.
 
 ## SYSCALL and SYSRET
 
@@ -36,14 +37,14 @@ The first ChronoOS syscall ABI is intentionally small:
 - `rax` holds the return value.
 - `rcx` and `r11` are clobbered by the CPU as part of `SYSCALL/SYSRET`.
 
-Initial syscall numbers:
+Initial syscall table:
 
-| Number | Name | Meaning |
-| --- | --- | --- |
-| `1` | `sys_write(fd, buf, len)` | Write bytes to screen (`fd=1`) or serial (`fd=2`). |
-| `2` | `sys_read(fd, buf, len)` | Read one keyboard line from stdin (`fd=0`). |
-| `3` | `sys_exit(code)` | Exit an ELF process back to the shell, or park the older demo. |
-| `4` | `sys_uptime()` | Return the PIT tick count. |
+| Syscall | Number | Inputs | Outputs | Status | Verification |
+| --- | --- | --- | --- | --- | --- |
+| `write` | `1` | `fd`, `buf`, `len` | byte count or error value | implemented in code | not verified |
+| `read` | `2` | `fd`, `buf`, `len` | byte count or error value | implemented in code | not verified |
+| `exit` | `3` | `code` | returns to shell for active ELF process; parks older demo | implemented in code | not verified |
+| `uptime` | `4` | none | PIT tick count | implemented in code | not verified |
 
 In debug builds, the kernel logs calls to serial, for example:
 
@@ -77,3 +78,6 @@ The text appears on the framebuffer from ring 3 through the kernel syscall
 dispatcher. The separate `exec` path now uses the same syscall ABI for static
 ELF programs, but there is still no process scheduler, dynamic linker, argv, or
 environment.
+
+See `docs/userspace-model.md` for the broader current boundary and future
+process-model roadmap.

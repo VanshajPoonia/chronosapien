@@ -66,3 +66,8 @@ Expected serial lines:
 After the handler skips `hlt`, the user code enters a tiny infinite loop. This
 demo stays focused on privilege enforcement; `docs/syscalls.md` covers the
 separate `SYSCALL/SYSRET` path that builds on this foundation.
+
+The `ring3` demo is separate from the foreground static ELF path used by
+`exec <name>`. It does not create a process table entry, set up argv/env, load
+an ELF file, or prove a mature userland. See `docs/userspace-model.md` for the
+current user-space boundary.
