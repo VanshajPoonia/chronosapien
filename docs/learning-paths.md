@@ -19,7 +19,17 @@ networking commands without running probes or changing system state.
 - `learn scheduler`: cooperative tasks, SMP/AP status, and scheduler limits.
 - `learn eras`: era themes, travel commands, and visual identity.
 - `learn roadmap`: future systems marked as roadmap/design-only.
-- `learn next`: a safe first curriculum route.
+- `learn map`: compact status and verification map for major learning areas.
+- `learn progress`: static progress summary, badges pointer, and next route.
+- `learn beginner`: safe first route through boot, memory, filesystem, apps/UI,
+  and status.
+- `learn advanced`: verification-oriented route through userspace, networking,
+  scheduler/SMP, fsck/journal, and boot-boundary follow-up.
+- `learn next`: recommends the learning map and the next safe route.
+- `explain <term>`: short glossary entry for common OS terms.
+- `museum index`: compact index of core and deeper museum pages.
+- `quest dependencies`: static dependency-style learning route.
+- `quest badges`: static learning badges derived from quest state.
 
 Useful aliases include `learn fs`, `learn apps`, `learn windows`, `learn net`,
 `learn smp`, `learn theme`, and `learn future`.
@@ -33,6 +43,14 @@ Each path prints:
 - verification status,
 - related ChronoOS commands,
 - one safe next command.
+
+`learn map` adds a compact table-like view for Boot, Memory,
+Interrupts/Input, Filesystem, Apps/UI, Userspace, Networking, Scheduler/SMP,
+and Roadmap/Future. It shows status, verification level, suggested command, and
+one related command for each area.
+
+`learn progress`, `quest dependencies`, and `quest badges` are static
+presentation screens. They do not track what the current user has actually run.
 
 The learning paths intentionally route to existing content instead of duplicating
 large museum or tour pages. They should stay compact enough for the framebuffer
