@@ -147,11 +147,11 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 2. UEFI Boot
 
-- [ ] Build the UEFI image with `.\scripts\build-uefi.ps1`.
+- [x] Build the UEFI image with `.\scripts\build-uefi.ps1`.
 - [ ] Boot it with `.\scripts\run-uefi.ps1`.
-- [ ] Prefer direct single-core QEMU for first verification if the helper script uses `-smp 2`.
+- [x] Prefer direct single-core QEMU for first verification if the helper script uses `-smp 2`.
 - [ ] If the UEFI loader fails to compile, record `blocked: build failure` and do not attempt QEMU boot.
-- [ ] Confirm the UEFI loader prints/logs loader start.
+- [x] Confirm the UEFI loader prints/logs loader start.
 - [ ] Confirm GOP framebuffer output reaches the kernel.
 - [ ] Confirm the ChronoOS shell prompt appears.
 - [ ] Confirm the UEFI path does not require Secure Boot.
@@ -225,13 +225,13 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 7. PS/2 Mouse And Window Interactions
 
-- [ ] Mouse initializes according to serial output.
+- [x] Mouse initializes according to serial output.
 - [ ] Pointer/cursor movement is visible.
-- [ ] `windows status` reports count/capacity, drag state, and supported window apps.
-- [ ] `open notes` creates a window.
-- [ ] `windows list` shows the notes window with an ID and owning task ID.
-- [ ] `open sysinfo` creates a window.
-- [ ] `windows focus <id>` brings an existing window to the front.
+- [x] `windows status` reports count/capacity, drag state, and supported window apps.
+- [x] `open notes` creates a window.
+- [x] `windows list` shows the notes window with an ID and owning task ID.
+- [x] `open sysinfo` creates a window.
+- [x] `windows focus <id>` brings an existing window to the front.
 - [ ] `windows close <id>` closes a window and stops its owning task.
 - [ ] `open paint` reports roadmap/design-only instead of pretending paint exists.
 - [ ] Clicking a title bar focuses a window.
@@ -252,21 +252,22 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 9. ChronoFS Read / Write / Delete
 
-- [ ] `fs status` prints mode, disk availability, file counts, slots, and journal summary.
-- [ ] `fs info` prints the fixed layout and limits without mutating metadata.
-- [ ] `ls` works on a clean disk.
-- [ ] `write hello.txt Hi there` succeeds.
-- [ ] `cat hello.txt` prints `Hi there`.
-- [ ] `fs check` reports the same read-only status class as `fsck`.
-- [ ] `rm hello.txt` succeeds.
-- [ ] `cat hello.txt` reports file not found after removal.
+- [x] `fs status` prints mode, disk availability, file counts, slots, and journal summary.
+- [x] `fs info` prints the fixed layout and limits without mutating metadata.
+- [x] `ls` works on a clean disk.
+- [x] `write verify.txt chrono verification test` succeeds.
+- [x] `cat verify.txt` prints `chrono verification test`.
+- [x] `fs check` reports the same read-only status class as `fsck`.
+- [x] `rm verify.txt` succeeds.
+- [x] `cat verify.txt` reports file not found after removal and reboot.
 - [ ] A written file persists after reboot.
 - [ ] If ATA is unavailable, heap fallback is clearly reported as non-persistent.
 
 ## 10. fsck And fsck repair
 
-- [ ] `fsck` on a clean disk reports clean or only expected warnings.
-- [ ] `fs check` groups checked, suspicious, repaired, and not-repaired status.
+- [x] `fsck` on a clean disk reports clean or only expected warnings.
+- [x] `fsck` and `fs check` print an explicit `Clean:` line.
+- [x] `fs check` groups checked, suspicious, repaired, and not-repaired status.
 - [ ] `fsck repair` prints a mutation warning before reporting repair results.
 - [ ] `fs repair` and `fs check repair` refuse to mutate and point to `fsck repair`.
 - [ ] `fsck repair` on a clean disk does not damage files.
@@ -277,11 +278,11 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 11. Journal / Recovery Behavior
 
-- [ ] `journal` reports available and clean on a normal mounted disk.
-- [ ] `fs journal` reports the same journal state as `journal`.
-- [ ] Journal output says clean means no pending record, not full filesystem proof.
-- [ ] Writing a file leaves the journal clean after completion.
-- [ ] Removing a file leaves the journal clean after completion.
+- [x] `journal` reports available and clean on a normal mounted disk.
+- [x] `fs journal` reports the same journal state as `journal`.
+- [x] Journal output says clean means no pending record, not full filesystem proof.
+- [x] Writing a file leaves the journal clean after completion.
+- [x] Removing a file leaves the journal clean after completion.
 - [ ] A controlled intent-state journal record rolls back safely on mount.
 - [ ] A controlled committed-state journal record rolls forward safely on mount.
 - [ ] A corrupt journal record is refused and reported without guessing.
@@ -302,10 +303,10 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 13. Product Commands
 
-- [ ] `start` prints the first-run welcome screen.
+- [x] `start` prints the first-run welcome screen.
 - [ ] `welcome` prints the same first-run welcome screen.
 - [ ] `guide` prints the guide topic menu.
-- [ ] `guide quick` prints the short first-demo path.
+- [x] `guide quick` prints the short first-demo path.
 - [ ] `guide full` prints the full demo route without executing risky commands.
 - [ ] `guide eras` points to era/travel/poster era commands.
 - [ ] `guide apps` points to the app launcher, notes, calc, sysinfo, and window paths.
@@ -317,7 +318,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 - [ ] `tour` prints the tour overview.
 - [ ] `tour boot`, `tour memory`, `tour files`, `tour apps`, `tour userspace`, and `tour future` work.
 - [ ] `capsule`, `capsule milestones`, `capsule current`, and `capsule next` work.
-- [ ] `doctor` prints conservative subsystem status.
+- [x] `doctor` prints conservative subsystem status.
 - [ ] `poster`, `poster boot`, `poster system`, `poster roadmap`, and `poster eras` work.
 - [ ] `travel 1987`, `travel 1998`, `travel 2004`, and `travel 2049` map to expected eras.
 - [ ] `apps` prints the launcher.
@@ -327,18 +328,18 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 14. Ring 3 Demo
 
-- [ ] `userspace status` reports Ring 3/syscall/ELF boundaries without running demos.
+- [x] `userspace status` reports Ring 3/syscall/ELF boundaries without running demos.
 - [ ] `userspace help` lists the read-only userspace inspection commands.
 - [ ] `ring3` prints the userspace runtime-verification warning before running.
-- [ ] `ring3` enters the user-mode demo.
-- [ ] The privileged instruction fault is caught as expected.
-- [ ] The kernel logs the ring 3 transition and violation.
+- [x] `ring3` enters the user-mode demo.
+- [x] The privileged instruction fault is caught as expected.
+- [x] The kernel logs the ring 3 transition and violation.
 - [ ] The system remains inspectable after the demo.
 - [ ] The result is documented as a teaching demo, not a general userland.
 
 ## 15. Syscalls
 
-- [ ] `userspace syscalls` lists syscall numbers 1-4: write, read, exit, uptime.
+- [x] `userspace syscalls` lists syscall numbers 1-4: write, read, exit, uptime.
 - [ ] `syshello` prints the userspace runtime-verification warning before running.
 - [ ] `syshello` enters ring 3.
 - [ ] `sys_write` prints hello text through the kernel dispatcher.
@@ -351,7 +352,7 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 - [ ] `userspace elf` explains the static ELF64 boundary without loading a program.
 - [ ] `userspace roadmap` marks argv/env, process table, dynamic linker, package manager, and preemptive scheduler as future work.
-- [ ] Build and install `hello.elf` with `.\scripts\build-user.ps1`.
+- [ ] Build and install `hello.elf` into a disposable ChronoFS image; do not mutate the repo data disk for verification.
 - [ ] `ls` shows `hello.elf`.
 - [ ] `exec hello.elf` prints the userspace runtime-verification warning before loading.
 - [ ] `exec hello.elf` prints the user-space hello text.
