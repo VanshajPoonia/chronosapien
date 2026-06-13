@@ -73,10 +73,10 @@ design, and what has actual verification evidence.
   mouse click packet was logged. `sysinfo`, `open sysinfo`, notes read/write,
   cursor movement, drag, close, Backspace, shifted input, polling fallback,
   GIF capture, and hardware remain unverified.
-- Important UEFI limit: `pwsh -NoLogo -NoProfile -File scripts/build-uefi.ps1`
-  downloaded the UEFI loader dependencies after escalation but failed to compile
-  `uefi-loader` because `uefi::boot::MemoryMap` no longer exists in the current
-  `uefi` crate API. No UEFI QEMU boot was attempted.
+- Important UEFI limit: the 2026-06-13 UEFI build/boot pass fixed the current
+  UEFI loader API drift and image-builder blockers, and single-core OVMF started
+  the ChronoOS UEFI loader. The loader then failed with `Out of Resources`
+  before framebuffer handoff or kernel boot complete.
 - Important SMP limit: a 2026-06-02 two-core BIOS serial-only QEMU smoke at
   `/private/tmp/chronoos-smp-20260602-162000.serial.log` reached
   `[CHRONO] smp: BSP online (core 0)` and `[CHRONO] active era: 1984`, but did
@@ -98,7 +98,7 @@ design, and what has actual verification evidence.
 | Public ChronoOS identity | implemented in code | not runtime-facing | Public docs use ChronoOS; repo/package names may remain `chronosapien`. |
 | BIOS boot path | implemented in code | verified in QEMU, needs broader runtime verification | Single-core BIOS boot reached `[CHRONO] boot complete` in serial-only and visible QEMU runs; multi-core still needs verification. |
 | Custom BIOS bootloader path | partially implemented | blocked: build dependency missing | Stage/handoff code and scripts exist, but `nasm` was not on PATH during the 2026-06-02 preflight. |
-| UEFI loader path | implemented in code | blocked: build failure | UEFI docs/scripts exist, OVMF is available, but `uefi-loader` failed to compile against the current `uefi` crate API. |
+| UEFI loader path | implemented in code | partially verified in QEMU UEFI | UEFI image builds and OVMF starts the ChronoOS loader, but the 2026-06-13 run failed with `Out of Resources` before kernel handoff. |
 | Framebuffer console/UI | implemented in code | verified in QEMU, needs broader runtime verification | QEMU screendump showed the top bar, boot text, and `CHRONO>` prompt; broader rendering and interaction still need checks. |
 | Serial logging | implemented in code | verified in QEMU, needs broader runtime verification | Boot-time serial logging reached boot complete in single-core QEMU; shell-command serial output is only partially observed. |
 | Shell command surface | implemented in code | verified in QEMU, needs broader runtime verification | `help`, `help start`, and `about` were observed through visible QEMU; most commands still need staged checks. |
@@ -139,8 +139,9 @@ design, and what has actual verification evidence.
 - Custom BIOS boot is partially implemented. Keep it separate from the normal
   BIOS path because it has its own stage/handoff risk. The 2026-06-02 custom
   BIOS preflight was blocked because `nasm` was missing.
-- UEFI boot is implemented in code, but the 2026-06-02 UEFI image build failed
-  in `uefi-loader` before QEMU boot could be attempted.
+- UEFI boot is implemented in code. The 2026-06-13 UEFI image build succeeded,
+  and single-core OVMF started the ChronoOS loader, but the loader failed with
+  `Out of Resources` before kernel handoff.
 - Framebuffer and shell startup have limited visible QEMU evidence from the
   2026-06-02 screendumps. UEFI, custom BIOS, and SMP/AP boot still need
   separate verification.
@@ -379,14 +380,14 @@ code and a progress-log entry records the change:
 - ChronoFS repair/recovery: writes metadata during repair/recovery and must be
   tested only with controlled disk images.
 - Heap allocator: reusable allocator exists but needs stress/reuse checks.
-- Custom BIOS and UEFI boot: code-present paths are currently blocked by build
-  issues or missing dependencies before runtime boot evidence.
+- Custom BIOS and UEFI boot: custom BIOS remains blocked by missing `nasm`;
+  UEFI now has loader-start evidence but still fails before kernel handoff.
 - Networking: keep limited to static IPv4 ARP/UDP; only RTL8139 init/MAC is
   partially verified so far.
 
 ## Recommended Next Goal
 
-Fix the UEFI loader API mismatch or install NASM only as a targeted build-path
-task, then rerun one high-risk verification path at a time. For networking, use
-a more reliable shell input path before attempting `net arp` or `net send`
-again.
+Investigate the UEFI loader `Out of Resources` failure or install NASM only as
+a targeted custom-BIOS build-path task, then rerun one high-risk verification
+path at a time. For networking, use a more reliable shell input path before
+attempting `net arp` or `net send` again.
