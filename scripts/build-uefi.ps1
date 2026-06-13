@@ -1,12 +1,13 @@
 $ErrorActionPreference = "Stop"
 
-$kernelTargetDir = "target\x86_64-unknown-none\debug"
-$uefiTargetDir = "target\x86_64-unknown-uefi\debug"
-$builderDir = "$kernelTargetDir\uefi"
-$builder = "$builderDir\uefi_image_builder.exe"
-$kernel = "$kernelTargetDir\kernel"
-$loader = "$uefiTargetDir\uefi-loader.efi"
-$image = "$kernelTargetDir\chronosapien-uefi.img"
+$kernelTargetDir = Join-Path (Join-Path (Join-Path "target" "x86_64-unknown-none") "debug") ""
+$uefiTargetDir = Join-Path (Join-Path (Join-Path "target" "x86_64-unknown-uefi") "debug") ""
+$builderDir = Join-Path $kernelTargetDir "uefi"
+$builder = Join-Path $builderDir "uefi_image_builder.exe"
+$builderSource = Join-Path "tools" "uefi_image_builder.rs"
+$kernel = Join-Path $kernelTargetDir "kernel"
+$loader = Join-Path $uefiTargetDir "uefi-loader.efi"
+$image = Join-Path $kernelTargetDir "chronosapien-uefi.img"
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     throw "cargo is required to build ChronoOS."
@@ -37,7 +38,7 @@ if (-not (Test-Path $loader)) {
 }
 
 Write-Host "Building UEFI image builder..."
-rustc tools\uefi_image_builder.rs -o $builder
+rustc $builderSource -o $builder
 
 Write-Host "Creating GPT/FAT32 ESP image..."
 & $builder $loader $kernel $image
