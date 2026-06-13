@@ -1,5 +1,7 @@
 //! Tiny line-based shell for the first interactive milestone.
 
+use alloc::vec::Vec;
+use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicU8, Ordering};
 
 use crate::apps;
@@ -19,11 +21,17 @@ use crate::wm;
 use crate::{print, println, serial_println};
 
 const COMMAND_BUFFER_CAPACITY: usize = 80;
+const RECENT_COMMAND_COUNT: usize = 6;
+const RECENT_COMMAND_CAPACITY: usize = 64;
 const RESET_COMMAND_PORT: u16 = 0x64;
 const CPU_RESET_COMMAND: u8 = 0xFE;
 const RELIABILITY_MODE_DEMO: u8 = 1;
 
 static RELIABILITY_MODE: AtomicU8 = AtomicU8::new(RELIABILITY_MODE_DEMO);
+static RECENT_COMMANDS: GlobalRecentCommands =
+    GlobalRecentCommands(UnsafeCell::new(RecentCommands::new()));
+static RECENT_APPS: GlobalRecentCommands =
+    GlobalRecentCommands(UnsafeCell::new(RecentCommands::new()));
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum ReliabilityMode {
@@ -105,6 +113,7 @@ pub fn run() -> ! {
                 hide_cursor(&mut cursor_visible);
                 println!();
 
+                record_recent_command(buffer.as_str());
                 execute_command(buffer.as_str());
                 buffer.clear();
                 print_prompt();
@@ -206,6 +215,120 @@ impl CommandBuffer {
     }
 }
 
+struct GlobalRecentCommands(UnsafeCell<RecentCommands>);
+
+unsafe impl Sync for GlobalRecentCommands {}
+
+struct RecentCommands {
+    entries: [[u8; RECENT_COMMAND_CAPACITY]; RECENT_COMMAND_COUNT],
+    lengths: [usize; RECENT_COMMAND_COUNT],
+    next: usize,
+    count: usize,
+}
+
+impl RecentCommands {
+    const fn new() -> Self {
+        Self {
+            entries: [[0; RECENT_COMMAND_CAPACITY]; RECENT_COMMAND_COUNT],
+            lengths: [0; RECENT_COMMAND_COUNT],
+            next: 0,
+            count: 0,
+        }
+    }
+
+    fn record(&mut self, command: &str) {
+        let command = command.trim();
+        if command.is_empty() || command == "recent" {
+            return;
+        }
+
+        let bytes = command.as_bytes();
+        let mut len = bytes.len();
+        if len > RECENT_COMMAND_CAPACITY {
+            len = RECENT_COMMAND_CAPACITY;
+        }
+
+        let slot = self.next;
+        let mut index = 0;
+        while index < len {
+            self.entries[slot][index] = bytes[index];
+            index += 1;
+        }
+        while index < RECENT_COMMAND_CAPACITY {
+            self.entries[slot][index] = 0;
+            index += 1;
+        }
+
+        self.lengths[slot] = len;
+        self.next = (self.next + 1) % RECENT_COMMAND_COUNT;
+        if self.count < RECENT_COMMAND_COUNT {
+            self.count += 1;
+        }
+    }
+}
+
+fn record_recent_command(command: &str) {
+    // SAFETY: The shell is the only writer. Commands can call other commands
+    // through `execute_command`, but only the interactive Enter path records.
+    unsafe {
+        (*RECENT_COMMANDS.0.get()).record(command);
+    }
+}
+
+fn print_recent_commands() {
+    // SAFETY: Read-only snapshot from the single shell command path.
+    let recent = unsafe { &*RECENT_COMMANDS.0.get() };
+
+    println!("Recent commands");
+    println!("Scope: in-memory commands typed since boot; no arrow-key recall.");
+
+    if recent.count == 0 {
+        println!("No recent commands yet.");
+        println!("Try: workspace, shortcuts, help, apps, fs status");
+        return;
+    }
+
+    let mut shown = 0;
+    while shown < recent.count {
+        let index = (recent.next + RECENT_COMMAND_COUNT - 1 - shown) % RECENT_COMMAND_COUNT;
+        let len = recent.lengths[index];
+        let text = unsafe { core::str::from_utf8_unchecked(&recent.entries[index][..len]) };
+        println!("{}. {}", shown + 1, text);
+        shown += 1;
+    }
+}
+
+fn record_recent_app(name: &str) {
+    // SAFETY: App launcher routes run on the same single shell command path as
+    // command history. This stores names only and has fixed capacity.
+    unsafe {
+        (*RECENT_APPS.0.get()).record(name);
+    }
+}
+
+fn print_recent_apps() {
+    // SAFETY: Read-only snapshot from the single shell command path.
+    let recent = unsafe { &*RECENT_APPS.0.get() };
+
+    println!("Recent apps");
+    println!("Scope: in-memory app launcher routes since boot.");
+
+    if recent.count == 0 {
+        println!("No app launcher entries yet.");
+        println!("Try: apps featured");
+        return;
+    }
+
+    let mut shown = 0;
+    while shown < recent.count {
+        let index = (recent.next + RECENT_COMMAND_COUNT - 1 - shown) % RECENT_COMMAND_COUNT;
+        let len = recent.lengths[index];
+        let text = unsafe { core::str::from_utf8_unchecked(&recent.entries[index][..len]) };
+        println!("{}. {}", shown + 1, text);
+        shown += 1;
+    }
+}
+
 fn execute_command(command: &str) {
     let command = command.trim();
 
@@ -216,11 +339,21 @@ fn execute_command(command: &str) {
     match command {
         "" => {}
         command if command == "help" || command.starts_with("help ") => run_help(command),
+        "workspace" | "status" => print_workspace_dashboard(),
+        "shortcuts" => print_shortcuts(),
+        "whereami" => print_whereami(),
+        "verify" => print_verify_summary(),
+        "recent" => print_recent_commands(),
+        command if command == "files" || command.starts_with("files ") => run_files_command(command),
+        "theme" => print_theme_workspace(),
         command if command == "mode" || command.starts_with("mode ") => run_mode_command(command),
         command if command == "safe" || command.starts_with("safe ") => run_safe_command(command),
         "start" | "welcome" => print_welcome(),
         command if command == "guide" || command.starts_with("guide ") => run_guide(command),
         command if command == "learn" || command.starts_with("learn ") => run_learn(command),
+        command if command == "explain" || command.starts_with("explain ") => {
+            run_explain_command(command)
+        }
         command if command == "demo" || command.starts_with("demo ") => run_demo(command),
         command if command == "tour" || command.starts_with("tour ") => run_tour(command),
         command if command == "capsule" || command.starts_with("capsule ") => run_capsule(command),
@@ -280,11 +413,15 @@ fn run_help(command: &str) {
 
     match topic {
         "" => print_help(),
+        "search" => print_help_search(topic),
+        topic if topic.starts_with("search ") => print_help_search(topic),
+        "workspace" | "dashboard" | "shortcuts" | "whereami" => print_help_workspace(),
         "start" | "guide" => print_help_start(),
         "learn" | "learning" => print_help_learn(),
         "mode" | "safe" | "reliability" => print_help_mode(),
         "apps" | "app" => print_help_apps(),
         "fs" | "files" | "filesystem" => print_help_fs(),
+        "theme" | "themes" => print_help_theme(),
         "system" | "status" | "verify" => print_help_system(),
         "network" | "net" => print_help_network(),
         "userspace" | "user" | "elf" => print_help_userspace(),
@@ -296,21 +433,36 @@ fn run_help(command: &str) {
 
 fn print_help() {
     println!("ChronoOS help");
+    println!("Workspace       : workspace, shortcuts, whereami, recent, status, verify");
     println!("Getting started : start, welcome, guide, learn, demo, tour");
-    println!("Learning paths  : learn boot|memory|filesystem|userspace|networking");
+    println!("Learning paths  : learn map|progress|beginner|advanced|next, explain <term>");
     println!("Reliability     : mode, mode safe|demo|experimental, safe on|off");
     println!("Eras and themes : era, travel <year>, poster eras, apps theme");
     println!("Apps            : apps, notes, calc, sysinfo, open notes, open sysinfo");
     println!("Windows/tasks   : windows, open notes, open sysinfo, tasks, kill <id>");
-    println!("Filesystem      : fs, ls, cat, write, rm, fsck, journal");
-    println!("Museum/quests   : museum ..., quest list, quest status, stats, inventory");
+    println!("Filesystem      : files, fs, ls, cat, write, rm, fsck, journal");
+    println!("Museum/quests   : museum index, quest list/status/dependencies/badges");
     println!("System status   : doctor, sysinfo, mem, cores, uptime, clock, poster system");
     println!("Userspace       : ring3, syshello, exec <name> (needs verification)");
     println!("Networking      : net status, net config, net arp, net udp, net log");
     println!("Debug/lab       : beep <hz>, reboot, fsck repair, risky demos");
     println!("Roadmap/future  : capsule next, poster roadmap, tour future");
     println!();
-    println!("More help: help start|learn|mode|apps|fs|system|network|userspace|labs|roadmap");
+    println!("More help: help workspace|start|learn|mode|apps|fs|system|network|userspace");
+    println!("Search: help search <term>");
+}
+
+fn print_help_workspace() {
+    println!("Help: workspace");
+    println!("- workspace : compact dashboard for the current shell");
+    println!("- status    : alias for workspace");
+    println!("- verify    : read-only verification boundary summary");
+    println!("- whereami  : current era, mode, UI context, and next action");
+    println!("- shortcuts : best demo and utility commands");
+    println!("- recent    : commands typed since boot, no persistent history");
+    println!();
+    println!("These commands are read-only and do not certify runtime behavior.");
+    println!("Next: workspace");
 }
 
 fn print_help_start() {
@@ -340,7 +492,12 @@ fn print_help_learn() {
     println!("- learn scheduler    : tasks, scheduler, SMP/AP boundary");
     println!("- learn eras         : themes, travel, era identity");
     println!("- learn roadmap      : future systems");
+    println!("- learn map          : learning area status map");
+    println!("- learn progress     : static progress and badge summary");
+    println!("- learn beginner     : safe first curriculum route");
+    println!("- learn advanced     : intentional verification route");
     println!("- learn next         : safe next curriculum step");
+    println!("- explain <term>     : short OS glossary entry");
     println!("Each path is read-only and does not run probes.");
 }
 
@@ -359,12 +516,17 @@ fn print_help_mode() {
 
 fn print_help_apps() {
     println!("Help: apps");
-    println!("- apps / apps list       : static app registry");
-    println!("- apps info <name>       : app manifest details");
-    println!("- apps launch <name>     : run safe launch command if available");
-    println!("- apps verified          : app entries with partial QEMU evidence");
-    println!("- apps roadmap           : future app ideas");
-    println!("- apps notes|calc|sysinfo: legacy direct routes");
+    println!("- apps / apps list         : static app registry");
+    println!("- apps featured            : best demo-ready app surfaces");
+    println!("- apps recent              : app launcher routes since boot");
+    println!("- apps category <name>     : browse Core, Files, Learning, System, Networking, Visual, Debug/Lab, Roadmap/Future");
+    println!("- apps info <name>         : app manifest details");
+    println!("- apps help <name>         : app-specific help and related commands");
+    println!("- apps demo <name>         : safe demo script preview");
+    println!("- apps launch <name>       : run launch command if available");
+    println!("- apps verified            : app entries with partial QEMU evidence");
+    println!("- apps roadmap             : future app ideas");
+    println!("- apps notes|calc|sysinfo  : legacy direct routes");
     println!("- notes           : notes home screen");
     println!("- calc 6 * 7      : integer calculator");
     println!("- sysinfo         : compact status view");
@@ -378,6 +540,14 @@ fn print_help_apps() {
 
 fn print_help_fs() {
     println!("Help: filesystem");
+    println!("- files                    : ChronoFS usability overview");
+    println!("- files list               : visible files with byte sizes");
+    println!("- files info <name>        : file size, storage mode, safety note");
+    println!("- files search <term>      : search names and UTF-8 contents");
+    println!("- files sample             : read-only sample file suggestions");
+    println!("- files demo               : guided demo script, no automatic writes");
+    println!("- files copy <src> <dst>   : copy only when destination is absent");
+    println!("- files rename <old> <new> : deferred safe-rename explanation");
     println!("- fs                       : ChronoFS status summary");
     println!("- fs info                  : layout, limits, and journal reservation");
     println!("- fs check                 : read-only fsck summary");
@@ -390,12 +560,31 @@ fn print_help_fs() {
     println!("- fsck repair              : conservative metadata repair");
     println!("- journal                  : ChronoFS journal status");
     println!();
-    println!("Warning: fsck repair mutates metadata; fs commands are read-only.");
-    println!("Next: tour files");
+    println!("Warning: fsck repair mutates metadata; files rename is intentionally deferred.");
+    println!("Aliases/cards: apps files");
+    println!("Next: files");
+}
+
+fn print_help_theme() {
+    println!("Help: themes");
+    println!("- theme      : current era/theme card");
+    println!("- era        : list available eras");
+    println!("- era 1984   : monochrome terminal era");
+    println!("- era 1995   : chunky desktop era");
+    println!("- era 2007   : glossy app-era lens");
+    println!("- era 2040   : future lab console");
+    println!("- travel <year> : map a year to an era");
+    println!("- poster eras   : screenshot-friendly era card");
+    println!();
+    println!("Theme changes presentation only, not kernel behavior.");
 }
 
 fn print_help_system() {
     println!("Help: system status");
+    println!("- workspace       : compact shell dashboard");
+    println!("- status          : alias for workspace");
+    println!("- verify          : read-only verification summary");
+    println!("- whereami        : current shell context");
     println!("- doctor          : conservative subsystem report");
     println!("- poster system   : screenshot-friendly status card");
     println!("- capsule current : current milestone snapshot");
@@ -406,7 +595,7 @@ fn print_help_system() {
     println!("- uptime / clock  : timer-derived counters");
     println!();
     println!("These are status surfaces, not runtime certification.");
-    println!("Next: doctor");
+    println!("Next: workspace");
 }
 
 fn print_help_network() {
@@ -466,18 +655,161 @@ fn print_help_roadmap() {
     println!("Next: capsule next or mode status");
 }
 
+struct HelpSearchEntry {
+    command: &'static str,
+    terms: &'static str,
+    summary: &'static str,
+}
+
+const HELP_SEARCH_INDEX: &[HelpSearchEntry] = &[
+    HelpSearchEntry {
+        command: "workspace",
+        terms: "workspace dashboard status verify shell whereami shortcuts recent",
+        summary: "Compact shell dashboard and product orientation.",
+    },
+    HelpSearchEntry {
+        command: "shortcuts",
+        terms: "shortcuts quick commands demo useful start guide apps files theme",
+        summary: "Best demo and utility command list.",
+    },
+    HelpSearchEntry {
+        command: "whereami",
+        terms: "whereami context current era mode ui verification",
+        summary: "Explain current era, reliability mode, and UI context.",
+    },
+    HelpSearchEntry {
+        command: "status",
+        terms: "status workspace dashboard verification doctor",
+        summary: "Alias for the workspace dashboard.",
+    },
+    HelpSearchEntry {
+        command: "verify",
+        terms: "verify verification evidence qemu hardware blocked unverified",
+        summary: "Read-only verification boundary summary.",
+    },
+    HelpSearchEntry {
+        command: "files",
+        terms: "files fs filesystem chronofs list info search sample demo copy rename ls cat write rm fsck journal",
+        summary: "Shell-first ChronoFS usability commands.",
+    },
+    HelpSearchEntry {
+        command: "theme",
+        terms: "theme era themes travel poster eras 1984 1995 2007 2040",
+        summary: "Era/theme command card.",
+    },
+    HelpSearchEntry {
+        command: "apps",
+        terms: "apps launcher featured recent category info help demo notes calc sysinfo files theme tasks verification risk roadmap",
+        summary: "Static app registry and shell-first app launcher.",
+    },
+    HelpSearchEntry {
+        command: "learn",
+        terms: "learn learning curriculum map progress beginner advanced boot memory filesystem userspace networking explain glossary",
+        summary: "Structured learning paths and progress map.",
+    },
+    HelpSearchEntry {
+        command: "explain",
+        terms: "explain glossary term kernel bootloader framebuffer interrupt heap filesystem journal syscall userspace elf arp udp scheduler smp",
+        summary: "Short OS glossary explanations.",
+    },
+    HelpSearchEntry {
+        command: "museum index",
+        terms: "museum index exhibits boot kernel memory filesystem userspace syscalls elf networking smp scheduler",
+        summary: "Index of museum learning pages.",
+    },
+    HelpSearchEntry {
+        command: "quest badges",
+        terms: "quest badges dependencies progress learning achievements inventory",
+        summary: "Static quest badges and dependency route.",
+    },
+    HelpSearchEntry {
+        command: "safe status",
+        terms: "safe mode reliability warning demo experimental",
+        summary: "Current warning-only reliability mode.",
+    },
+];
+
+fn print_help_search(topic: &str) {
+    let term = topic.strip_prefix("search").unwrap_or("").trim();
+    if term.is_empty() {
+        println!("Usage: help search <term>");
+        println!("Try: help search fs, help search app, help search verify");
+        return;
+    }
+
+    println!("Help search: {}", term);
+    let mut matches = 0;
+    for entry in HELP_SEARCH_INDEX {
+        if contains_ignore_ascii_case(entry.terms, term)
+            || contains_ignore_ascii_case(entry.command, term)
+            || contains_ignore_ascii_case(entry.summary, term)
+        {
+            println!("- {}: {}", entry.command, entry.summary);
+            matches += 1;
+        }
+    }
+
+    if matches == 0 {
+        println!("No direct matches.");
+        println!("Try: help workspace, help apps, help fs, help system");
+    }
+}
+
+fn contains_ignore_ascii_case(haystack: &str, needle: &str) -> bool {
+    let h = haystack.as_bytes();
+    let n = needle.as_bytes();
+    if n.is_empty() {
+        return true;
+    }
+    if n.len() > h.len() {
+        return false;
+    }
+
+    let mut start = 0;
+    while start + n.len() <= h.len() {
+        let mut offset = 0;
+        while offset < n.len() && ascii_eq_ignore_case(h[start + offset], n[offset]) {
+            offset += 1;
+        }
+        if offset == n.len() {
+            return true;
+        }
+        start += 1;
+    }
+
+    false
+}
+
+fn ascii_eq_ignore_case(left: u8, right: u8) -> bool {
+    ascii_lower(left) == ascii_lower(right)
+}
+
+fn ascii_lower(byte: u8) -> u8 {
+    if byte >= b'A' && byte <= b'Z' {
+        byte + 32
+    } else {
+        byte
+    }
+}
+
 fn print_unknown_help_topic(topic: &str) {
     println!("Unknown help topic: {}", topic);
-    println!("Try: help start|learn|mode|apps|fs|system|network|userspace|labs|roadmap");
+    if let Some(suggestion) = suggest_command(topic) {
+        println!("Did you mean: help {}?", suggestion);
+    }
+    println!("Try: help workspace|start|learn|mode|apps|fs|system|network|userspace");
+    println!("Search: help search <term>");
 }
 
 fn print_unknown_command(command: &str) {
     println!("unknown command: {}", command);
 
-    if command.starts_with("status") || command.starts_with("verify") {
-        println!("Hint: use doctor or help system for conservative status.");
+    if let Some(suggestion) = suggest_command(command) {
+        println!("Did you mean: {}?", suggestion);
+    } else if command.starts_with("status") || command.starts_with("verify") {
+        println!("Hint: use workspace, verify, doctor, or help system.");
     } else if command.starts_with("file") || command.starts_with("files") {
-        println!("Hint: use help fs for ls, cat, write, rm, fsck, and journal.");
+        println!("Hint: use files or help fs for ls, cat, write, rm, fsck, and journal.");
     } else if command.starts_with("app") {
         println!("Hint: use apps or help apps.");
     } else if command.starts_with("net") {
@@ -488,8 +820,154 @@ fn print_unknown_command(command: &str) {
         println!("Hint: use learn or help learn.");
     }
 
-    println!("Try: help");
-    println!("Topics: help start|learn|mode|apps|fs|system|network|userspace|labs|roadmap");
+    println!("Try: help, shortcuts, or workspace");
+    println!("Search: help search <term>");
+}
+
+struct CommandSuggestion {
+    typo: &'static str,
+    suggestion: &'static str,
+}
+
+const COMMAND_TYPO_SUGGESTIONS: &[CommandSuggestion] = &[
+    CommandSuggestion {
+        typo: "hlep",
+        suggestion: "help",
+    },
+    CommandSuggestion {
+        typo: "apss",
+        suggestion: "apps",
+    },
+    CommandSuggestion {
+        typo: "verfy",
+        suggestion: "verify",
+    },
+    CommandSuggestion {
+        typo: "lern",
+        suggestion: "learn",
+    },
+    CommandSuggestion {
+        typo: "workspce",
+        suggestion: "workspace",
+    },
+    CommandSuggestion {
+        typo: "whreami",
+        suggestion: "whereami",
+    },
+];
+
+const COMMON_COMMANDS: &[&str] = &[
+    "help",
+    "workspace",
+    "shortcuts",
+    "whereami",
+    "status",
+    "verify",
+    "recent",
+    "apps",
+    "learn",
+    "guide",
+    "files",
+    "theme",
+    "safe",
+    "doctor",
+    "fs",
+    "journal",
+    "windows",
+];
+
+fn suggest_command(command: &str) -> Option<&'static str> {
+    let command = command.trim();
+
+    for suggestion in COMMAND_TYPO_SUGGESTIONS {
+        if command == suggestion.typo {
+            return Some(suggestion.suggestion);
+        }
+    }
+
+    for candidate in COMMON_COMMANDS {
+        if is_near_command(command, candidate) {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn is_near_command(input: &str, candidate: &str) -> bool {
+    let input = input.as_bytes();
+    let candidate = candidate.as_bytes();
+
+    if input.len() == candidate.len() {
+        let mut mismatches = 0;
+        let mut index = 0;
+        while index < input.len() {
+            if !ascii_eq_ignore_case(input[index], candidate[index]) {
+                mismatches += 1;
+            }
+            index += 1;
+        }
+        return mismatches <= 1 || is_single_transposition(input, candidate);
+    }
+
+    if input.len() + 1 == candidate.len() {
+        return is_one_missing_byte(input, candidate);
+    }
+
+    if candidate.len() + 1 == input.len() {
+        return is_one_missing_byte(candidate, input);
+    }
+
+    false
+}
+
+fn is_single_transposition(input: &[u8], candidate: &[u8]) -> bool {
+    if input.len() != candidate.len() || input.len() < 2 {
+        return false;
+    }
+
+    let mut index = 0;
+    while index + 1 < input.len() {
+        if !ascii_eq_ignore_case(input[index], candidate[index]) {
+            return ascii_eq_ignore_case(input[index], candidate[index + 1])
+                && ascii_eq_ignore_case(input[index + 1], candidate[index])
+                && ranges_equal_ignore_case(input, candidate, index + 2);
+        }
+        index += 1;
+    }
+
+    false
+}
+
+fn is_one_missing_byte(shorter: &[u8], longer: &[u8]) -> bool {
+    let mut short_index = 0;
+    let mut long_index = 0;
+    let mut skipped = false;
+
+    while short_index < shorter.len() && long_index < longer.len() {
+        if ascii_eq_ignore_case(shorter[short_index], longer[long_index]) {
+            short_index += 1;
+            long_index += 1;
+        } else if skipped {
+            return false;
+        } else {
+            skipped = true;
+            long_index += 1;
+        }
+    }
+
+    true
+}
+
+fn ranges_equal_ignore_case(left: &[u8], right: &[u8], start: usize) -> bool {
+    let mut index = start;
+    while index < left.len() {
+        if !ascii_eq_ignore_case(left[index], right[index]) {
+            return false;
+        }
+        index += 1;
+    }
+    true
 }
 
 fn run_mode_command(command: &str) {
@@ -573,6 +1051,131 @@ fn print_mode_usage() {
 fn print_safe_usage() {
     println!("Usage: safe [status|on|off|help]");
     println!("safe on -> mode safe; safe off -> mode demo");
+}
+
+fn print_workspace_dashboard() {
+    let profile = theme::active_profile();
+    let mode = current_reliability_mode();
+    let status = fs::status();
+
+    println!("ChronoOS workspace");
+    println!("Era/theme: {}", profile.name);
+    println!("Prompt: {}", profile.screen_prompt);
+    println!("Mode: {} (warning-only)", mode.label());
+    println!();
+    println!("Verified core:");
+    println!("- single-core BIOS boot, serial logs, framebuffer shell");
+    println!("- onboarding/status/app registry screenshots");
+    println!("- ChronoFS CRUD/check/journal on disposable QEMU image");
+    println!();
+    println!("Apps:");
+    println!("- apps, apps list, notes, calc, sysinfo");
+    println!("- open notes/open sysinfo are partial window paths");
+    println!();
+    println!("ChronoFS:");
+    println!(
+        "- disk: {}",
+        if status.disk_available { "available" } else { "not available" }
+    );
+    println!(
+        "- mode: {}",
+        if status.persistent { "persistent ATA disk" } else { "memory fallback" }
+    );
+    println!(
+        "- files: visible={} slots={}/{} journal={}",
+        status.visible_file_count,
+        status.used_file_slots,
+        status.max_files,
+        status.journal.state
+    );
+    println!();
+    println!("Suggested next command: shortcuts");
+    println!("Learning suggestion: learn next");
+    println!("Verification note: workspace is read-only; it does not run live probes.");
+}
+
+fn print_shortcuts() {
+    println!("ChronoOS shortcuts");
+    println!("Start and help:");
+    println!("- start        : first-run welcome");
+    println!("- guide        : guided shell map");
+    println!("- help         : categorized command list");
+    println!("- shortcuts    : this command list");
+    println!();
+    println!("Product workspace:");
+    println!("- workspace    : compact dashboard");
+    println!("- whereami     : current shell context");
+    println!("- recent       : commands typed since boot");
+    println!("- apps         : text app launcher");
+    println!("- files        : ChronoFS command card");
+    println!("- theme        : era/theme command card");
+    println!();
+    println!("Learning and status:");
+    println!("- learn        : curriculum paths");
+    println!("- demo         : read-only product preview");
+    println!("- status       : alias for workspace");
+    println!("- verify       : verification boundary summary");
+    println!("- safe status  : warning-only reliability mode");
+}
+
+fn print_whereami() {
+    let profile = theme::active_profile();
+    let mode = current_reliability_mode();
+
+    println!("Where am I?");
+    println!("Mode: {}", mode.label());
+    println!("Era: {}", profile.name);
+    println!("Prompt: {}", profile.screen_prompt);
+    println!("UI context: framebuffer shell with tiny fixed-capacity windows.");
+    println!("Safe status: reliability mode is warning-only, not a sandbox.");
+    println!("Verification status: BIOS shell is the safest verified demo base.");
+    println!("Unverified nearby: manual typing, Backspace/Shift, mouse drag/close, tasks/kill.");
+    println!("Suggested next action: workspace or shortcuts");
+}
+
+fn print_verify_summary() {
+    println!("ChronoOS verification summary");
+    println!("This is a read-only summary, not a live certification run.");
+    println!();
+    println!("Verified in QEMU:");
+    println!("- single-core BIOS boot, serial output, framebuffer shell");
+    println!("- start, guide quick, mode status, safe on, doctor, apps list");
+    println!("- disposable ChronoFS CRUD/check/journal/delete-persistence path");
+    println!("- userspace status/syscalls screens and fixed ring3 teaching demo");
+    println!();
+    println!("Partially verified or blocked:");
+    println!("- window open/list/focus and serial-backed close need lifecycle follow-up");
+    println!("- syshello and static ELF exec remain unverified/tooling-blocked");
+    println!("- UEFI loader starts under OVMF but fails with Out of Resources");
+    println!("- no hardware proof yet");
+    println!();
+    println!("Next verification target: input/window lifecycle cleanup.");
+}
+
+fn print_files_workspace() {
+    println!("ChronoFS workspace");
+    println!("Use these commands to inspect files without guessing the raw fs syntax.");
+    println!();
+    println!("- files list          : visible files with byte sizes");
+    println!("- files info <name>   : size, storage mode, and safety note");
+    println!("- files search <term> : match filenames and UTF-8 file contents");
+    println!("- files sample        : read-only sample file ideas");
+    println!("- files demo          : guided demo script, no automatic writes");
+    println!("- files copy <s> <d>  : non-overwriting copy through ChronoFS");
+    println!("- files rename <o> <n>: deferred safe-rename explanation");
+    println!();
+    println!("Compatibility: ls, cat, write, rm, fs check, and journal still work.");
+    println!("Verification: files namespace is code-present; QEMU proof is still needed.");
+    println!("Safety: repair/recovery and independent write persistence remain unverified.");
+    println!();
+    print_files_app_card();
+    println!("Quick check: files list or fs status");
+}
+
+fn print_theme_workspace() {
+    println!("Workspace alias: theme");
+    print_theme_app_card();
+    println!("Quick switch: era 1995 or travel 2004");
 }
 
 pub fn print_reliability_warning(area: &str) {
@@ -858,6 +1461,80 @@ struct LearningPath {
     next: &'static str,
 }
 
+struct LearningMapArea {
+    area: &'static str,
+    status: &'static str,
+    verification: &'static str,
+    suggested: &'static str,
+    related: &'static str,
+}
+
+const LEARNING_MAP: &[LearningMapArea] = &[
+    LearningMapArea {
+        area: "Boot",
+        status: "implemented in code",
+        verification: "verified in QEMU for single-core BIOS path",
+        suggested: "learn boot",
+        related: "museum boot",
+    },
+    LearningMapArea {
+        area: "Memory",
+        status: "implemented in code",
+        verification: "heap reuse still needs runtime verification",
+        suggested: "learn memory",
+        related: "mem",
+    },
+    LearningMapArea {
+        area: "Interrupts/Input",
+        status: "implemented in code",
+        verification: "keyboard partial; mouse/window input needs proof",
+        suggested: "learn interrupts",
+        related: "doctor",
+    },
+    LearningMapArea {
+        area: "Filesystem",
+        status: "implemented in code",
+        verification: "ChronoFS CRUD partial; repair/recovery unverified",
+        suggested: "learn filesystem",
+        related: "fs status",
+    },
+    LearningMapArea {
+        area: "Apps/UI",
+        status: "partially implemented",
+        verification: "app launcher partial; window lifecycle needs proof",
+        suggested: "learn gui",
+        related: "apps featured",
+    },
+    LearningMapArea {
+        area: "Userspace",
+        status: "partially implemented",
+        verification: "ring3 teaching demo verified; exec blocked",
+        suggested: "learn userspace",
+        related: "userspace status",
+    },
+    LearningMapArea {
+        area: "Networking",
+        status: "partially implemented",
+        verification: "RTL8139 init/MAC partial; ARP/UDP unverified",
+        suggested: "learn networking",
+        related: "net status",
+    },
+    LearningMapArea {
+        area: "Scheduler/SMP",
+        status: "partially implemented",
+        verification: "BSP-only SMP evidence; AP/tasks need proof",
+        suggested: "learn scheduler",
+        related: "cores",
+    },
+    LearningMapArea {
+        area: "Roadmap/Future",
+        status: "roadmap/design-only",
+        verification: "not runtime behavior",
+        suggested: "learn roadmap",
+        related: "capsule next",
+    },
+];
+
 const LEARNING_PATHS: &[LearningPath] = &[
     LearningPath {
         key: "boot",
@@ -964,6 +1641,26 @@ fn run_learn(command: &str) {
         return;
     }
 
+    match topic {
+        "map" => {
+            print_learn_map();
+            return;
+        }
+        "progress" => {
+            print_learn_progress();
+            return;
+        }
+        "beginner" => {
+            print_learn_beginner();
+            return;
+        }
+        "advanced" => {
+            print_learn_advanced();
+            return;
+        }
+        _ => {}
+    }
+
     let canonical = match topic {
         "fs" | "files" => "filesystem",
         "apps" | "windows" | "windowing" => "gui",
@@ -988,6 +1685,10 @@ fn print_learn_overview() {
     for path in LEARNING_PATHS {
         println!("- learn {:<11} : {}", path.key, path.title);
     }
+    println!("- learn map         : status and verification map");
+    println!("- learn progress    : static learning progress summary");
+    println!("- learn beginner    : safe first route");
+    println!("- learn advanced    : intentional verification route");
     println!("- learn next        : safest next path");
 }
 
@@ -1007,18 +1708,235 @@ fn print_learning_path(path: &LearningPath) {
 
 fn print_learn_next() {
     println!("ChronoOS learning path: next");
-    println!("For a first curriculum pass, stay on read-only surfaces:");
-    println!("1. learn boot       - machine startup story");
-    println!("2. learn memory     - RAM, paging, heap");
-    println!("3. learn filesystem - ChronoFS status and fsck");
-    println!("4. learn gui        - apps and tiny windows");
-    println!("5. learn networking - ARP/UDP observability, no new protocols");
+    println!("Start with the map, then follow the read-only beginner route.");
+    println!("1. learn map        - see areas, status, and proof boundaries");
+    println!("2. learn beginner   - safe first curriculum");
+    println!("3. workspace        - current mode and verification summary");
+    println!("4. quest status     - static next quest");
     println!();
-    println!("Then check status with: doctor");
+    println!("Suggested next safe command: learn map");
+    println!("This is not live progress tracking or certification.");
 }
 
 fn print_learn_usage() {
-    println!("Usage: learn [boot|memory|interrupts|filesystem|gui|userspace|networking|scheduler|eras|roadmap|next]");
+    println!("Usage: learn [map|progress|beginner|advanced|next]");
+    println!("       learn [boot|memory|interrupts|filesystem|gui|userspace|networking|scheduler|eras|roadmap]");
+}
+
+fn print_learn_map() {
+    println!("ChronoOS learning map");
+    println!("Static educational map; not a runtime certification system.");
+    println!();
+
+    for area in LEARNING_MAP {
+        println!("{}", area.area);
+        println!("  Status: {}", area.status);
+        println!("  Verification: {}", area.verification);
+        println!("  Try: {}", area.suggested);
+        println!("  Related: {}", area.related);
+    }
+}
+
+fn print_learn_progress() {
+    let total = LEARNING_MAP.len();
+    let roadmap = LEARNING_MAP
+        .iter()
+        .filter(|area| area.status == "roadmap/design-only")
+        .count();
+    let active = total.saturating_sub(roadmap);
+
+    println!("ChronoOS learning progress");
+    println!("Mode: static/sessionless educational map");
+    println!("Available areas: {}", total);
+    println!("Implemented or partial areas: {}", active);
+    println!("Roadmap/future areas: {}", roadmap);
+    println!("Badges: see quest badges");
+    println!("Dependencies: see quest dependencies");
+    println!();
+    println!("Verification boundary:");
+    println!("- QEMU evidence exists for narrow BIOS/app/ChronoFS/userspace paths.");
+    println!("- Code-present systems still need focused runtime proof.");
+    println!("- Roadmap/future systems are not implemented behavior.");
+    println!();
+    println!("Next safe route: learn beginner");
+}
+
+fn print_learn_beginner() {
+    println!("ChronoOS beginner route");
+    println!("Read-only first pass; no probes or risky commands.");
+    println!("1. learn boot       - startup story");
+    println!("2. learn memory     - RAM, paging, heap");
+    println!("3. learn filesystem - ChronoFS status and journal");
+    println!("4. learn gui        - apps and tiny windows");
+    println!("5. workspace        - current shell dashboard");
+    println!("6. verify           - evidence boundary summary");
+    println!();
+    println!("Suggested next safe command: learn boot");
+}
+
+fn print_learn_advanced() {
+    println!("ChronoOS advanced route");
+    println!("Intentional verification map; commands may need controlled QEMU evidence.");
+    println!("1. learn userspace  - Ring 3, syscalls, static ELF boundary");
+    println!("2. userspace status - read-only userspace summary");
+    println!("3. learn networking - RTL8139, ARP, UDP boundaries");
+    println!("4. learn scheduler  - cooperative tasks and SMP/AP boundary");
+    println!("5. fs check         - read-only ChronoFS check");
+    println!("6. journal          - one-record journal status");
+    println!("7. capsule next     - UEFI/custom boot and future tracks");
+    println!();
+    println!("Avoid in casual demos: fsck repair, net send, syshello, exec <name>.");
+}
+
+struct Explanation {
+    term: &'static str,
+    lines: &'static [&'static str],
+    command: &'static str,
+}
+
+const EXPLANATIONS: &[Explanation] = &[
+    Explanation {
+        term: "kernel",
+        lines: &[
+            "The kernel is the core OS program.",
+            "It manages hardware, memory, interrupts, files, and the shell.",
+        ],
+        command: "museum kernel",
+    },
+    Explanation {
+        term: "bootloader",
+        lines: &[
+            "A bootloader is the tiny program firmware starts first.",
+            "It prepares the machine and jumps into the kernel.",
+        ],
+        command: "learn boot",
+    },
+    Explanation {
+        term: "framebuffer",
+        lines: &[
+            "A framebuffer is memory that represents pixels on screen.",
+            "ChronoOS writes text UI into it after boot.",
+        ],
+        command: "poster boot",
+    },
+    Explanation {
+        term: "interrupt",
+        lines: &[
+            "An interrupt is a signal asking the CPU for attention.",
+            "Timers, keyboard input, mouse packets, and faults use this idea.",
+        ],
+        command: "learn interrupts",
+    },
+    Explanation {
+        term: "heap",
+        lines: &[
+            "The heap is kernel-managed memory for growing data.",
+            "ChronoOS has a reusable heap, but reuse still needs stress proof.",
+        ],
+        command: "mem",
+    },
+    Explanation {
+        term: "filesystem",
+        lines: &[
+            "A filesystem gives names and structure to bytes on disk.",
+            "ChronoFS is ChronoOS's tiny educational file format.",
+        ],
+        command: "learn filesystem",
+    },
+    Explanation {
+        term: "journal",
+        lines: &[
+            "A journal records an intended metadata change.",
+            "ChronoFS uses a tiny one-record journal for write/remove safety.",
+        ],
+        command: "journal",
+    },
+    Explanation {
+        term: "syscall",
+        lines: &[
+            "A syscall is a controlled entry from userspace into the kernel.",
+            "ChronoOS has a small teaching syscall boundary.",
+        ],
+        command: "userspace syscalls",
+    },
+    Explanation {
+        term: "userspace",
+        lines: &[
+            "Userspace is where less-privileged programs run.",
+            "ChronoOS has teaching demos, not a full process platform.",
+        ],
+        command: "userspace status",
+    },
+    Explanation {
+        term: "elf",
+        lines: &[
+            "ELF is an executable file format.",
+            "ChronoOS has a static ELF path, but execution still needs proof.",
+        ],
+        command: "userspace elf",
+    },
+    Explanation {
+        term: "arp",
+        lines: &[
+            "ARP maps an IPv4 address to an Ethernet MAC address.",
+            "ChronoOS exposes ARP as a teaching/status path.",
+        ],
+        command: "net arp",
+    },
+    Explanation {
+        term: "udp",
+        lines: &[
+            "UDP sends small datagrams without a connection.",
+            "ChronoOS has ARP/UDP code paths, but behavior needs proof.",
+        ],
+        command: "net udp",
+    },
+    Explanation {
+        term: "scheduler",
+        lines: &[
+            "A scheduler chooses which task runs next.",
+            "ChronoOS has cooperative task teaching paths, not preemption.",
+        ],
+        command: "learn scheduler",
+    },
+    Explanation {
+        term: "smp",
+        lines: &[
+            "SMP means multiple CPU cores can participate.",
+            "ChronoOS has BSP-only evidence; AP startup still needs proof.",
+        ],
+        command: "museum smp",
+    },
+];
+
+fn run_explain_command(command: &str) {
+    let term = command.strip_prefix("explain").unwrap_or("").trim();
+    if term.is_empty() {
+        print_explain_usage();
+        return;
+    }
+
+    let Some(explanation) = EXPLANATIONS
+        .iter()
+        .find(|entry| entry.term.eq_ignore_ascii_case(term))
+    else {
+        println!("No short explanation for '{}'.", term);
+        print_explain_usage();
+        return;
+    };
+
+    println!("Explain: {}", explanation.term);
+    for line in explanation.lines {
+        println!("{}", line);
+    }
+    println!("Try: {}", explanation.command);
+}
+
+fn print_explain_usage() {
+    println!("Usage: explain <term>");
+    println!("Terms: kernel, bootloader, framebuffer, interrupt, heap");
+    println!("       filesystem, journal, syscall, userspace, ELF");
+    println!("       ARP, UDP, scheduler, SMP");
 }
 
 fn run_demo(command: &str) {
@@ -1570,26 +2488,43 @@ fn run_apps_launcher(command: &str) {
 
     match app {
         "" | "list" => print_apps_launcher(),
+        "featured" => print_apps_featured(),
+        "recent" => print_recent_apps(),
         "verified" => print_apps_verified(),
         "roadmap" => print_apps_roadmap(),
         "help" => print_apps_usage(),
+        app if app.starts_with("help ") => apps_help(app),
+        app if app.starts_with("category ") => apps_category(app),
         app if app.starts_with("info ") => apps_info(app),
+        app if app.starts_with("demo ") => apps_demo(app),
         app if app.starts_with("launch ") => apps_launch(app),
         "notes" => launch_existing_app("notes"),
         "calc" => launch_existing_app("calc"),
         "sysinfo" => launch_existing_app("sysinfo"),
         "clock" => launch_existing_app("clock"),
         "tasks" => launch_existing_app("tasks"),
-        "files" => print_files_app_card(),
-        "museum" => print_museum_app_card(),
-        "theme" => print_theme_app_card(),
+        "files" => {
+            record_recent_app("files");
+            print_files_app_card();
+        }
+        "museum" => {
+            record_recent_app("museum");
+            print_museum_app_card();
+        }
+        "theme" => {
+            record_recent_app("theme");
+            print_theme_app_card();
+        }
         _ => print_apps_usage(),
     }
 }
 
 fn print_apps_usage() {
-    println!("Usage: apps [list|info <name>|launch <name>|verified|roadmap]");
+    println!("Usage: apps [list|featured|recent|category <name>]");
+    println!("       apps [info|help|demo|launch] <name>");
+    println!("       apps [verified|roadmap]");
     println!("Aliases: apps notes|calc|sysinfo|files|clock|museum|theme|tasks");
+    println!("Categories: Core, Files, Learning, System, Networking, Visual, Debug/Lab, Roadmap/Future");
 }
 
 fn apps_style_for_era(name: &str) -> (&'static str, &'static str, &'static str) {
@@ -1616,6 +2551,7 @@ fn print_apps_launcher() {
     println!();
     println!("Launch with: apps launch <name> or apps <name>");
     println!("Inspect with: apps info <name>");
+    println!("Browse with: apps featured, apps category <name>, apps recent");
     println!();
 
     for app in apps::registry() {
@@ -1624,22 +2560,68 @@ fn print_apps_launcher() {
 
     println!();
     println!("This is a static registry, not a package manager or dynamic loader.");
-    println!("Legacy alias: apps clock");
+    println!("Roadmap entries are labels, not installed apps.");
 }
 
 fn print_app_entry(marker: &str, app: &apps::AppManifest) {
     println!(
-        "{} {:9} - {} [{}]",
+        "{} {:9} - {} [{} | {} | {}]",
         marker,
         app.name,
         app.description,
-        app.status.label()
+        app.status.label(),
+        app.verification.badge(),
+        app.risk.badge()
     );
 }
 
 fn launch_existing_app(command: &str) {
+    record_recent_app(command);
     println!("Launching existing command: {}", command);
     execute_command(command);
+}
+
+fn print_apps_featured() {
+    println!("Featured apps");
+    println!("Best shell-first demo surfaces; demo commands are not run automatically.");
+
+    for app in apps::registry() {
+        if app.featured {
+            println!(
+                "- {} ({}) [{} | {}]",
+                app.name,
+                app.category,
+                app.verification.badge(),
+                app.risk.badge()
+            );
+            println!("  Launch: {}", app.launch_command);
+        }
+    }
+
+    println!("Try: apps demo notes, apps demo files, apps info status");
+}
+
+fn apps_category(command: &str) {
+    let category = command.strip_prefix("category").unwrap_or("").trim();
+    if category.is_empty() {
+        println!("Usage: apps category <name>");
+        println!("Categories: Core, Files, Learning, System, Networking, Visual, Debug/Lab, Roadmap/Future");
+        return;
+    }
+
+    println!("Apps category: {}", category);
+    let mut matches = 0;
+    for app in apps::registry() {
+        if app_category_matches(app.category, category) {
+            print_app_entry("-", app);
+            matches += 1;
+        }
+    }
+
+    if matches == 0 {
+        println!("No apps in that category.");
+        println!("Try: apps category Core or apps category System");
+    }
 }
 
 fn apps_info(command: &str) {
@@ -1662,6 +2644,45 @@ fn apps_info(command: &str) {
     println!("Status: {}", app.status.label());
     println!("Verification: {}", app.verification.label());
     println!("Risk: {}", app.risk.label());
+    print_app_command_list("Related commands", app.related_commands);
+}
+
+fn apps_help(command: &str) {
+    let name = command.strip_prefix("help").unwrap_or("").trim();
+    if name.is_empty() {
+        println!("Usage: apps help <name>");
+        return;
+    }
+
+    let Some(app) = apps::find_manifest(name) else {
+        println!("No app manifest named '{}'.", name);
+        println!("Try: apps list");
+        return;
+    };
+
+    println!("App help: {}", app.name);
+    println!("{}", app.help);
+    print_app_command_list("Related commands", app.related_commands);
+}
+
+fn apps_demo(command: &str) {
+    let name = command.strip_prefix("demo").unwrap_or("").trim();
+    if name.is_empty() {
+        println!("Usage: apps demo <name>");
+        return;
+    }
+
+    let Some(app) = apps::find_manifest(name) else {
+        println!("No app manifest named '{}'.", name);
+        println!("Try: apps featured");
+        return;
+    };
+
+    println!("App demo: {}", app.name);
+    println!("This is a safe script preview; commands are not run automatically.");
+    println!("Verification: {}", app.verification.label());
+    println!("Risk: {}", app.risk.label());
+    print_app_command_list("Demo path", app.demo_commands);
 }
 
 fn apps_launch(command: &str) {
@@ -1683,6 +2704,9 @@ fn apps_launch(command: &str) {
         return;
     }
 
+    if !app.launch_command.starts_with("apps ") {
+        record_recent_app(app.name);
+    }
     println!("Launching from registry: {}", app.launch_command);
     execute_command(app.launch_command);
 }
@@ -1705,6 +2729,76 @@ fn print_apps_roadmap() {
         }
     }
     println!("No package manager, dynamic linker, or dynamic app loading exists.");
+}
+
+fn print_app_command_list(title: &str, commands: &[&str]) {
+    println!("{}:", title);
+    if commands.is_empty() {
+        println!("- (none)");
+        return;
+    }
+
+    for command in commands {
+        println!("- {}", command);
+    }
+}
+
+fn app_category_matches(category: &str, query: &str) -> bool {
+    if contains_ignore_ascii_case(category, query) {
+        return true;
+    }
+
+    match ascii_lower_str(query) {
+        "core" => category == "Core",
+        "files" | "file" | "storage" => category == "Files",
+        "learning" | "learn" | "education" => category == "Learning",
+        "system" | "status" | "systems" => category == "System",
+        "networking" | "network" | "net" => category == "Networking",
+        "visual" | "theme" | "themes" => category == "Visual",
+        "debug" | "lab" | "debug/lab" => category == "Debug/Lab",
+        "roadmap" | "future" | "roadmap/future" => category == "Roadmap/Future",
+        _ => false,
+    }
+}
+
+fn ascii_lower_str(input: &str) -> &'static str {
+    if input.eq_ignore_ascii_case("Core") {
+        "core"
+    } else if input.eq_ignore_ascii_case("Files") || input.eq_ignore_ascii_case("File") {
+        "files"
+    } else if input.eq_ignore_ascii_case("Storage") {
+        "storage"
+    } else if input.eq_ignore_ascii_case("Learning") || input.eq_ignore_ascii_case("Learn") {
+        "learning"
+    } else if input.eq_ignore_ascii_case("Education") {
+        "education"
+    } else if input.eq_ignore_ascii_case("System") || input.eq_ignore_ascii_case("Systems") {
+        "system"
+    } else if input.eq_ignore_ascii_case("Status") {
+        "status"
+    } else if input.eq_ignore_ascii_case("Networking") || input.eq_ignore_ascii_case("Network") {
+        "networking"
+    } else if input.eq_ignore_ascii_case("Net") {
+        "net"
+    } else if input.eq_ignore_ascii_case("Visual") {
+        "visual"
+    } else if input.eq_ignore_ascii_case("Theme") || input.eq_ignore_ascii_case("Themes") {
+        "theme"
+    } else if input.eq_ignore_ascii_case("Debug") {
+        "debug"
+    } else if input.eq_ignore_ascii_case("Lab") {
+        "lab"
+    } else if input.eq_ignore_ascii_case("Debug/Lab") {
+        "debug/lab"
+    } else if input.eq_ignore_ascii_case("Roadmap") {
+        "roadmap"
+    } else if input.eq_ignore_ascii_case("Future") {
+        "future"
+    } else if input.eq_ignore_ascii_case("Roadmap/Future") {
+        "roadmap/future"
+    } else {
+        ""
+    }
 }
 
 fn print_files_app_card() {
@@ -2115,6 +3209,222 @@ fn list_files() {
     }
 }
 
+fn run_files_command(command: &str) {
+    let mode = command.strip_prefix("files").unwrap_or("").trim();
+
+    match mode {
+        "" | "help" => print_files_workspace(),
+        "list" => list_files_with_sizes(),
+        "sample" => print_files_sample(),
+        "demo" => print_files_demo(),
+        mode if mode.starts_with("info ") => files_info(mode.strip_prefix("info").unwrap().trim()),
+        mode if mode.starts_with("search ") => {
+            files_search(mode.strip_prefix("search").unwrap().trim())
+        }
+        mode if mode.starts_with("copy ") => files_copy(mode.strip_prefix("copy").unwrap().trim()),
+        mode if mode.starts_with("rename ") => {
+            files_rename(mode.strip_prefix("rename").unwrap().trim())
+        }
+        _ => {
+            println!("Usage: files [list|info <name>|search <term>|sample|demo]");
+            println!("       files copy <src> <dst>");
+            println!("       files rename <old> <new>");
+        }
+    }
+}
+
+fn list_files_with_sizes() {
+    println!("ChronoFS files");
+
+    if !fs::list(|name| match fs::file_info(name) {
+        Ok(info) => println!("- {} ({} bytes)", info.name, info.size_bytes),
+        Err(_) => println!("- {} (metadata unavailable)", name),
+    }) {
+        println!("(no files)");
+    }
+
+    println!("Hidden journal metadata is not listed as a user file.");
+}
+
+fn files_info(name: &str) {
+    if name.is_empty() {
+        println!("Usage: files info <name>");
+        return;
+    }
+
+    match fs::file_info(name) {
+        Ok(info) => {
+            let status = fs::status();
+            println!("ChronoFS file info");
+            println!("Name: {}", info.name);
+            println!("Size: {} bytes", info.size_bytes);
+            println!("Storage: {}", info.storage.label());
+            println!(
+                "Disk: {}",
+                if status.disk_available {
+                    "available"
+                } else {
+                    "unavailable"
+                }
+            );
+            println!(
+                "Persistence note: {}",
+                if status.persistent {
+                    "writes use the ATA-backed ChronoFS path"
+                } else {
+                    "heap fallback is volatile and disappears on reboot"
+                }
+            );
+            println!("Verification note: simple CRUD was QEMU-tested; repair/recovery was not.");
+        }
+        Err(error) => print_fs_operation_error("inspect", name, error),
+    }
+}
+
+fn files_search(term: &str) {
+    if term.is_empty() {
+        println!("Usage: files search <term>");
+        return;
+    }
+
+    println!("ChronoFS search: {}", term);
+    let mut matches = 0usize;
+
+    fs::list(|name| {
+        let name_match = contains_ignore_ascii_case(name, term);
+        let content_match = match fs::read(name) {
+            Ok(content) => contains_ignore_ascii_case(content, term),
+            Err(_) => false,
+        };
+
+        if name_match || content_match {
+            print!("- {}: ", name);
+            if name_match && content_match {
+                println!("name and UTF-8 content match");
+            } else if name_match {
+                println!("name match");
+            } else {
+                println!("UTF-8 content match");
+            }
+            matches += 1;
+        }
+    });
+
+    if matches == 0 {
+        println!("No visible file matches.");
+    } else {
+        println!("Matched {} file(s). Contents were not dumped.", matches);
+    }
+}
+
+fn print_files_sample() {
+    println!("ChronoFS sample files");
+    println!("This command is read-only. It suggests safe demo content.");
+    println!();
+    println!("Try:");
+    println!("- write hello.txt hello from ChronoOS");
+    println!("- write demo.txt ChronoOS file demo");
+    println!("- files list");
+    println!("- files info demo.txt");
+    println!("- files search ChronoOS");
+    println!();
+    println!("Use a disposable image when verifying writes, deletes, copy, or fsck.");
+}
+
+fn print_files_demo() {
+    println!("ChronoFS guided demo");
+    println!("This walkthrough does not mutate files automatically.");
+    println!();
+    println!("1. files list");
+    println!("2. write demo.txt ChronoOS file demo");
+    println!("3. cat demo.txt");
+    println!("4. files info demo.txt");
+    println!("5. files search ChronoOS");
+    println!("6. fs check");
+    println!("7. journal");
+    println!();
+    println!("Optional copy check on a disposable image:");
+    println!("8. files copy demo.txt demo-copy.txt");
+    println!("9. cat demo-copy.txt");
+}
+
+fn files_copy(args: &str) {
+    let mut parts = args.split_ascii_whitespace();
+    let Some(src) = parts.next() else {
+        println!("Usage: files copy <src> <dst>");
+        return;
+    };
+    let Some(dst) = parts.next() else {
+        println!("Usage: files copy <src> <dst>");
+        return;
+    };
+    if parts.next().is_some() {
+        println!("Usage: files copy <src> <dst>");
+        return;
+    }
+
+    if src == dst {
+        println!("files copy: source and destination must be different");
+        return;
+    }
+
+    match fs::file_exists(dst) {
+        Ok(true) => {
+            println!("files copy: destination already exists: {}", dst);
+            println!("No overwrite was performed.");
+            return;
+        }
+        Ok(false) => {}
+        Err(error) => {
+            print_fs_operation_error("copy destination check", dst, error);
+            return;
+        }
+    }
+
+    let content = match fs::read_bytes(src) {
+        Ok(bytes) => Vec::from(bytes),
+        Err(error) => {
+            print_fs_operation_error("copy source read", src, error);
+            return;
+        }
+    };
+
+    match fs::write_bytes(dst, &content) {
+        Ok(()) => println!(
+            "Copied {} bytes from {} to {} without overwriting.",
+            content.len(),
+            src,
+            dst
+        ),
+        Err(error) => print_fs_operation_error("copy write", dst, error),
+    }
+}
+
+fn files_rename(args: &str) {
+    let mut parts = args.split_ascii_whitespace();
+    let Some(old_name) = parts.next() else {
+        println!("Usage: files rename <old> <new>");
+        return;
+    };
+    let Some(new_name) = parts.next() else {
+        println!("Usage: files rename <old> <new>");
+        return;
+    };
+    if parts.next().is_some() {
+        println!("Usage: files rename <old> <new>");
+        return;
+    }
+
+    println!("files rename is intentionally not implemented yet.");
+    println!("Requested: {} -> {}", old_name, new_name);
+    println!("Reason: safe rename needs stronger persistence and failure-mode verification.");
+    println!("Conservative path on a disposable image:");
+    println!("1. files copy {} {}", old_name, new_name);
+    println!("2. cat {}", new_name);
+    println!("3. files info {}", new_name);
+    println!("4. rm {} only after manual verification", old_name);
+}
+
 fn cat_file(command: &str) {
     let name = command.strip_prefix("cat").unwrap_or("").trim();
 
@@ -2125,7 +3435,7 @@ fn cat_file(command: &str) {
 
     match fs::read(name) {
         Ok(content) => println!("{}", content),
-        Err(error) => print_fs_error(name, error),
+        Err(error) => print_fs_operation_error("read", name, error),
     }
 }
 
@@ -2143,7 +3453,7 @@ fn write_file(command: &str) {
 
     match fs::write(name, content) {
         Ok(()) => {}
-        Err(error) => print_fs_error(name, error),
+        Err(error) => print_fs_operation_error("write", name, error),
     }
 }
 
@@ -2157,7 +3467,7 @@ fn remove_file(command: &str) {
 
     match fs::remove(name) {
         Ok(()) => {}
-        Err(error) => print_fs_error(name, error),
+        Err(error) => print_fs_operation_error("remove", name, error),
     }
 }
 
@@ -2268,7 +3578,7 @@ fn exec_file(command: &str) {
             Ok(code) => println!("[process exited: {}]", code),
             Err(error) => print_exec_error(name, error),
         },
-        Err(error) => print_fs_error(name, error),
+        Err(error) => print_fs_operation_error("exec read", name, error),
     }
 }
 
@@ -2540,14 +3850,27 @@ fn split_once_ascii_whitespace(input: &str) -> Option<(&str, &str)> {
     Some((head, tail.trim_start()))
 }
 
-fn print_fs_error(name: &str, error: FsError) {
+fn print_fs_operation_error(operation: &str, name: &str, error: FsError) {
     match error {
-        FsError::NotFound => println!("file not found: {}", name),
-        FsError::EmptyName | FsError::InvalidName => println!("invalid filename"),
-        FsError::NameTooLong => println!("filename too long"),
-        FsError::FileTooLarge => println!("file too large"),
-        FsError::NoSpace => println!("not enough disk space"),
-        FsError::Disk => println!("disk error"),
+        FsError::NotFound => println!("{} failed: file not found: {}", operation, name),
+        FsError::EmptyName => println!("{} failed: missing filename", operation),
+        FsError::InvalidName => {
+            println!("{} failed: invalid filename: {}", operation, name);
+            println!("Names cannot contain whitespace or use the hidden journal name.");
+        }
+        FsError::NameTooLong => {
+            println!("{} failed: filename too long: {}", operation, name);
+            println!("Maximum filename length is {} bytes.", fs::MAX_FILENAME_LEN);
+        }
+        FsError::FileTooLarge => println!("{} failed: file too large: {}", operation, name),
+        FsError::NoSpace => {
+            println!("{} failed: not enough ChronoFS space for {}", operation, name);
+            println!("Try files list, fs status, or use a fresh disposable data image.");
+        }
+        FsError::Disk => {
+            println!("{} failed: disk or UTF-8 error for {}", operation, name);
+            println!("Try fs status, fs check, and journal before retrying.");
+        }
     }
 }
 
