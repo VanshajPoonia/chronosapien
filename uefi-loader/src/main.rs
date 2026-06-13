@@ -8,13 +8,13 @@ use core::fmt::Write;
 use core::mem::size_of;
 use core::panic::PanicInfo;
 use core::ptr;
-use uefi::boot::{self, AllocateType, MemoryMap, MemoryType};
+use uefi::boot::{self, AllocateType, MemoryType};
 use uefi::fs::FileSystem;
+use uefi::mem::memory_map::MemoryMap;
 use uefi::prelude::*;
 use uefi::proto::console::gop::{GraphicsOutput, PixelFormat};
 use uefi::table::cfg::ConfigTableEntry;
 
-const KERNEL_PATH: &str = "\\CHRONO\\KERNEL.ELF";
 const CHRONO_BOOT_MAGIC: u64 = 0x5442_4f4e_4f52_4843;
 const CHRONO_BOOT_VERSION: u32 = 2;
 const MAX_MEMORY_REGIONS: usize = 256;
@@ -99,7 +99,8 @@ fn uefi_main() -> Result<(), Status> {
         let image = boot::image_handle();
         let mut fs =
             FileSystem::new(boot::get_image_file_system(image).map_err(|_| Status::NOT_FOUND)?);
-        fs.read(KERNEL_PATH).map_err(|_| Status::NOT_FOUND)?
+        fs.read(cstr16!("\\CHRONO\\KERNEL.ELF"))
+            .map_err(|_| Status::NOT_FOUND)?
     };
 
     let loaded = load_kernel(&kernel)?;
