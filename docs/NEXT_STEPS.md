@@ -2,22 +2,26 @@
 
 ## Current Priority Queue
 
-1. Preserve build sanity: `cargo check -p kernel --offline --locked` and the host-target `chronosapien` check now pass with no warnings.
-2. Preserve runtime tooling: QEMU 11.0.1 and PowerShell 7.6.2 are installed and available on PATH.
-3. Use `docs/ROADMAP_v0.2.md` as the v0.2 product roadmap and milestone planner.
-4. Use `docs/CURRENT_STATUS.md` as the current source-truth handoff; keep `docs/status-audit.md` as the Phase 2 risk/audit snapshot.
-5. Start v0.2 with Reliability And Verification: visible single-core BIOS QEMU proof for framebuffer shell, keyboard input, demo-safe commands, status/safe-mode surfaces, and screenshots.
-6. Use ChronoFS Hardening as the secondary v0.2 track: controlled QEMU checks for `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, `journal`, and controlled repair only on throwaway images.
-7. Record any successful QEMU or hardware evidence in `docs/AI_PROGRESS_LOG.md` before upgrading status labels from "needs runtime verification".
-8. Keep source/docs aligned as small systems are verified; do not start large new feature tracks yet.
+1. Use `docs/POST_VERIFICATION_SUMMARY.md` as the current product/engineering decision point after the visible BIOS, ChronoFS, window/input, userspace, and UEFI verification sequence.
+2. Use `docs/VERIFICATION_MATRIX.md` as the compact evidence matrix and `docs/PROGRESS_AUDIT.md` as the broader progress audit.
+3. Preserve build sanity: `cargo check -p kernel --offline --locked` and the host-target `chronosapien` check now pass with no warnings.
+4. Preserve runtime tooling: QEMU 11.0.1 and PowerShell 7.6.2 are installed and available on PATH.
+5. Treat the BIOS product path as the safest current demo base: single-core BIOS boot, serial logs, framebuffer shell, screenshots, `start`, `guide quick`, `mode status`, `safe on`, `doctor`, and `apps list` have QEMU evidence.
+6. Make input/window lifecycle stabilization the primary next track before broader UI polish: `windows close <id>`, `tasks`, `kill <observed-task-id>`, manual typing, Backspace, Shift, visible mouse movement, drag, and mouse close still need clean proof.
+7. Use shell workspace polish as the secondary product track once the input/window lifecycle gap is reduced.
+8. Keep ChronoFS repair/recovery, userspace syscall/ELF follow-up, and UEFI `Out of Resources` as separate narrow technical tracks.
+9. Record any successful QEMU or hardware evidence in `docs/AI_PROGRESS_LOG.md` before upgrading status labels from "needs runtime verification".
+10. Keep source/docs aligned as small systems are verified; do not start large new feature tracks yet.
 
-## v0.2 Planning Note
+## Progress Audit Note
 
-`docs/ROADMAP_v0.2.md` recommends Reliability And Verification as the primary
-v0.2 track and ChronoFS Hardening as the secondary track. User-space, learning
-experience, and UI/app shell polish remain useful follow-up tracks, but
-networking expansion, USB, dynamic linking, package management, full
-compositing, and preemptive scheduling are intentionally not v0.2 primary work.
+`docs/POST_VERIFICATION_SUMMARY.md` is the newest consolidation after five
+verification passes. It recommends input/window lifecycle stabilization as the
+primary track and shell workspace polish as the secondary product track.
+ChronoFS repair/recovery, userspace syscall/ELF execution, and UEFI loader
+failure work remain focused technical tracks. Networking expansion, USB,
+dynamic linking, package management, full compositing, and preemptive
+scheduling are intentionally not the immediate next track.
 
 ## Repository Workflow
 
