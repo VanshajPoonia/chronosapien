@@ -136,7 +136,7 @@ fn fat_sectors_for(partition_sectors: u32) -> u32 {
         let data_sectors = partition_sectors - RESERVED_SECTORS - FAT_COUNT * fat_sectors;
         let clusters = data_sectors / SECTORS_PER_CLUSTER;
         let needed = ((clusters + 2) * 4 + SECTOR_SIZE as u32 - 1) / SECTOR_SIZE as u32;
-        if needed == fat_sectors {
+        if needed <= fat_sectors {
             return fat_sectors;
         }
         fat_sectors = needed;
