@@ -11,6 +11,10 @@ command is handled by `kernel/src/shell.rs`; window mode reads the same file.
 ## Core Shell
 
 - `help`: list categorized command groups.
+- `help search <term>`: search the small built-in help index without running
+  probes.
+- `help workspace`: explain `workspace`, `shortcuts`, `whereami`, `recent`,
+  `status`, and `verify`.
 - `help start`: explain `start`, `welcome`, `guide`, `demo`, and `tour`.
 - `help learn`: explain structured learning paths.
 - `help mode`: explain reliability/safe mode.
@@ -22,7 +26,16 @@ command is handled by `kernel/src/shell.rs`; window mode reads the same file.
   `ring3`, `syshello`, and `exec <name>`.
 - `help labs`: explain risky/intentional verification commands.
 - `help roadmap`: explain roadmap/design-only systems.
-- `help files`, `help net`, `help status`, `help verify`, and `help future`: beginner-friendly topic aliases.
+- `help files`, `help theme`, `help net`, `help status`, `help verify`, and
+  `help future`: beginner-friendly topic aliases.
+- `workspace`: print a compact shell dashboard.
+- `status`: alias for `workspace`.
+- `verify`: print a read-only verification boundary summary.
+- `shortcuts`: list the best demo/useful commands.
+- `whereami`: explain current mode, era, UI context, and next action.
+- `recent`: show a fixed-size in-memory list of commands typed since boot.
+- `files`: show the shell-first ChronoFS command map and safety notes.
+- `theme`: show the era/theme command card.
 - `clear`: clear the framebuffer shell region and redraw the top bar.
 - `about`: print the ChronoOS identity line.
 - `reboot`: request a reset through the PS/2 controller.
@@ -43,6 +56,7 @@ command is handled by `kernel/src/shell.rs`; window mode reads the same file.
 Top-level `help` groups commands by:
 
 - Getting started
+- Workspace
 - Learning paths
 - Reliability mode
 - Eras and themes
@@ -61,8 +75,9 @@ The shell intentionally distinguishes overlapping product concepts:
 - `learn` connects curriculum paths to existing commands.
 - `demo` previews the current surface without changing state.
 - `tour` teaches OS concepts by subsystem.
-- `doctor` is the conservative status surface; there is no separate `status` or
-  `verify` command.
+- `workspace` is the compact dashboard, `status` aliases it, and `verify` is a
+  read-only verification summary rather than a live certification command.
+- `doctor` remains the conservative subsystem report.
 - `apps` is the text launcher; `open` is the partially implemented small-window
   path.
 - `fs` is the read-only inspection namespace; `ls`, `cat`, `write`, `rm`,
@@ -70,6 +85,24 @@ The shell intentionally distinguishes overlapping product concepts:
   users toward them.
 - `museum` teaches concepts; `quest` shows progress and next goals.
 - `mode` and `safe` categorize commands but do not block them.
+
+## Workspace Commands
+
+- `workspace`: show current era/theme, warning mode, verified BIOS/demo base,
+  available app routes, ChronoFS summary, suggested next command, and learning
+  suggestion.
+- `status`: alias for `workspace`.
+- `verify`: summarize QEMU-verified, partial, blocked, and unverified areas
+  without running live tests.
+- `shortcuts`: list the best first/demo commands.
+- `whereami`: explain current shell context and next action.
+- `recent`: list recent commands typed since boot. This is a fixed-size,
+  in-memory shell log, not persistent history and not arrow-key recall.
+- `files`: shell-first ChronoFS overview with inspection and demo guidance.
+- `theme`: alias/card for `era`, `travel <year>`, and `poster eras`.
+
+All workspace commands are text-only and read-only. They do not add runtime
+verification claims.
 
 ## Era And Product Commands
 
@@ -97,7 +130,12 @@ The shell intentionally distinguishes overlapping product concepts:
 - `learn scheduler`: cooperative tasks, SMP/AP boundary, and scheduler limits.
 - `learn eras`: era profiles, `travel <year>`, and `poster eras`.
 - `learn roadmap`: future systems marked roadmap/design-only.
-- `learn next`: a safe first curriculum route.
+- `learn map`: compact learning-area status and verification map.
+- `learn progress`: static progress/badge/dependency summary.
+- `learn beginner`: safe first curriculum route.
+- `learn advanced`: intentional verification-oriented route.
+- `learn next`: recommends the map and the next safe route.
+- `explain <term>`: short glossary entry for common OS terms.
 
 Learning paths are read-only educational screens. They do not run probes or
 upgrade runtime verification labels.
@@ -124,8 +162,16 @@ verification.
 
 ## Apps
 
-- `apps` / `apps list`: print the static app registry.
-- `apps info <name>`: print one app manifest.
+- `apps` / `apps list`: print the static app registry with verification and
+  risk badges.
+- `apps featured`: show the best shell-first demo app surfaces.
+- `apps recent`: show app launcher routes used since boot; this is in-memory
+  only.
+- `apps category <name>`: browse Core, Files, Learning, System, Networking,
+  Visual, Debug/Lab, and Roadmap/Future app categories.
+- `apps info <name>`: print one app manifest plus related commands.
+- `apps help <name>`: print app-specific help and related commands.
+- `apps demo <name>`: print a safe demo path without running commands.
 - `apps launch <name>`: run the existing launch command when the app is
   implemented and safe to route through the shell.
 - `apps verified`: list app entries with recorded partial QEMU evidence.
@@ -146,6 +192,19 @@ package manager, dynamic linker, or dynamic app loader.
 
 ## Filesystem
 
+- `files`: show a ChronoFS usability overview and safety notes.
+- `files list`: list visible files with byte sizes.
+- `files info <name>`: print file name, size, storage mode, disk/fallback
+  status, and verification notes.
+- `files search <term>`: search visible filenames and UTF-8 file contents
+  without dumping file bodies.
+- `files sample`: print read-only sample file commands; does not create files.
+- `files demo`: print a guided walkthrough for list/write/read/info/check/journal;
+  does not mutate automatically.
+- `files copy <src> <dst>`: copy a file only when the destination does not
+  already exist.
+- `files rename <old> <new>`: intentionally refuse and explain the conservative
+  copy, inspect, then manual `rm` path.
 - `fs` / `fs status`: print a read-only ChronoFS mode, disk, file-slot, and
   journal summary.
 - `fs info`: print fixed layout limits and journal reservation details.
@@ -163,8 +222,10 @@ package manager, dynamic linker, or dynamic app loader.
   verification.
 - `journal`: print ChronoFS journal status.
 
-The `fs` namespace is intentionally inspection-only. `fsck repair` remains the
-only filesystem repair command.
+The `fs` namespace is intentionally inspection-only. `files sample` and
+`files demo` are read-only. `files copy` mutates only by writing a new
+destination and refuses overwrites. `files rename` is deferred. `fsck repair`
+remains the only filesystem repair command.
 
 ## Windows And Tasks
 
@@ -228,8 +289,11 @@ capture remain roadmap/design-only.
 ## Museum And Quest
 
 - `museum boot|kernel|memory|interrupts|keyboard|serial|era`: print core museum exhibits.
+- `museum index`: list core and deeper museum topics.
 - `museum disk|filesystem|userspace|syscalls|elf|networking|smp|scheduler`: print deeper OS concept pages.
 - `quest list`: print quest progress.
 - `quest status`: print active quest/status information.
+- `quest dependencies`: print a static dependency-style learning route.
+- `quest badges`: print static learning badges derived from quest state.
 - `stats`: print player-style project stats.
 - `inventory`: print unlocked capability artifacts.
