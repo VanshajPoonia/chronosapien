@@ -34,23 +34,25 @@ scheduling are intentionally not the immediate next track.
 
 - Interrupt-driven keyboard: implemented in code; IRQ1 buffering exists and polling fallback remains, but it needs runtime verification.
 - Reusable heap allocator: implemented in code; the allocator is a simple free list, but reuse behavior needs build/runtime validation.
-- ChronoFS repair/journaling: implemented in code; read-only `fs` inspection, `fsck`, `fsck repair`, and a tiny one-record journal exist, but shell workflows and recovery scenarios need runtime verification.
-- Graphics shell: partially implemented; framebuffer console, mouse cursor, and small draggable windows exist, but there is no full desktop/compositor.
-- Process model: partially implemented; ring 3, syscalls, static ELF execution, and read-only `userspace` inspection exist, but there is no dynamic linker, argv/env, or general multiprocess model.
+- ChronoFS repair/journaling: implemented in code; read-only `fs` inspection, clean `fsck`, clean journal status, read/write/read/delete, and delete persistence have narrow disposable-image QEMU evidence, but `fsck repair`, recovery scenarios, independent write persistence, heap fallback, and disk-error behavior need runtime verification.
+- Graphics shell: partially implemented; framebuffer console, mouse cursor, and small draggable windows exist, but there is no full desktop/compositor. Narrow QEMU evidence now covers window open/list/focus and serial-backed `windows close 2`, while visual close confirmation, manual drag, mouse close, `tasks`, and `kill` still need proof.
+- Process model: partially implemented; `userspace status`, `userspace syscalls`, and the fixed `ring3` teaching demo have narrow QEMU evidence, while `userspace elf`, `syshello`, static ELF execution, and broader syscall behavior remain unverified. There is no dynamic linker, argv/env, or general multiprocess model.
 - Scheduler: partially implemented; cooperative task scheduling exists, while preemption and production-grade scheduling are roadmap/design-only.
+- UEFI boot: build/image path is fixed and single-core OVMF starts the ChronoOS loader, but the loader fails with `Out of Resources` before kernel framebuffer handoff or shell prompt.
 - Networking: partially implemented; ARP/UDP over RTL8139 plus read-only
   observability commands exist in code, while DHCP, DNS, TCP, sockets, packet
   capture, and broad hardware support are roadmap/design-only.
 - Real hardware/USB: partially implemented through the UEFI boot path; USB HID, USB storage, USB serial, and broad hardware support are roadmap/design-only.
 
-## Phase 2 Verification Order
+## Recommended Verification Order
 
-1. Visual BIOS QEMU pass: verify framebuffer text, shell prompt, PIT/timer, and keyboard input.
-2. SMP/AP follow-up: investigate why the two-core BIOS serial smoke exits before `[CHRONO] boot complete`.
-3. Storage smoke pass: `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, controlled `fsck repair`, and `journal`.
-4. Product/app pass: `demo`, `tour`, `capsule`, `doctor`, `poster`, `travel <year>`, `apps`, `notes`, `calc`, and `sysinfo`.
-5. Window/input pass: PS/2 mouse, cursor, `open notes`, `open sysinfo`, drag, focus, close, `tasks`, and `kill`.
-6. Risky systems last: custom BIOS path, UEFI path, SMP/AP startup, `userspace status`, ring 3, syscalls, static ELF execution, and ARP/UDP networking via `net status`, `net config`, `net arp`, `net log`, and `net send`.
+1. Input/window lifecycle pass: retest `windows close <id>`, `tasks`, `kill <observed-task-id>`, manual typing, Backspace, Shift, visible pointer movement, drag, and mouse close on a fresh disposable QEMU image; do not run `kill 0`.
+2. Shell workspace polish pass: improve the BIOS-safe product workspace only after the input/window lifecycle evidence is cleaner.
+3. Product-command input cleanup pass: retest only `poster system` and `capsule current` with reliable manual typing or a better input harness; do not upgrade unless serial shows exact command lines and screenshots show output.
+4. ChronoFS repair/recovery pass: use only throwaway images for independent write persistence, `fsck repair` on safe synthetic damage, repair refusal cases, journal rollback/roll-forward, corrupt journal refusal, and heap fallback.
+5. Userspace follow-up pass: exact `userspace elf`, exact `syshello`, and controlled `exec hello.elf` only after `ld.lld` or an equivalent safe linker path is available and the known test ELF can be installed into a disposable image.
+6. UEFI follow-up pass: investigate the loader `Out of Resources` failure before framebuffer handoff, then rerun single-core UEFI QEMU with serial/framebuffer evidence.
+7. Risky systems last: custom BIOS path after NASM is available, SMP/AP startup, ARP/UDP networking via `net status`, `net config`, `net arp`, `net log`, and `net send`, and real hardware only after QEMU paths are cleaner.
 
 ## Product / Indie Features
 
