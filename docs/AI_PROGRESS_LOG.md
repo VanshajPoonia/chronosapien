@@ -12,6 +12,22 @@ This file tracks every major Codex/AI-assisted change to ChronoOS.
 - Current source-truth handoff: `docs/CURRENT_STATUS.md`.
 - Verified in QEMU with limits: single-core BIOS boot reaches `[CHRONO] boot complete`; boot-time serial logging is observed; visible QEMU screendumps show the framebuffer shell prompt; QEMU monitor input submitted `help` and `help start`; `about`, `start`, `guide quick`, `mode status`, `safe on`, `doctor`, `apps`, `apps list`, the `notes` home screen, and `calc 6 - 7` output were observed in the framebuffer; `open notes`, `open sysinfo`, `windows status`, the `windows` list alias, and `windows focus 1` were observed in a 2026-06-13 window/input pass; one mouse click packet was logged in that pass; RTL8139 initialization and MAC discovery were observed; a 2026-06-13 disposable-image ChronoFS pass observed `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, `journal`, and delete persistence after reboot; a 2026-06-13 userspace-boundary pass observed `userspace status`, `userspace syscalls`, and `ring3` transition/privilege-fault handling; a 2026-06-13 UEFI pass observed OVMF starting the ChronoOS UEFI loader.
 - Implemented in code but still needs broader or first runtime verification: optional custom BIOS bootloader, UEFI kernel handoff after loader start, broader framebuffer redraw behavior, manual keyboard typing, Backspace, shifted input, keyboard polling fallback, visible cursor movement, window drag, mouse close, successful `windows close <id>`, timer behavior from shell commands, GDT/IDT/PIC behavior beyond boot, reusable heap allocator reuse, ChronoFS `fsck repair`, ChronoFS journal recovery, independent write persistence before deletion, heap fallback reporting, ARP/UDP behavior, syscall hello demo, static ELF execution, SMP/AP startup beyond BSP, scheduler task lifecycle, `tasks`, `kill`, museum, quests, `poster system`, `capsule current`, most product commands, GIF capture, and hardware.
+- Shell workspace polish now exists in code through `workspace`, `shortcuts`,
+  `whereami`, `recent`, `status`, `verify`, `theme`,
+  `help search <term>`, and richer unknown-command suggestions; these commands
+  still need QEMU verification.
+- ChronoFS usability polish now exists in code through `files`, `files list`,
+  `files info`, `files search`, `files sample`, `files demo`, non-overwriting
+  `files copy`, and refusing `files rename`; these commands still need
+  disposable-image QEMU verification.
+- App platform polish now exists in code through `apps featured`, `apps recent`,
+  `apps category <name>`, `apps help <name>`, `apps demo <name>`, richer static
+  manifests, verification badges, and risk labels; these commands still need
+  QEMU verification.
+- Learning progress map polish now exists in code through `learn map`,
+  `learn progress`, `learn beginner`, `learn advanced`, updated `learn next`,
+  `explain <term>`, `museum index`, `quest dependencies`, and `quest badges`;
+  these commands still need QEMU verification.
 - Partial/missing systems: richer graphics shell, fuller process model, preemptive scheduler, broader networking, real hardware/USB support, and runtime verification of current implemented-in-code systems.
 - Current priority: preserve context, stabilize the repo, verify existing systems, and avoid new OS features until build/runtime status is known.
 
@@ -28,6 +44,46 @@ Each future entry should use this format:
 - If not verified, what still needs verification:
 - New risks introduced:
 - Next recommended step:
+
+### 2026-06-14 — Add learning progress map commands
+- Prompt/task: Add a safe educational/product layer so ChronoOS users can see learning areas, status, verification boundaries, and roadmap/future systems without adding risky kernel features or claiming new runtime proof.
+- Files changed: `kernel/src/shell.rs`, `kernel/src/museum.rs`, `kernel/src/quest.rs`, `docs/learning-paths.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/POST_VERIFICATION_SUMMARY.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added `learn map`, `learn progress`, `learn beginner`, `learn advanced`, updated `learn next`, and `explain <term>` glossary entries; added `museum index`; added `quest dependencies` and `quest badges`; updated docs and manual testing with conservative code-present/not-verified labels.
+- What was intentionally avoided: No kernel feature work, persistent progress tracking, automatic quest completion, large duplicated museum text, probes, file mutation, app/window/task spawning, repair commands, runtime verification claim, QEMU run, hardware run, networking expansion, USB, dynamic linker, package manager, full compositor, or preemptive scheduling.
+- Runtime verified: no. `cargo check -p kernel --offline --locked` passed as build sanity, but no QEMU or hardware verification was run for these new commands.
+- If not verified, what still needs verification: `learn map`, `learn progress`, `learn beginner`, `learn advanced`, `learn next`, `explain kernel`, `explain filesystem`, `explain syscall`, `explain ARP`, `museum index`, `quest dependencies`, and `quest badges` need a visible BIOS QEMU smoke pass with serial/screenshot evidence.
+- New risks introduced: Low. The commands are static read-only educational screens and presentation metadata over existing learning/museum/quest state.
+- Next recommended step: Run the focused learning progress map BIOS QEMU smoke pass after the shell workspace/app-platform smoke checks.
+
+### 2026-06-13 — Add app platform polish commands
+- Prompt/task: Improve the ChronoOS app platform experience without adding package management, dynamic linking, dynamic app loading, or risky app architecture changes.
+- Files changed: `kernel/src/apps/mod.rs`, `kernel/src/shell.rs`, `docs/apps.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/VERIFICATION_MATRIX.md`, `docs/POST_VERIFICATION_SUMMARY.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Expanded static app manifests with expected categories, related commands, help text, safe demo command lists, featured flags, verification badges, and risk labels; added `apps featured`, `apps recent`, `apps category <name>`, `apps help <name>`, and `apps demo <name>`; updated app launcher output to show verification/risk badges; and kept legacy `apps notes|calc|sysinfo|files|clock|museum|theme|tasks` routes.
+- What was intentionally avoided: No package manager, dynamic linker, dynamic app loading, app store, installer, app architecture rewrite, automatic risky demo execution, new window app framework, runtime verification claim, QEMU run, hardware run, TCP/DHCP/DNS, USB, full compositor, or preemptive scheduling.
+- Runtime verified: no. `cargo check -p kernel --offline --locked` passed as build sanity, but no QEMU or hardware verification was run for these new commands.
+- If not verified, what still needs verification: `apps featured`, `apps recent`, `apps category Core`, `apps category Files`, `apps category Learning`, `apps info notes`, `apps help notes`, `apps demo notes`, `apps launch calc`, `apps verified`, `apps roadmap`, and legacy app aliases need a visible BIOS QEMU smoke pass with exact serial command lines and screenshots.
+- New risks introduced: Low. The new commands are static metadata and text output; `apps launch <name>` still delegates to existing shell commands rather than loading new code.
+- Next recommended step: Run a focused app-platform BIOS QEMU smoke pass after or alongside the shell workspace smoke pass.
+
+### 2026-06-13 — Add ChronoFS usability namespace
+- Prompt/task: Add a safe ChronoFS usability layer inside the shell without redesigning the filesystem, changing the disk format, or claiming new runtime verification.
+- Files changed: `kernel/src/fs.rs`, `kernel/src/shell.rs`, `docs/storage.md`, `docs/chronofs-hardening.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/VERIFICATION_MATRIX.md`, `docs/POST_VERIFICATION_SUMMARY.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added filesystem inspection helpers for file metadata and existence checks; expanded the shell `files` namespace with overview, `files list`, `files info <name>`, `files search <term>`, read-only `files sample`, read-only `files demo`, non-overwriting `files copy <src> <dst>`, and a conservative `files rename <old> <new>` refusal; and improved file-operation errors so they name the operation and filename.
+- What was intentionally avoided: No disk-format change, directory model, permissions, timestamps, large-file support, POSIX behavior, automatic sample-file creation, automatic demo mutation, destructive rename, repair/recovery upgrade, QEMU claim, hardware claim, TCP/DHCP/DNS, USB, dynamic linker, package manager, full compositor, or preemptive scheduling.
+- Runtime verified: no. `cargo check -p kernel --offline --locked` passed as build sanity, but no QEMU or hardware verification was run for these new commands.
+- If not verified, what still needs verification: `files`, `files sample`, `files list`, `files info demo.txt`, `files search demo`, `files search ChronoOS`, `files copy demo.txt demo-copy.txt`, `cat demo-copy.txt`, refusing `files rename demo.txt renamed.txt`, related error messages, and interaction with `fs check`/`journal` need a disposable-image QEMU smoke pass with serial and screenshot evidence.
+- New risks introduced: Low to moderate. Most commands are read-only, but `files copy` writes a new destination file through the existing ChronoFS path and therefore needs disposable-image runtime proof before demo claims.
+- Next recommended step: Run a disposable-image ChronoFS usability QEMU smoke pass after the general shell workspace smoke pass.
+
+### 2026-06-13 — Add shell workspace polish commands
+- Prompt/task: Improve the main ChronoOS shell workspace with safe, text-first discoverability features without adding risky kernel systems.
+- Files changed: `kernel/src/shell.rs`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/CURRENT_STATUS.md`, `docs/PROGRESS_AUDIT.md`, `docs/POST_VERIFICATION_SUMMARY.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added read-only `workspace`, `shortcuts`, `whereami`, `recent`, `status`, `verify`, `files`, and `theme` commands; added fixed-size in-memory recent-command display without arrow-key recall or persistent history; added `help search <term>` over a static help index; expanded help topics for workspace/theme/status surfaces; and improved unknown-command suggestions for common near misses such as `hlep`, `apss`, `verfy`, and `lern`.
+- What was intentionally avoided: No TCP, DHCP, DNS, USB, dynamic linker, package manager, full compositor, preemptive scheduler, shell rewrite, prompt-format change, arrow-key command history, persistent history, runtime verification claim, QEMU run, hardware run, or risky subsystem expansion.
+- Runtime verified: no. `cargo check -p kernel --offline --locked` passed, but no QEMU or hardware pass was run for these new shell commands.
+- If not verified, what still needs verification: `workspace`, `shortcuts`, `whereami`, `recent`, `status`, `verify`, `files`, `theme`, `help search fs`, `help search app`, and unknown-command suggestions for `hlep`, `apss`, `verfy`, and `lern` need a visible BIOS QEMU smoke pass with serial/screenshot evidence.
+- New risks introduced: Low. The changes are shell text surfaces plus a small fixed-size in-memory command log; command history recall and deeper editing were intentionally deferred.
+- Next recommended step: Run a focused visible BIOS QEMU smoke pass for the new workspace commands and typo suggestions before marking them verified.
 
 ### 2026-06-13 — Consolidate post-verification decision point
 - Prompt/task: Consolidate the visible BIOS, ChronoFS, window/input, userspace-boundary, and UEFI verification passes into one product/engineering decision point without adding features or new runtime claims.

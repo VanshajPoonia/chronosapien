@@ -22,6 +22,8 @@ ChronoOS now has a trustworthy BIOS-based demo core:
 - The window/app shell has narrow QEMU evidence for opening, listing, focusing,
   and serial-backed close behavior, but the input/window lifecycle is still the
   main product-polish risk.
+- Shell workspace polish commands are now implemented in code as read-only
+  orientation surfaces, but they have not yet been runtime-verified.
 - Userspace has narrow teaching evidence for `userspace status`,
   `userspace syscalls`, and the fixed `ring3` privilege-boundary demo. Runtime
   syscall hello and static ELF execution remain unverified or tooling-blocked.
@@ -46,7 +48,11 @@ and should not block BIOS-based product polish.
 | safe mode | partially verified in QEMU | `mode status` and `safe on` observed in `/private/tmp/chronoos-visible-bios-20260613-184819-safe-on.png`. | Keep wording clear that safe mode is warning-only, not a sandbox. |
 | doctor/status/verify | partially verified in QEMU | `doctor` observed; status surfaces such as `poster system` and `capsule current` were input-garbled. | Retest `poster system` and `capsule current` with reliable input. |
 | app launcher | partially verified in QEMU | `apps`, `apps list`, notes home, `calc 6 - 7`, `open notes`, and `open sysinfo` have QEMU evidence. | Verify `apps info`, `apps launch`, standalone `sysinfo`, and notes persistence before broader claims. |
+| app platform polish | implemented in code, not verified | `apps featured`, `apps recent`, `apps category`, `apps help`, `apps demo`, richer manifest metadata, verification badges, and risk labels are implemented. | Run a focused app launcher QEMU smoke pass before using these as verified demo proof. |
+| learning progress map | implemented in code, not verified | `learn map`, `learn progress`, `learn beginner`, `learn advanced`, updated `learn next`, `explain <term>`, `museum index`, `quest dependencies`, and `quest badges` are implemented as static educational screens. | Run a focused learning-map QEMU smoke pass before using these as verified demo proof. |
+| shell workspace polish | implemented in code, not verified | `workspace`, `shortcuts`, `whereami`, `recent`, `status`, `verify`, `files`, `theme`, `help search <term>`, and typo suggestions are implemented as text-only commands. | Run a focused BIOS QEMU smoke pass before claiming runtime behavior. |
 | ChronoFS commands | partially verified in QEMU | Disposable-image pass observed `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, `fs check`, `fs journal`, `fsck`, and `journal`. | Keep using throwaway images for storage tests. |
+| ChronoFS usability layer | implemented in code, not verified | `files list`, `files info`, `files search`, `files sample`, `files demo`, non-overwriting `files copy`, and refusing `files rename` are implemented. | Run a disposable-image QEMU smoke pass before using these commands as demo proof. |
 | ChronoFS persistence | partially verified in QEMU | Reboot with same disposable image showed deleted `verify.txt` stayed absent and `cat verify.txt` reported not found. | Add a separate pre-delete reboot test before claiming independent write persistence. |
 | fsck | partially verified in QEMU | Clean read-only `fs check` and `fsck` output observed with suspicious counts, repaired `0`, and read-only not-repaired wording. | Test `fsck repair` only on controlled synthetic damage. |
 | journal | partially verified in QEMU | `fs journal` and `journal` reported clean/empty journal state after completed operations. | Verify rollback, roll-forward, corrupt-record refusal, and crash recovery on throwaway images. |
@@ -70,7 +76,8 @@ and should not block BIOS-based product polish.
 - Single-core BIOS demo path: boot, serial log, framebuffer shell, screenshots,
   and the narrow onboarding/status/app-registry flow.
 - Shell-first product polish that stays within verified BIOS behavior and avoids
-  new low-level claims.
+  new low-level claims. New workspace polish is code-present but still needs a
+  QEMU smoke pass.
 - ChronoFS read-only inspection and simple disposable-image CRUD demos, with
   repair/recovery still treated separately.
 - Ring 3 as an educational fixed demo, not a full userspace platform.
@@ -122,10 +129,11 @@ tasks
 kill <observed-non-shell-task-id>
 ```
 
-Secondary track: shell workspace polish after the lifecycle gap is clean. The
-BIOS shell, onboarding, safe/status, screenshots, and app launcher are healthy
-enough to build on, but broader UI polish should not lean on unverified manual
-input, mouse drag/close, or task-kill behavior.
+Secondary track: QEMU smoke verification for the shell workspace commands, then
+additional shell workspace polish. The BIOS shell, onboarding, safe/status,
+screenshots, and app launcher are healthy enough to build on, but broader UI
+polish should not lean on unverified manual input, mouse drag/close, or
+task-kill behavior.
 
 Keep ChronoFS repair/recovery, userspace syscall/ELF execution, and UEFI
 `Out of Resources` as separate focused verification/engineering tracks.

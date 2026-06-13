@@ -102,7 +102,8 @@ design, and what has actual verification evidence.
 | Framebuffer console/UI | implemented in code | verified in QEMU, needs broader runtime verification | QEMU screendump showed the top bar, boot text, and `CHRONO>` prompt; broader rendering and interaction still need checks. |
 | Serial logging | implemented in code | verified in QEMU, needs broader runtime verification | Boot-time serial logging reached boot complete in single-core QEMU; shell-command serial output is only partially observed. |
 | Shell command surface | implemented in code | verified in QEMU, needs broader runtime verification | `help`, `help start`, and `about` were observed through visible QEMU; most commands still need staged checks. |
-| Command and UX polish | implemented in code | verified in QEMU, needs broader runtime verification | Grouped `help` and `help start` were observed; other topic pages, unknown hints, and risky warnings still need checks. |
+| Command and UX polish | implemented in code | verified in QEMU, needs broader runtime verification | Grouped `help` and `help start` were observed; newer workspace commands, help search, recent command display, and richer unknown-command suggestions still need QEMU checks. |
+| Shell workspace polish | implemented in code | needs runtime verification | `workspace`, `shortcuts`, `whereami`, `recent`, `status`, `verify`, `files`, `theme`, and `help search <term>` are read-only shell surfaces. |
 | Reliability/safe mode | implemented in code | needs runtime verification | `mode` and `safe` commands categorize demo-safe, verification, and experimental paths with warning-only behavior. |
 | Apps | implemented in code | partially verified in QEMU, needs broader runtime verification | Static app registry and `apps` launcher exist; `apps`, `notes`, and `calc 6 - 7` were observed; registry subcommands, `sysinfo`, notes read/write, and persistence still need checks. |
 | Guided onboarding | implemented in code | needs runtime verification | `start`, `welcome`, and `guide` topic pages route first-run users toward existing safe commands. |
@@ -117,7 +118,7 @@ design, and what has actual verification evidence.
 | User-space showcase | partially implemented | needs runtime verification | `ring3`, `syshello`, `exec`, and museum/tour pages exist; no polished showcase app exists. |
 | Visual boot timeline | partially implemented | needs runtime verification | `capsule` and `poster boot` are text surfaces; no visual timeline is implemented. |
 | Era-specific help/about | partially implemented | needs runtime verification | `about`, `era`, `travel`, product text, and category help exist; deeper era-specific help remains future polish. |
-| Mini desktop/app launcher | partially implemented | needs runtime verification | Text launcher plus small notes/sysinfo windows exist; not a full desktop. |
+| Mini desktop/app launcher | partially implemented | needs runtime verification | Static shell-first app platform now includes featured/recent/category/info/help/demo metadata commands plus small notes/sysinfo windows; not a full desktop. |
 | ChronoFS | implemented in code | needs runtime verification | ATA-backed named files and shell commands exist; shell workflows are not verified. |
 | fsck and journal | implemented in code | needs runtime verification | Conservative `fsck`, `fsck repair`, one-record journal, and mount recovery exist; crash states need controlled tests. |
 | Keyboard | implemented in code | verified in QEMU, needs broader runtime verification | QEMU monitor `sendkey` submitted shell commands; manual typing, Backspace, Shift, and polling fallback still need checks. |
@@ -177,6 +178,10 @@ design, and what has actual verification evidence.
 - Reliability mode commands are implemented in code: `mode`, `mode status`,
   `mode safe`, `mode demo`, `mode experimental`, `safe`, `safe status`,
   `safe on`, and `safe off`. They warn only; they do not block commands.
+- Shell workspace polish commands are implemented in code: `workspace`,
+  `shortcuts`, `whereami`, `recent`, `status`, `verify`, `files`, `theme`, and
+  `help search <term>`. These are read-only product-orientation surfaces and
+  still need QEMU verification.
 - Filesystem commands are implemented in code: `ls`, `cat`, `write`, `rm`,
   `fsck`, `fsck repair`, and `journal`.
 - Userspace commands are implemented in code: `ring3`, `syshello`, and
@@ -267,7 +272,10 @@ design, and what has actual verification evidence.
 ## Mini Desktop And App Launcher
 
 - Status: partially implemented.
-- A text app launcher, cooperative tasks, and small notes/sysinfo windows exist.
+- A text app launcher, richer static app metadata, cooperative tasks, and small
+  notes/sysinfo windows exist.
+- App platform polish commands include `apps featured`, `apps recent`,
+  `apps category <name>`, `apps help <name>`, and `apps demo <name>`.
 - This is not a full desktop, compositor, or GUI toolkit.
 
 ## ChronoFS

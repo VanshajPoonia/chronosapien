@@ -38,7 +38,7 @@ The real verified core is narrower than the codebase:
 - Implemented in code but still unverified: `fsck repair`, journal recovery,
   independent write persistence before deletion, heap fallback reporting, heap
   reuse, successful `windows close <id>`, `tasks`, `kill`, broader scheduler
-  lifecycle, `poster system`, `capsule current`, most product/status commands,
+  lifecycle, `poster system`, `capsule current`, new workspace/status commands,
   learning paths, app registry subcommands beyond `apps list`, `userspace elf`,
   `syshello`, static ELF execution, and ARP/UDP behavior.
 - Blocked or broken: UEFI kernel handoff after loader start, custom BIOS build
@@ -61,9 +61,10 @@ The real verified core is narrower than the codebase:
 | Docs | portfolio docs | implemented in code | documented only | Portfolio kit/showcase/resume posts exist; runtime claims still need evidence checks. |
 | Product shell | guided onboarding | implemented in code | partially verified in QEMU | `start` and `guide quick` were observed on 2026-06-13; `welcome` and broader guide topics remain unverified. |
 | Product shell | command/UX polish | implemented in code | partially verified in QEMU | `help`, `help start`, and `about` were observed; most topic pages remain unverified. |
+| Product shell | shell workspace polish | implemented in code | needs runtime verification | `workspace`, `shortcuts`, `whereami`, `recent`, `status`, `verify`, `files`, `theme`, `help search <term>`, and typo suggestions exist; no QEMU evidence yet. |
 | Product shell | safe mode | implemented in code | partially verified in QEMU | `mode status` and `safe on` were observed on 2026-06-13; other mode/safe flows remain unverified. |
 | Product shell | learning paths | implemented in code | needs runtime verification | `learn` namespace exists and is read-only; QEMU walkthrough still needed. |
-| Apps | app registry | implemented in code | partially verified in QEMU | `apps list` was observed on 2026-06-13; `apps info`, `apps launch`, `apps verified`, and `apps roadmap` remain unverified. |
+| Apps | app registry | implemented in code | partially verified in QEMU | `apps list` was observed on 2026-06-13; newer app platform polish commands such as `apps featured`, `apps recent`, `apps category`, `apps help`, and `apps demo` remain unverified. |
 | Apps/UI | window/app lifecycle | partially implemented | partially verified in QEMU | `open notes`, `open sysinfo`, `windows status`, `windows` list alias, `windows focus 1`, and serial-backed `windows close 2` observed on 2026-06-13; visual close confirmation, `tasks`, `kill`, drag, and mouse close remain unverified. |
 | Storage | ChronoFS hardening | implemented in code | partially verified in QEMU | 2026-06-13 disposable-image pass observed `fs status`, `fs info`, `ls`, `write`, `cat`, `rm`, and delete persistence after reboot. |
 | Storage | fsck | implemented in code | partially verified in QEMU | 2026-06-13 pass observed clean read-only `fs check` and `fsck`; `fsck repair` remains unverified. |
@@ -103,6 +104,8 @@ This inventory is based on `kernel/src/shell.rs`, `kernel/src/apps/mod.rs`,
 ### Getting started
 
 - `help`
+- `help search <term>`
+- `help workspace`
 - `help start`, `help guide`
 - `start`
 - `welcome`
@@ -121,11 +124,17 @@ This inventory is based on `kernel/src/shell.rs`, `kernel/src/apps/mod.rs`,
 - `travel <year>`
 - `poster eras`
 - `apps theme`
+- `theme`
 
 ### Apps
 
 - `apps`, `apps list`
+- `apps featured`
+- `apps recent`
+- `apps category <name>`
 - `apps info <name>`
+- `apps help <name>`
+- `apps demo <name>`
 - `apps launch <name>`
 - `apps verified`
 - `apps roadmap`
@@ -135,6 +144,7 @@ This inventory is based on `kernel/src/shell.rs`, `kernel/src/apps/mod.rs`,
   `notes open`
 - `calc <int> +|-|*|/ <int>`
 - `sysinfo`
+- `files`
 
 ### Filesystem
 
@@ -169,6 +179,12 @@ This inventory is based on `kernel/src/shell.rs`, `kernel/src/apps/mod.rs`,
 
 ### Status/verification
 
+- `workspace`
+- `status`
+- `verify`
+- `whereami`
+- `shortcuts`
+- `recent`
 - `doctor`
 - `capsule`
 - `capsule milestones`, `capsule current`, `capsule next`
@@ -180,9 +196,8 @@ This inventory is based on `kernel/src/shell.rs`, `kernel/src/apps/mod.rs`,
 - `clock`
 - `help system`, `help status`, `help verify`
 
-There is no separate top-level `status` or `verify` command; the shell routes
-users toward `doctor`, `help system`, `capsule current`, and poster/status
-surfaces.
+`status` is a top-level alias for the workspace dashboard. `verify` is a
+read-only verification summary, not a live certification command.
 
 ### Userspace
 
@@ -313,7 +328,8 @@ These docs appear current enough to use as source-truth or active references:
   `safe on` commands.
 - Learning paths, guided onboarding, demo/tour/capsule/doctor/poster surfaces
   beyond the observed `start`, `guide quick`, and `doctor` paths.
-- App registry subcommands beyond the observed `apps list`: `apps info`,
+- App registry subcommands beyond the observed `apps list`: `apps featured`,
+  `apps recent`, `apps category`, `apps info`, `apps help`, `apps demo`,
   `apps launch`, `apps verified`, `apps roadmap`.
 - `sysinfo`, notes read/write/clear/persistence, and broader calculator cases.
 - Window lifecycle gaps after the 2026-06-13 pass: exact `windows list`
