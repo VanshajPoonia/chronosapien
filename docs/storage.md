@@ -4,7 +4,8 @@ ChronoOS stores shell files on a second QEMU IDE disk named `chronofs-data.img`.
 The boot image stays separate, so the filesystem can own sector 0 of the data
 disk without overwriting the BIOS boot sector.
 
-Status: implemented in code, needs runtime verification.
+Status: implemented in code, partially verified in QEMU for the disposable
+image flow recorded on 2026-06-13.
 
 ## ATA PIO
 
@@ -66,12 +67,13 @@ clear stale metadata in unused file table slots. It refuses ambiguous damage,
 duplicate-sector ownership, untrusted superblocks, and cases where guessing
 would risk user data.
 
-The shell output groups what was checked, what looks suspicious, what was
-repaired, and what was intentionally not repaired. `fsck repair` prints a
-mutation warning and should be used only with controlled disk images and
-before/after evidence.
+The shell output groups what was checked, whether the check is clean, what
+looks suspicious, what was repaired, and what was intentionally not repaired.
+`fsck repair` prints a mutation warning and should be used only with controlled
+disk images and before/after evidence.
 
-Status: implemented in code, needs runtime verification.
+Status: implemented in code, partially verified in QEMU for clean read-only
+checks on 2026-06-13. Mutating repair remains unverified.
 
 ## Journal And Recovery
 
@@ -84,8 +86,9 @@ operation when the journal record is safe. Recovery also rebuilds the bitmap
 from file table entries. Unsafe or corrupt journal records are refused and
 reported through serial logs.
 
-Status: implemented in code, needs runtime verification. Crash recovery has not
-been proven in QEMU or on hardware in this repo.
+Status: implemented in code, partially verified in QEMU for clean/empty journal
+status on 2026-06-13. Crash recovery has not been proven in QEMU or on hardware
+in this repo.
 
 A clean journal means there is no pending one-record journal operation. It does
 not prove full filesystem runtime verification.
@@ -94,6 +97,44 @@ not prove full filesystem runtime verification.
 
 See `docs/chronofs-hardening.md` for the current design, risks, inspection
 commands, repair boundaries, and recommended verification path.
+
+## 2026-06-13 Disposable QEMU Verification
+
+A controlled visible single-core BIOS QEMU pass used a fresh disposable 16 MiB
+data image at `/private/tmp/chronoos-chronofs-20260613-191106.img`, not the
+repo's `target/x86_64-unknown-none/debug/chronofs-data.img`.
+
+Observed with exact serial `cmd:` lines and screenshots:
+
+- fresh format/mount reached `[CHRONO] boot complete`
+- `fs status` reported persistent ATA disk, disk availability, file/slot counts,
+  and journal summary
+- `fs info` reported the `CHRONFS1` v1 layout and limits
+- initial `ls` showed no visible user files
+- `write verify.txt chrono verification test` completed
+- `cat verify.txt` printed `chrono verification test`
+- `fs check` and `fsck` reported a clean read-only check with checked areas,
+  suspicious counts, repaired `0`, and read-only not-repaired wording
+- `fs journal` and `journal` reported a clean/empty journal after completed
+  operations
+- `rm verify.txt` completed and a later `ls` no longer showed `verify.txt`
+- rebooting with the same disposable image showed `verify.txt` remained absent,
+  and `cat verify.txt` reported `file not found: verify.txt`
+
+Evidence:
+
+- main serial log: `/private/tmp/chronoos-chronofs-20260613-191106.serial.log`
+- reboot serial log:
+  `/private/tmp/chronoos-chronofs-20260613-191106-reboot.serial.log`
+- screenshots:
+  `/private/tmp/chronoos-chronofs-20260613-191106-current-before-rm-retry.png`,
+  `/private/tmp/chronoos-chronofs-20260613-191106-post-delete-ls.png`, and
+  `/private/tmp/chronoos-chronofs-20260613-191106-reboot-persistence.png`
+
+This verifies read/write/read/delete and delete persistence on the disposable
+image. It does not verify independent write persistence before deletion,
+`fsck repair`, journal rollback/roll-forward, corrupt journal refusal, heap
+fallback, disk-error handling, or hardware.
 
 ## QEMU Smoke Test Target
 
