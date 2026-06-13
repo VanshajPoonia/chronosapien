@@ -2296,6 +2296,16 @@ fn run_fsck(command: &str) {
 
 fn print_fsck_report(report: &fs::FsckReport, repair: bool) {
     println!("ChronoFS check: {}", report.status_label());
+    println!(
+        "Clean: {}",
+        if !report.disk_available {
+            "not checkable"
+        } else if report.warnings == 0 && report.errors == 0 {
+            "yes"
+        } else {
+            "no"
+        }
+    );
     println!("Checked: superblock, file table, extents, bitmap, duplicate sectors");
     println!("Entries: checked={} live={}", report.checked_entries, report.live_entries);
     println!(
