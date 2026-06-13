@@ -10,6 +10,34 @@ any screenshots or serial logs in `docs/AI_PROGRESS_LOG.md`.
 Use `docs/CURRENT_STATUS.md` for the current status labels before and after each
 test pass. `docs/status-audit.md` remains the Phase 2-specific risk snapshot.
 
+## Shell Workspace Polish Verification
+
+Status: implemented in code, needs runtime verification.
+
+These commands were added as safe text-first shell polish. Do not mark them
+verified until a QEMU or hardware pass records exact `cmd:` serial lines and
+visible output.
+
+- [ ] `workspace` shows era/theme, reliability mode, verification summary,
+      app routes, ChronoFS status, suggested next command, and learning
+      suggestion.
+- [ ] `status` aliases `workspace`.
+- [ ] `verify` prints a read-only verification boundary summary without running
+      live tests.
+- [ ] `shortcuts` lists the curated demo/useful commands.
+- [ ] `whereami` explains current mode, era, UI context, verification boundary,
+      and next action.
+- [ ] `files` shows the ChronoFS command map and safety notes.
+- [ ] `theme` shows the era/theme command card.
+- [ ] `recent` shows starter commands when empty and then shows typed commands
+      since boot without persistent history or arrow-key recall.
+- [ ] `help search fs` finds filesystem/ChronoFS commands.
+- [ ] `help search app` finds app/workspace commands.
+- [ ] `help workspace`, `help theme`, `help status`, and `help verify` route to
+      useful topic help.
+- [ ] Near-miss commands such as `hlep`, `apss`, `verfy`, and `lern` suggest
+      `help`, `apps`, `verify`, and `learn`.
+
 ## 2026-06-13 Visible BIOS Product Evidence
 
 This verification pass used the normal BIOS image in visible single-core QEMU,
@@ -252,6 +280,18 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 9. ChronoFS Read / Write / Delete
 
+- [ ] `files` shows the ChronoFS usability overview without mutating files.
+- [ ] `files list` lists visible files with byte sizes.
+- [ ] `files info <name>` reports file name, size, storage mode, disk/fallback
+      status, and verification note.
+- [ ] `files search <term>` finds filename matches and UTF-8 content matches
+      without dumping full file contents.
+- [ ] `files sample` prints read-only sample commands and creates no files.
+- [ ] `files demo` prints a guided walkthrough and creates no files.
+- [ ] `files copy <src> <dst>` copies only when the destination is absent.
+- [ ] `files copy <src> <dst>` refuses to overwrite an existing destination.
+- [ ] `files rename <old> <new>` refuses mutation and explains the conservative
+      copy, inspect, then manual `rm` path.
 - [x] `fs status` prints mode, disk availability, file counts, slots, and journal summary.
 - [x] `fs info` prints the fixed layout and limits without mutating metadata.
 - [x] `ls` works on a clean disk.
@@ -303,6 +343,21 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 ## 13. Product Commands
 
+- [ ] `learn map` prints Boot, Memory, Interrupts/Input, Filesystem, Apps/UI,
+      Userspace, Networking, Scheduler/SMP, and Roadmap/Future with status,
+      verification, suggested command, and related command.
+- [ ] `learn progress` states that progress is static/sessionless and points to
+      `quest badges`, `quest dependencies`, and the next safe route.
+- [ ] `learn beginner` prints a safe read-only first route.
+- [ ] `learn advanced` prints a verification-oriented route and warns away from
+      risky casual-demo commands.
+- [ ] `learn next` recommends `learn map` and does not claim live tracking.
+- [ ] `explain kernel` prints a short glossary entry and suggested command.
+- [ ] `explain filesystem` prints a short glossary entry and suggested command.
+- [ ] `explain syscall` prints a short glossary entry and suggested command.
+- [ ] `museum index` lists core and deeper museum topics.
+- [ ] `quest dependencies` prints a static dependency route.
+- [ ] `quest badges` prints static learning badges derived from quest state.
 - [x] `start` prints the first-run welcome screen.
 - [ ] `welcome` prints the same first-run welcome screen.
 - [ ] `guide` prints the guide topic menu.
@@ -322,6 +377,18 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 - [ ] `poster`, `poster boot`, `poster system`, `poster roadmap`, and `poster eras` work.
 - [ ] `travel 1987`, `travel 1998`, `travel 2004`, and `travel 2049` map to expected eras.
 - [ ] `apps` prints the launcher.
+- [ ] `apps featured` lists notes, calc, sysinfo, files, museum/learn, theme,
+      and status/verify surfaces.
+- [ ] `apps recent` starts empty or with in-memory app launcher routes from the
+      current boot only.
+- [ ] `apps category Core`, `apps category Files`, `apps category Learning`,
+      `apps category System`, `apps category Networking`, `apps category Visual`,
+      `apps category Debug/Lab`, and `apps category Roadmap/Future` filter the
+      static registry.
+- [ ] `apps info notes` shows name, category, description, launch command,
+      status, verification status, risk level, and related commands.
+- [ ] `apps help notes` shows app-specific help and related commands.
+- [ ] `apps demo notes` prints a safe demo path without executing commands.
 - [ ] `apps notes`, `apps calc`, `apps sysinfo`, `apps files`, `apps clock`, `apps museum`, `apps theme`, and `apps tasks` behave as documented.
 - [ ] Product commands use conservative status labels and do not claim runtime verification.
 - [ ] `doctor` and `poster system` report mouse/window/network/userspace limits truthfully.
@@ -423,7 +490,12 @@ Build sanity is not runtime verification, but it gates every QEMU/hardware pass.
 
 - [ ] `apps` displays launcher entries without requiring graphics-only interaction.
 - [ ] `apps list` displays the same static registry surface.
+- [ ] `apps featured` displays only curated demo-friendly entries.
+- [ ] `apps recent` displays only app launcher routes from this boot.
+- [ ] `apps category <name>` filters the static registry without launching apps.
 - [ ] `apps info notes` shows name, category, launch command, status, verification, and risk.
+- [ ] `apps help notes` shows help text and related commands.
+- [ ] `apps demo notes` prints commands without running them.
 - [ ] `apps launch calc` delegates to an existing shell command instead of dynamic loading.
 - [ ] `apps verified` lists only entries with recorded partial QEMU evidence.
 - [ ] `apps roadmap` lists roadmap/design-only app ideas without launching them.

@@ -9,11 +9,11 @@ QEMU or hardware evidence records the framebuffer shell, keyboard input, and the
 commands being shown. See `docs/RELEASE_v0.1.md` for the release story and
 `docs/KNOWN_LIMITATIONS.md` for boundaries.
 
-Current verification boundary: single-core BIOS serial-only QEMU reached
-`[CHRONO] boot complete`. Visible framebuffer output, shell interaction, apps,
-filesystem workflows, userspace, networking, mouse/windows, UEFI, custom BIOS,
-SMP/AP, and hardware still need runtime verification unless later evidence is
-recorded in `docs/AI_PROGRESS_LOG.md`.
+Current verification boundary: single-core BIOS QEMU has evidence for boot,
+serial output, framebuffer shell, `start`, `guide quick`, `mode status`,
+`safe on`, `doctor`, `apps list`, disposable-image ChronoFS basics, and narrow
+userspace/window paths. New shell workspace polish commands should be treated as
+implemented in code until a later QEMU pass records them.
 
 ## Demo Rules
 
@@ -31,6 +31,9 @@ Goal: show identity, product feel, and a conservative status surface.
 
 1. Start from a visible BIOS QEMU boot and first shell prompt.
 2. Set the demo safety frame:
+   - `workspace`
+   - `shortcuts`
+   - `whereami`
    - `mode status`
    - `mode safe`
 3. Show identity:
@@ -48,6 +51,8 @@ Goal: show identity, product feel, and a conservative status surface.
    - `demo`
    - `poster`
 6. Close with status honesty:
+   - `status`
+   - `verify`
    - `help system`
    - `doctor`
    - `safe off`
@@ -65,11 +70,14 @@ Suggested narration:
 Goal: show ChronoOS as both a systems project and an indie educational product.
 
 1. Identity and shell:
+   - `workspace`
+   - `shortcuts`
    - `welcome`
    - `guide full`
    - `learn next`
    - `about`
    - `help`
+   - `help search app`
    - `help apps`
    - `uptime`
    - `mem`
@@ -87,19 +95,29 @@ Goal: show ChronoOS as both a systems project and an indie educational product.
    - `inventory`
 4. Apps:
    - `apps`
+   - `apps featured`
+   - `apps category Core`
    - `apps notes`
+   - `apps demo notes`
    - `notes write hello from ChronoOS`
    - `notes read`
    - `calc 6 * 7`
    - `sysinfo`
 5. Filesystem:
+   - `files`
+   - `files sample`
+   - `files list`
    - `help fs`
    - `ls`
    - `write demo.txt ChronoOS has a tiny filesystem`
    - `cat demo.txt`
+   - `files info demo.txt`
+   - `files search tiny`
    - `fsck`
    - `journal`
 6. Conservative close:
+   - `whereami`
+   - `verify`
    - `capsule current`
    - `doctor`
 
@@ -108,16 +126,21 @@ Goal: show ChronoOS as both a systems project and an indie educational product.
 Goal: show the full current surface without expanding into risky systems.
 
 1. Boot and identity:
+   - `workspace`
+   - `shortcuts`
+   - `whereami`
    - `start`
    - `guide`
    - `guide full`
    - `about`
    - `help`
+   - `help search fs`
    - `help start`
    - `clock`
    - `uptime`
    - `mem`
 2. Era experience:
+   - `theme`
    - `era 1984`
    - `era 1995`
    - `era 2007`
@@ -142,7 +165,11 @@ Goal: show the full current surface without expanding into risky systems.
    - `inventory`
 5. Apps and launcher:
    - `apps`
+   - `apps featured`
+   - `apps category Learning`
    - `apps calc`
+   - `apps info calc`
+   - `apps demo calc`
    - `calc 21 + 21`
    - `apps sysinfo`
    - `sysinfo`
@@ -210,7 +237,16 @@ Goal: show the full current surface without expanding into risky systems.
 
 ## Commands To Show Museum And Quest Layer
 
+- `learn map`
+- `learn progress`
+- `learn beginner`
+- `learn advanced`
+- `learn next`
+- `explain kernel`
+- `explain filesystem`
+- `explain syscall`
 - `museum boot`
+- `museum index`
 - `museum kernel`
 - `museum memory`
 - `museum interrupts`
@@ -223,6 +259,8 @@ Goal: show the full current surface without expanding into risky systems.
 - `museum scheduler`
 - `quest list`
 - `quest status`
+- `quest dependencies`
+- `quest badges`
 - `stats`
 - `inventory`
 
@@ -230,7 +268,14 @@ Goal: show the full current surface without expanding into risky systems.
 
 - `apps`
 - `apps list`
+- `apps featured`
+- `apps recent`
+- `apps category Core`
+- `apps category Files`
+- `apps category Learning`
 - `apps info notes`
+- `apps help notes`
+- `apps demo notes`
 - `apps launch calc`
 - `apps verified`
 - `apps roadmap`
@@ -251,9 +296,16 @@ Goal: show the full current surface without expanding into risky systems.
 
 ## Commands To Show Filesystem
 
+- `files`
+- `files sample`
+- `files list`
 - `ls`
 - `write <name> <content>`
 - `cat <name>`
+- `files info <name>`
+- `files search <term>`
+- `files copy <src> <dst>` on a disposable image only
+- `files rename <old> <new>` to show the current conservative refusal
 - `rm <name>`
 
 Use throwaway demo filenames such as `demo.txt` or `tour.txt`. Avoid deleting
