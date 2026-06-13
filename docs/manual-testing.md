@@ -10,6 +10,109 @@ any screenshots or serial logs in `docs/AI_PROGRESS_LOG.md`.
 Use `docs/CURRENT_STATUS.md` for the current status labels before and after each
 test pass. `docs/status-audit.md` remains the Phase 2-specific risk snapshot.
 
+## 2026-06-13 Visible BIOS Product Evidence
+
+This verification pass used the normal BIOS image in visible single-core QEMU,
+serial logging, QEMU monitor input, QEMU monitor `screendump`, and `sips`
+conversion. It did not run hardware, UEFI, custom BIOS, SMP/AP, networking
+packet behavior, GIF capture, or new feature work.
+
+| Command | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| `boot` | verified in QEMU | `/private/tmp/chronoos-visible-bios-20260613-184819.serial.log`; `/private/tmp/chronoos-visible-bios-20260613-184819-boot.png`. | Reached `[CHRONO] boot complete`; visible prompt/top bar observed. |
+| `start` | verified in QEMU | Serial `cmd: start`; `/private/tmp/chronoos-visible-bios-20260613-184819-start.png`. | First-run welcome screen observed. |
+| `guide quick` | verified in QEMU | Serial `cmd: guide quick`; `/private/tmp/chronoos-visible-bios-20260613-184819-guide-quick.png`. | Quick guide path observed. |
+| `mode status` | verified in QEMU | Serial `cmd: mode status`; output visible in `/private/tmp/chronoos-visible-bios-20260613-184819-safe-on.png`. | Evidence is in the later visible frame; the standalone `mode-status` screendump was inconclusive. |
+| `safe on` | verified in QEMU | Serial `cmd: safe on`; `/private/tmp/chronoos-visible-bios-20260613-184819-safe-on.png`. | Warning-only safe mode observed; no sandbox claim. |
+| `doctor` | verified in QEMU | Serial `cmd: doctor`; `/private/tmp/chronoos-visible-bios-20260613-184819-doctor.png`. | Conservative subsystem report observed. |
+| `poster system` | needs manual verification | Logs show `poster s`, `possteerr  ssyyssttem`, and `pposter system`. | QEMU monitor input garbled this command; no exact command evidence. |
+| `capsule current` | needs manual verification | Log `/private/tmp/chronoos-visible-bios-20260613-185808.serial.log` shows `ccapsule current`. | QEMU monitor input garbled this command; no exact command evidence. |
+| `apps list` | verified in QEMU | Serial `cmd: apps list`; `/private/tmp/chronoos-visible-bios-20260613-185808-apps-list.png`. | Static app registry list observed. |
+| screenshot capture | verified in QEMU | QEMU `screendump` PPMs and `sips` PNGs under `/private/tmp/chronoos-visible-bios-20260613-*`. | GIF capture remains unverified. |
+
+## 2026-06-13 Window/Input Evidence
+
+This verification pass used the normal BIOS image in visible single-core QEMU,
+serial logging, QEMU monitor input, QEMU monitor `screendump`, QEMU HMP mouse
+commands, `sips` conversion, and a fresh disposable data image:
+`/private/tmp/chronoos-window-input-20260613-193131.img`. It did not run
+hardware, UEFI, custom BIOS, SMP/AP, networking expansion, or source changes.
+Manual keyboard typing was blocked by the Codex environment, so Backspace and
+Shift remain unverified.
+
+| Test | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| Boot | verified in QEMU | `/private/tmp/chronoos-window-input-20260613-193131.serial.log`; `/private/tmp/chronoos-window-input-20260613-193131-boot.png`. | Reached `[CHRONO] boot complete`. |
+| Manual typing | blocked by environment | No manual visible-QEMU typing was available. | QEMU monitor `sendkey` evidence is not manual keyboard proof. |
+| Backspace | blocked by environment | Not manually typed. | Keep unchecked. |
+| Shift | blocked by environment | Not manually typed. | Keep unchecked. |
+| `windows status` | verified in QEMU | Serial `cmd: windows status`; `/private/tmp/chronoos-window-input-20260613-193131-windows-status.png`. | Window boundary/status text observed. |
+| `open notes` | verified in QEMU | Serial `cmd: open notes`, task spawn, and `wm: open notes`; `/private/tmp/chronoos-window-input-20260613-193131-open-notes.png`. | Notes window observed. |
+| `open sysinfo` | verified in QEMU | Serial `cmd: open sysinfo`, task spawn, and `wm: open sysinfo`; `/private/tmp/chronoos-window-input-20260613-193131-current-after-sysinfo-attempt.png`. | Input retry opened two sysinfo windows. |
+| `windows list` | partially verified in QEMU | Exact `windows list` garbled as `wwindows list`; exact alias `windows` listed windows in `/private/tmp/chronoos-window-input-20260613-193131-windows-list-exact.png`. | Retest exact command with manual input. |
+| `windows focus 1` | verified in QEMU | Serial `cmd: windows focus 1`; `/private/tmp/chronoos-window-input-20260613-193131-mouse-click-notes-attempt.png`. | Notes window was brought to front. |
+| Mouse movement/click | partially verified in QEMU | Serial `mouse: click at 70,65`; `/private/tmp/chronoos-window-input-20260613-193131-mouse-click-notes-attempt.png`. | Click packet observed; visible cursor movement not clearly proven. |
+| Mouse drag | needs manual verification | No clear before/after movement evidence. | Keep unchecked. |
+| Mouse close | needs manual verification | No successful close-button click evidence. | Keep unchecked. |
+| `windows close 2` | partially verified in QEMU | Serial `cmd: windows close 2`, `sched: killed task 2`, and `wm: close sysinfo`; `/private/tmp/chronoos-window-input-20260613-193131-windows-close-2.png`. | Serial close/kill path observed, but the screenshot was a breakpoint-like black framebuffer and no follow-up list/tasks output was captured. |
+| `tasks` | implemented in code, not verified | Not run after the close attempt. | Needs a fresh pass. |
+| `kill <id>` | implemented in code, not verified | Not run after the close attempt. | Use only a real non-shell task ID; never `kill 0`. |
+
+## 2026-06-13 Disposable ChronoFS Evidence
+
+This verification pass used the normal BIOS image in visible single-core QEMU,
+serial logging, QEMU monitor input, QEMU monitor `screendump`, `sips`
+conversion, and a fresh disposable data image:
+`/private/tmp/chronoos-chronofs-20260613-191106.img`. It did not use the repo
+data image, run `fsck repair`, test crash recovery, run hardware, or add
+features.
+
+| Test | Command | Status | Evidence | Notes |
+| --- | --- | --- | --- | --- |
+| Fresh disposable mount | boot | verified in QEMU | `/private/tmp/chronoos-chronofs-20260613-191106.serial.log`; `/private/tmp/chronoos-chronofs-20260613-191106-boot.png`. | Fresh image formatted, journal was created, and boot reached `[CHRONO] boot complete`. |
+| Status | `fs status` | verified in QEMU | Serial `cmd: fs status`; `/private/tmp/chronoos-chronofs-20260613-191106-fs-status.png`. | Persistent ATA disk and journal summary observed. |
+| Layout/listing | `fs info`; `ls` | verified in QEMU | Serial exact commands; `/private/tmp/chronoos-chronofs-20260613-191106-fs-info-ls.png`. | Layout and empty visible listing observed. |
+| Write/read | `write verify.txt chrono verification test`; `cat verify.txt` | verified in QEMU | Serial exact commands; `/private/tmp/chronoos-chronofs-20260613-191106-current-before-rm-retry.png`. | Readback printed `chrono verification test`. |
+| Check/journal | `fs check`; `fs journal`; `fsck`; `journal` | verified in QEMU | Serial exact commands; `/private/tmp/chronoos-chronofs-20260613-191106-current-before-rm-retry.png`. | Clean read-only check and clean/empty journal state observed. |
+| Delete/listing | `rm verify.txt`; `ls` | verified in QEMU | Serial exact commands; `/private/tmp/chronoos-chronofs-20260613-191106-post-delete-ls.png`. | `verify.txt` was absent after deletion. |
+| Reboot delete persistence | `ls`; `cat verify.txt`; `fs status`; `journal` | verified in QEMU | Reboot serial `/private/tmp/chronoos-chronofs-20260613-191106-reboot.serial.log`; `/private/tmp/chronoos-chronofs-20260613-191106-reboot-persistence.png`. | Same disposable image remounted clean; `cat verify.txt` reported file not found. |
+| Input artifacts | `lls`; `ffs check` | needs manual verification | Main serial log includes these stray commands before exact retries. | QEMU monitor input artifacts; not counted as filesystem behavior. |
+| Repair/recovery | `fsck repair`; crash recovery | implemented in code, not verified | Not executed. | Requires controlled corruption/journal images before any status upgrade. |
+
+## 2026-06-13 Userspace Boundary Evidence
+
+This verification pass used the normal BIOS image in visible single-core QEMU,
+serial logging, QEMU monitor input, QEMU monitor `screendump`, `sips`
+conversion, RTL8139 attached, and fresh disposable 16 MiB data images under
+`/private/tmp/chronoos-userspace-20260613-195220-*.img`. It did not run
+hardware, mutate the repo data disk, create a new ELF test program, or add
+features.
+
+| Test | Command | Status | Evidence | Notes |
+| --- | --- | --- | --- | --- |
+| Boundary status | `userspace status` | verified in QEMU | Serial `cmd: userspace status`; `/private/tmp/chronoos-userspace-20260613-195220-userspace-status.png`. | Read-only status screen observed. |
+| Syscall table | `userspace syscalls` | verified in QEMU | Serial `cmd: userspace syscalls`; `/private/tmp/chronoos-userspace-20260613-195220-userspace-syscalls-clean.png`. | Listed write/read/exit/uptime; this is not runtime syscall execution. |
+| ELF boundary screen | `userspace elf` | needs manual verification | Serial attempts logged `uuserspace elf` and `serspace elf`. | No exact command evidence; do not check the manual item yet. |
+| Ring 3 demo | `ring3` | verified in QEMU | Serial `cmd: ring3`, `kernel: entered ring 3`, `ring3: transition ok`, and `ring3: privilege violation caught`; `/private/tmp/chronoos-userspace-20260613-195220-ring3.png`. | Fixed teaching demo only, not a general process model. |
+| Syscall hello demo | `syshello` | needs manual verification | Serial attempts logged `ssyshello` and `yshello`; diagnostic screenshot `/private/tmp/chronoos-userspace-20260613-195220-syshello.png`. | No exact command evidence; no syscall write/exit proof. |
+| Test ELF setup | build/install `hello.elf` | blocked by tooling | `command -v ld.lld` returned no path. | `user/hello.c` and `user/user.ld` exist, but no safe `hello.elf` was installed. |
+| Static ELF exec | `exec hello.elf` | blocked by tooling | Not run. | Blocked because the known test ELF was unavailable. |
+
+## 2026-06-13 UEFI Build/Boot Evidence
+
+This verification pass used the UEFI loader, the repo UEFI image builder,
+single-core QEMU with OVMF, serial logging, QEMU monitor `screendump`, and
+`sips` PNG conversion. It did not run hardware, custom BIOS, SMP/AP,
+networking, USB, or unrelated kernel work.
+
+| Step | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| Tooling preflight | build fixed, boot not verified | `pwsh`, `qemu-system-x86_64`, `sips`, `nc`, `/opt/homebrew/share/qemu/edk2-x86_64-code.fd`, and `/opt/homebrew/share/qemu/edk2-i386-vars.fd` were present. | This is tooling evidence only. |
+| UEFI loader build | build fixed, boot not verified | `cargo build -p uefi-loader --target x86_64-unknown-uefi --offline --locked` passed. | Fixed UEFI crate API drift in the loader. |
+| UEFI image build | build fixed, boot not verified | `pwsh -NoLogo -NoProfile -File scripts/build-uefi.ps1` produced `target/x86_64-unknown-none/debug/chronosapien-uefi.img` (64 MiB). | Fixed portable path handling and FAT sizing in the image build path. |
+| Single-core UEFI QEMU | partially verified in QEMU UEFI | `/private/tmp/chronoos-uefi-20260613-220234.serial.log`; `/private/tmp/chronoos-uefi-20260613-220234-boot.png`. | OVMF started the ChronoOS UEFI loader, then the loader failed with `Out of Resources` and firmware entered the UEFI shell. |
+| Kernel framebuffer/shell | implemented in code, not verified | No `[CHRONO] uefi: framebuffer`, `handoff ok`, or `[CHRONO] boot complete` appeared in the UEFI serial log. | Do not claim UEFI kernel boot or shell verification. |
+
 ## Tooling Preflight
 
 - [ ] Confirm `rustc -vV` uses the intended pinned nightly toolchain.
