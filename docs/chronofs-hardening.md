@@ -1,6 +1,7 @@
 # ChronoFS Hardening
 
-Status: implemented in code, needs runtime verification.
+Status: implemented in code, partially verified in QEMU for the disposable
+image flow recorded on 2026-06-13.
 
 ChronoFS is the small educational filesystem used by ChronoOS shell commands.
 This hardening pass keeps the existing disk format and focuses on inspection,
@@ -52,6 +53,11 @@ unused file table slots. It refuses untrusted superblocks, duplicate-sector
 ownership, invalid extents, unsafe errors, and cases where guessing could risk
 user data.
 
+`fsck` and `fs check` print an explicit clean/not-clean line before listing
+checked areas, suspicious findings, repaired items, and not-repaired reasons.
+This keeps demos and verification notes from inferring cleanliness from a
+summary label alone.
+
 ## Journal And Recovery
 
 ChronoFS reserves a hidden `__chronofs_journal` file for one metadata operation
@@ -73,13 +79,55 @@ runtime-verified.
 - File deletion depends on bitmap, file table, superblock, and journal sync
   order.
 - Heap fallback has no persistence.
-- ChronoFS shell workflows remain unverified until a focused QEMU pass records
-  `ls`, `write`, `cat`, `rm`, `fs status`, `fs check`, `journal`, reboot
-  persistence, and controlled repair evidence.
+- ChronoFS shell workflows have narrow QEMU evidence for the 2026-06-13
+  disposable image pass, but controlled repair, recovery states, heap fallback,
+  and disk-error behavior remain unverified.
+
+## 2026-06-13 Disposable QEMU Verification
+
+This pass used visible single-core BIOS QEMU and a fresh disposable data image:
+
+```text
+/private/tmp/chronoos-chronofs-20260613-191106.img
+```
+
+Verified in QEMU with exact serial command lines plus framebuffer screenshots:
+
+- `fs status`
+- `fs info`
+- `ls`
+- `write verify.txt chrono verification test`
+- `cat verify.txt`
+- `fs check`
+- `fs journal`
+- `fsck`
+- `journal`
+- `rm verify.txt`
+- post-delete `ls`
+- reboot with the same disposable image
+- post-reboot `ls`, `cat verify.txt`, `fs status`, and `journal`
+
+Observed result: the fresh image formatted and mounted, the file was written and
+read back, read-only `fs check`/`fsck` reported clean, the journal reported
+clean/empty after completed operations, the file was removed, and after reboot
+with the same image `verify.txt` remained absent.
+
+Evidence:
+
+- `/private/tmp/chronoos-chronofs-20260613-191106.serial.log`
+- `/private/tmp/chronoos-chronofs-20260613-191106-reboot.serial.log`
+- `/private/tmp/chronoos-chronofs-20260613-191106-current-before-rm-retry.png`
+- `/private/tmp/chronoos-chronofs-20260613-191106-post-delete-ls.png`
+- `/private/tmp/chronoos-chronofs-20260613-191106-reboot-persistence.png`
+
+Not verified by this pass: `fsck repair`, bitmap/stale-slot repair, repair
+refusal cases, journal rollback, journal roll-forward, corrupt journal refusal,
+independent write persistence before deletion, heap fallback, disk-error
+handling, hardware, or non-disposable image behavior.
 
 ## Verification Path
 
-Recommended first runtime pass:
+Recommended repair/recovery follow-up pass:
 
 ```text
 fs status
@@ -95,5 +143,5 @@ journal
 ```
 
 Use `fsck repair` only on a controlled disk image after recording the pre-repair
-state. Do not upgrade ChronoFS verification labels until QEMU or hardware logs
-and screenshots are captured.
+state. Do not upgrade repair or recovery labels until QEMU or hardware logs and
+screenshots are captured.
