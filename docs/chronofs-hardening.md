@@ -37,6 +37,24 @@ not persistent and cannot be checked like the on-disk format.
 The `fs` namespace is read-only. Mutating repair remains explicit through
 `fsck repair`.
 
+## Usability Layer
+
+`files` is the shell-first usability namespace for ChronoFS:
+
+- `files list` shows visible files with byte sizes.
+- `files info <name>` reports size, storage mode, disk/fallback status, and a
+  verification note.
+- `files search <term>` searches filenames and UTF-8 file contents without
+  dumping bodies.
+- `files sample` and `files demo` are read-only teaching commands.
+- `files copy <src> <dst>` is non-overwriting and uses the existing ChronoFS
+  write path.
+- `files rename <old> <new>` is intentionally deferred until rename/persistence
+  failure modes are verified.
+
+Status: implemented in code, not runtime-verified. It is a usability layer, not
+a disk-format or repair change.
+
 ## fsck Boundaries
 
 `fsck` checks:
@@ -82,6 +100,8 @@ runtime-verified.
 - ChronoFS shell workflows have narrow QEMU evidence for the 2026-06-13
   disposable image pass, but controlled repair, recovery states, heap fallback,
   and disk-error behavior remain unverified.
+- The `files` usability namespace needs its own disposable-image QEMU smoke
+  pass before it can be listed as runtime-verified.
 
 ## 2026-06-13 Disposable QEMU Verification
 

@@ -56,6 +56,27 @@ ChronoOS now has a read-only `fs` inspection namespace:
 The `fs` namespace does not repair or rewrite metadata. Mutating repair remains
 explicit through `fsck repair`.
 
+## Files Usability Namespace
+
+The `files` namespace is a shell-first usability layer over the same ChronoFS
+primitives. It does not change the disk format.
+
+- `files`: show the command map and safety notes.
+- `files list`: list visible files with byte sizes.
+- `files info <name>`: show name, size, storage mode, disk/fallback status, and
+  verification notes.
+- `files search <term>`: search visible filenames and UTF-8 file contents
+  without dumping file bodies.
+- `files sample`: print read-only sample commands; it does not create files.
+- `files demo`: print a guided walkthrough; it does not mutate automatically.
+- `files copy <src> <dst>`: copy through the existing ChronoFS write path only
+  when the destination does not already exist.
+- `files rename <old> <new>`: intentionally refuses for now and explains the
+  conservative copy, inspect, then manual `rm` path.
+
+Status: implemented in code, not yet runtime-verified in QEMU. Use a
+disposable data image before upgrading any `files` command to verified.
+
 ## fsck And Repair
 
 `fsck` is implemented in code as a conservative checker. It inspects the
