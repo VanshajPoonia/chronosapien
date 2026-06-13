@@ -54,7 +54,7 @@ PATH, so `scripts/build-custom.ps1` and `scripts/run-custom.ps1` were not run.
 
 ## UEFI Path
 
-Status: implemented in code, blocked: build failure.
+Status: implemented in code, partially verified in QEMU UEFI.
 
 The UEFI build creates a GPT/FAT32 image with:
 
@@ -68,11 +68,17 @@ GOP framebuffer output, reads the ACPI RSDP, exits Boot Services, writes the
 ChronoOS v2 handoff, loads the new page table, and jumps to
 `chrono_custom_entry`.
 
-The 2026-06-02 UEFI build preflight found OVMF at
-`/opt/homebrew/share/qemu/edk2-x86_64-code.fd`, but
-`scripts/build-uefi.ps1` failed while compiling `uefi-loader` because
-`uefi::boot::MemoryMap` no longer exists in the current `uefi` crate API. No
-UEFI QEMU boot was attempted after that build failure.
+The 2026-06-13 UEFI build/boot pass fixed the current `uefi` crate API drift
+and the UEFI image builder path/FAT sizing blockers. `scripts/build-uefi.ps1`
+now builds `target/x86_64-unknown-none/debug/chronosapien-uefi.img` on this
+host.
+
+| Step | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| UEFI loader build | build fixed, boot not verified | `cargo build -p uefi-loader --target x86_64-unknown-uefi --offline --locked` passed. | Fixed `MemoryMap` import path and compile-time UEFI path literal usage. |
+| UEFI image build | build fixed, boot not verified | `pwsh -NoLogo -NoProfile -File scripts/build-uefi.ps1` produced `target/x86_64-unknown-none/debug/chronosapien-uefi.img` (64 MiB). | Script path construction and FAT sizing were fixed narrowly for the image builder. |
+| Single-core UEFI QEMU | partially verified in QEMU UEFI | `/private/tmp/chronoos-uefi-20260613-220234.serial.log`; `/private/tmp/chronoos-uefi-20260613-220234-boot.png`. | OVMF started the ChronoOS UEFI loader, then loader failed with `Out of Resources` before kernel framebuffer handoff. |
+| Kernel framebuffer/shell | implemented in code, not verified | Same UEFI run did not reach `[CHRONO] uefi: framebuffer`, `handoff ok`, or `[CHRONO] boot complete`. | Do not claim UEFI kernel boot yet. |
 
 ## Startup Notes
 
