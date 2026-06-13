@@ -1,6 +1,6 @@
 //! Retro terminal RPG quests derived from compiled ChronoOS capabilities.
 
-const QUEST_USAGE: &str = "Usage: quest list|status";
+const QUEST_USAGE: &str = "Usage: quest list|status|dependencies|badges";
 const INNER_WIDTH: usize = 72;
 
 #[derive(Clone, Copy)]
@@ -239,6 +239,14 @@ fn run_quest_command(command: &str) {
             crate::serial_println!("[CHRONO] quest: status");
             print_quest_status();
         }
+        "dependencies" => {
+            crate::serial_println!("[CHRONO] quest: dependencies");
+            print_quest_dependencies();
+        }
+        "badges" => {
+            crate::serial_println!("[CHRONO] quest: badges");
+            print_quest_badges();
+        }
         _ => print_usage(),
     }
 }
@@ -296,6 +304,53 @@ fn print_quest_status() {
         None => {
             print_frame_line("All current quests complete.", style);
         }
+    }
+
+    print_footer(style);
+}
+
+fn print_quest_dependencies() {
+    let style = frame_style();
+
+    print_header("QUEST DEPENDENCIES", style);
+    print_frame_line("Static learning route; not live progress tracking.", style);
+    print_frame_line("", style);
+    print_frame_line("1. Boot -> Serial -> Framebuffer -> Shell", style);
+    print_frame_line("2. Memory -> Heap -> Filesystem", style);
+    print_frame_line("3. Apps -> Museum -> Learning paths", style);
+    print_frame_line("4. Input -> Windows -> Tasks", style);
+    print_frame_line("5. Disk -> ChronoFS -> fsck/journal", style);
+    print_frame_line("6. Userspace -> Syscalls -> ELF", style);
+    print_frame_line("7. Networking -> Scheduler/SMP -> Roadmap", style);
+    print_frame_line("", style);
+    print_frame_line("Next: learn map", style);
+    print_footer(style);
+}
+
+fn print_quest_badges() {
+    let style = frame_style();
+    let mut printed = false;
+
+    print_header("LEARNING BADGES", style);
+    print_frame_line("Badges are static quest presentation metadata.", style);
+    print_frame_line("", style);
+
+    for quest in QUESTS {
+        if let Some(item) = quest.inventory {
+            print_frame_line(
+                BadgeLine {
+                    marker: quest.state.marker(),
+                    item,
+                    status: quest.state.label(),
+                },
+                style,
+            );
+            printed = true;
+        }
+    }
+
+    if !printed {
+        print_frame_line("No badges available yet.", style);
     }
 
     print_footer(style);
@@ -508,5 +563,17 @@ struct InventoryLine(&'static str);
 impl core::fmt::Display for InventoryLine {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(formatter, "- {}", self.0)
+    }
+}
+
+struct BadgeLine {
+    marker: &'static str,
+    item: &'static str,
+    status: &'static str,
+}
+
+impl core::fmt::Display for BadgeLine {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(formatter, "{} {:<24} {}", self.marker, self.item, self.status)
     }
 }

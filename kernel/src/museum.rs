@@ -1,6 +1,6 @@
 //! Beginner-friendly educational exhibits for the ChronoOS shell.
 
-const USAGE: &str = "Usage: museum boot|kernel|memory|interrupts|keyboard|serial|era";
+const USAGE: &str = "Usage: museum index|boot|kernel|memory|interrupts|keyboard|serial|era";
 const INNER_WIDTH: usize = 68;
 
 struct Exhibit {
@@ -31,6 +31,12 @@ pub fn run(command: &str) -> bool {
         return true;
     }
 
+    if topic == "index" {
+        crate::serial_println!("[CHRONO] museum: index");
+        print_index();
+        return true;
+    }
+
     let Some(exhibit) = find_exhibit(topic) else {
         print_usage();
         return true;
@@ -43,6 +49,25 @@ pub fn run(command: &str) -> bool {
 
 fn print_usage() {
     crate::println!("{}", USAGE);
+}
+
+fn print_index() {
+    crate::println!("ChronoOS museum index");
+    crate::println!("Core exhibits:");
+    crate::println!("- museum boot        : firmware and startup");
+    crate::println!("- museum kernel      : the kernel's role");
+    crate::println!("- museum memory      : RAM, paging, heap");
+    crate::println!("- museum interrupts  : CPU and device events");
+    crate::println!("- museum keyboard    : scancodes and input");
+    crate::println!("- museum serial      : COM1 debug trail");
+    crate::println!("- museum era         : ChronoOS presentation eras");
+    crate::println!();
+    crate::println!("Deep dives:");
+    crate::println!("- museum disk | museum filesystem | museum userspace");
+    crate::println!("- museum syscalls | museum elf | museum networking");
+    crate::println!("- museum smp | museum scheduler");
+    crate::println!();
+    crate::println!("Next: learn map");
 }
 
 fn find_exhibit(topic: &str) -> Option<Exhibit> {
