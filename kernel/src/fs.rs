@@ -202,6 +202,27 @@ pub struct FsStatus {
 }
 
 #[derive(Clone, Copy)]
+pub enum FileStorage {
+    PersistentDisk,
+    HeapFallback,
+}
+
+impl FileStorage {
+    pub const fn label(&self) -> &'static str {
+        match self {
+            Self::PersistentDisk => "persistent ATA disk",
+            Self::HeapFallback => "heap fallback",
+        }
+    }
+}
+
+pub struct FileInfo {
+    pub name: String,
+    pub size_bytes: usize,
+    pub storage: FileStorage,
+}
+
+#[derive(Clone, Copy)]
 struct DiskEntry {
     used: bool,
     name_len: u8,
@@ -777,6 +798,35 @@ pub fn read_bytes(name: &str) -> Result<&'static [u8], FsError> {
         .find(|file| file.name == name)
         .map(|file| file.content.as_slice())
         .ok_or(FsError::NotFound)
+}
+
+pub fn file_info(name: &str) -> Result<FileInfo, FsError> {
+    validate_name(name)?;
+
+    let state: &'static FsState = unsafe { &*FS.0.get() };
+    let storage = if state.disk.is_some() {
+        FileStorage::PersistentDisk
+    } else {
+        FileStorage::HeapFallback
+    };
+
+    state
+        .files
+        .iter()
+        .find(|file| file.name == name)
+        .map(|file| FileInfo {
+            name: file.name.clone(),
+            size_bytes: file.content.len(),
+            storage,
+        })
+        .ok_or(FsError::NotFound)
+}
+
+pub fn file_exists(name: &str) -> Result<bool, FsError> {
+    validate_name(name)?;
+
+    let state: &'static FsState = unsafe { &*FS.0.get() };
+    Ok(state.files.iter().any(|file| file.name == name))
 }
 
 pub fn write(name: &str, content: &str) -> Result<(), FsError> {
