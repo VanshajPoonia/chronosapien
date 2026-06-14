@@ -45,6 +45,26 @@ Each future entry should use this format:
 - New risks introduced:
 - Next recommended step:
 
+### 2026-06-14 — Design userspace/process next steps
+- Prompt/task: Prepare a conservative next-step plan for userspace/process work after the userspace boundary verification pass, without implementing a full process model or adding new runtime claims.
+- Files changed: `docs/USERSPACE_NEXT.md`, `docs/userspace-model.md`, `docs/NEXT_STEPS.md`, `docs/VERIFICATION_MATRIX.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added a staged userspace/process design covering the current Ring 3/syscall/static ELF boundary, read-only process metadata, safer app execution, argv/env design, stronger isolation, future preemption, and acceptance criteria for the next actual implementation prompt; linked the design from the current userspace model and next-step queue.
+- What was intentionally avoided: No source changes, full process model, process table, scheduling semantics, preemptive scheduler, dynamic linker, package manager, fork/exec semantics, argv/env implementation, runtime verification claim, QEMU run, or hardware run.
+- Runtime verified: no. This was a documentation-only design pass.
+- If not verified, what still needs verification: `userspace elf`, exact `syshello`, runtime syscall write/exit behavior, and controlled `exec hello.elf` after a known safe test ELF can be built and installed into a disposable ChronoFS image.
+- New risks introduced: Low. The new file is design guidance only and does not change kernel behavior.
+- Next recommended step: Implement only a read-only foreground ELF process metadata/status command, then verify it separately before expanding userspace behavior.
+
+### 2026-06-14 — Plan ChronoOS v0.3 roadmap
+- Prompt/task: Create a realistic v0.3 release plan based on verified repo reality and the theme "ChronoOS as a tiny educational OS workspace."
+- Files changed: `docs/ROADMAP_v0.3.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
+- What changed: Added the v0.3 roadmap with eight evaluated tracks, a recommendation table, detailed acceptance criteria, and the exact next verification prompt; updated the next-step queue to make educational workspace verification primary, window/input stabilization secondary, and userspace/process metadata an optional stretch track.
+- What was intentionally avoided: No source changes, feature implementation, QEMU run, hardware run, runtime verification claim, TCP/DHCP/DNS, USB, dynamic linker, package manager, full compositor, preemptive scheduler, or broad hardware planning as a v0.3 requirement.
+- Runtime verified: no. This was a documentation-only release planning pass.
+- If not verified, what still needs verification: The code-present v0.3 workspace surfaces still need visible single-core BIOS QEMU proof with exact serial command lines and screenshots before labels are upgraded.
+- New risks introduced: Low. The roadmap narrows release scope and explicitly defers risky systems.
+- Next recommended step: Run the v0.3 educational workspace verification pass from `docs/ROADMAP_v0.3.md`.
+
 ### 2026-06-14 — Add learning progress map commands
 - Prompt/task: Add a safe educational/product layer so ChronoOS users can see learning areas, status, verification boundaries, and roadmap/future systems without adding risky kernel features or claiming new runtime proof.
 - Files changed: `kernel/src/shell.rs`, `kernel/src/museum.rs`, `kernel/src/quest.rs`, `docs/learning-paths.md`, `docs/shell-commands.md`, `docs/demo-script.md`, `docs/manual-testing.md`, `docs/POST_VERIFICATION_SUMMARY.md`, `docs/NEXT_STEPS.md`, `docs/AI_PROGRESS_LOG.md`.
