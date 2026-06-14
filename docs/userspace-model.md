@@ -6,6 +6,11 @@ ChronoOS has early user-space teaching paths, not a full Unix-like process
 model. The current goal is to make privilege transitions, syscalls, and static
 ELF loading understandable before adding broader process features.
 
+For the staged next-step design, see `docs/USERSPACE_NEXT.md`. That document is
+the source of truth for future process metadata, safer execution, argv/env
+design, stronger isolation, and preemption boundaries. This file describes the
+current implementation state.
+
 ## Current Pieces
 
 - `ring3`: copies a tiny fixed byte sequence into the demo user page and enters
@@ -59,6 +64,11 @@ validation uses the active ELF process ranges.
 The cooperative scheduler manages kernel/app task slots such as shell and small
 window tasks. It is not a preemptive user-process scheduler. `exec <name>` is a
 foreground teaching path, not a general multi-process platform.
+
+The safest next process step is read-only metadata for that single foreground
+ELF path: name, fixed process ID, active/inactive state, entry point, mapped
+range count, last exit code, and verification status. This would still not be a
+process table and should not change scheduling behavior.
 
 ## Not Supported
 
@@ -117,3 +127,11 @@ Use a disposable ChronoFS image for the test ELF. Do not use
 the known `user/hello.c` test ELF into `/private/tmp` once `ld.lld` or an
 equivalent documented linker path is available. Record serial logs and
 screenshots before upgrading any verification labels.
+
+## Safe Next Design Step
+
+Before broader execution features, implement only a read-only process metadata
+surface such as `userspace process` or `process status`. It should summarize
+the foreground static ELF slot and work when no process is active. Do not add
+fork, argv/env, dynamic linking, package management, permissions, or preemptive
+scheduling as part of that step.
