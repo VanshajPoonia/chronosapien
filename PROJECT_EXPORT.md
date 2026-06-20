@@ -1,70 +1,134 @@
-# Chronosapian Project Export
+# ChronoOS Project Export
 
 ## 1. Project Name And Purpose
 
-Project name in `Cargo.toml`: `chronosapien`.
+Public/product identity: **ChronoOS**. Repo package name in `Cargo.toml` is
+still `chronosapien`, and the README title is `Chronosapian`. Per
+`AGENTS.md`, this naming split is intentional and should not be renamed
+without an explicit task.
 
-Primary README title: `Chronosapian`.
+ChronoOS is a beginner-friendly Rust `no_std` x86_64 hobby/educational
+operating system. v0.3 theme: "ChronoOS as a tiny educational OS workspace."
+It builds for QEMU with a BIOS image path (primary, demo-safe) and a UEFI
+loader path (build-fixed, boot not yet verified), and exposes kernel concepts
+through a framebuffer shell with eras, museum pages, quests, learning paths,
+small built-in apps, a custom filesystem (ChronoFS), early ARP/UDP
+networking, a tiny window manager, a cooperative scheduler, and a Ring
+3/syscall teaching path.
 
-Docs and source also use `ChronoOS` for the OS/boot protocol naming. This naming split is real in the repo and should be cleaned up later if a single public name is desired.
-
-Chronosapian is a beginner-friendly Rust hobby operating system project. It builds a `no_std` x86_64 kernel for QEMU, with BIOS and UEFI boot paths, framebuffer text UI, serial logging, era-themed presentation, persistent storage, early networking, ring 3 demos, static ELF execution, SMP work, mouse input, small windows, and cooperative tasks.
-
-This file describes the current repository state only. Features are marked as code-present unless runtime verification was possible.
+This file describes current repository state and is informed by
+`docs/POST_VERIFICATION_SUMMARY.md`, `docs/VERIFICATION_MATRIX.md`,
+`docs/PROGRESS_AUDIT.md`, and `docs/ROADMAP_v0.3.md` (dated 2026-06-13).
+Features are marked code-present unless QEMU/hardware evidence exists; do not
+upgrade a status without recorded evidence in those docs.
 
 ## 2. What We Are Building
 
-We are building a small educational operating system that boots on emulated PC-compatible x86_64 hardware and exposes kernel concepts through a visible shell/UI:
-
-- Bootable kernel via the `bootloader` crate BIOS image path.
-- Optional custom BIOS bootloader path with Stage 1 and Stage 2 code in this repo.
-- Optional Rust UEFI loader that packages a GPT/FAT32 EFI System Partition image.
-- Framebuffer console with era-specific colors, prompt, boot text, top bar, cursor timing, boot chimes, text frames, sysinfo formatting, and window styling.
-- Tiny command shell with built-ins, apps, file commands, networking commands, museum/quest commands, windows, and task commands.
-- Early kernel subsystems: GDT, TSS, IDT, PIC, PIT, serial, PS/2 keyboard polling with IRQ1 buffering, PS/2 mouse IRQ handling, ATA PIO, PCI scanning, RTL8139 networking, paging, reusable free-list heap, SMP discovery/AP startup, and cooperative scheduling.
-- Small ring 3/user-mode path: fixed demo, SYSCALL/SYSRET services, and one foreground static ELF process loaded from ChronoFS.
+- Bootable kernel via the `bootloader` crate BIOS image path (the verified,
+  demo-safe default).
+- Optional custom BIOS bootloader path (Stage 1/Stage 2), currently blocked
+  locally because `nasm` is not on PATH.
+- Rust UEFI loader (`uefi-loader`) that builds a GPT/FAT32 ESP image; the
+  build succeeds and OVMF starts the loader, but it fails with
+  `Out of Resources` before kernel framebuffer handoff.
+- Framebuffer console with era-specific colors/text/sound, top bar, cursor,
+  window drawing, and mouse cursor rendering.
+- A terminal-first product shell: guided onboarding (`start`, `guide`),
+  workspace/status/verification surfaces (`workspace`, `status`, `verify`,
+  `doctor`, `poster`, `capsule`), a static app registry with discovery
+  metadata (`apps featured/recent/category/info/demo/launch`), a learning
+  progress map (`learn`, `explain`, `museum`, `quest`), and a ChronoFS
+  usability layer (`files list/info/search/sample/demo/copy`) layered over the
+  base filesystem commands.
+- Early kernel subsystems: GDT/TSS, IDT, PIC, PIT, serial, PS/2 keyboard
+  (IRQ1 + polling fallback), PS/2 mouse IRQ handling, ATA PIO, PCI scanning,
+  RTL8139 ARP/UDP networking, paging, a reusable free-list heap, SMP
+  discovery/AP startup, and a cooperative scheduler.
+- A tiny window manager (`windows`, `open notes`/`open sysinfo`, `tasks`,
+  `kill <id>`) layered on the scheduler.
+- A teaching-only userspace path: `userspace status`/`syscalls`, fixed
+  `ring3` privilege-boundary demo, and one foreground static ELF execution
+  path (`exec`); `docs/USERSPACE_NEXT.md` stages further work as read-only
+  ELF process metadata, not a general process model.
 
 ## 3. Current Tech Stack
 
 - Language: Rust 2021, nightly, `no_std` kernel.
 - Targets in `rust-toolchain.toml`: `x86_64-unknown-none`, `x86_64-unknown-uefi`.
-- Assembly: NASM-style `.asm` files for the optional custom BIOS bootloader.
-- User demo: freestanding C compiled with `clang`, linked with `ld.lld`.
-- Build/package tools: Cargo workspace, root `build.rs`, standalone Rust tools compiled with `rustc`, PowerShell scripts.
+- Assembly: NASM-style `.asm` files for the optional custom BIOS bootloader
+  (build currently blocked locally: `nasm` not found on PATH).
+- User demo: freestanding C (`user/hello.c`) intended for `clang` + `ld.lld`;
+  `ld.lld` is not currently on PATH, so `exec hello.elf` stays blocked.
+- Build/package tools: Cargo workspace (`kernel`, `uefi-loader` members), root
+  `build.rs`, standalone Rust host tools, PowerShell scripts.
 - Emulation target: QEMU `qemu-system-x86_64`.
-- Main Rust dependencies declared in manifests:
-  - root build dependency `bootloader = "0.11.15"`.
-  - kernel dependencies `bootloader_api = "0.11.15"` and `x86_64 = "0.14"`.
-  - UEFI loader dependency `uefi = "0.37.0"` with `alloc` and `global_allocator`.
-
-Important warning: `Cargo.lock` is stale/inconsistent. It only lists `bootloader 0.9.34` and `kernel`, while the manifests use `bootloader 0.11.15`, `bootloader_api`, `x86_64`, and the `uefi-loader` workspace member. The lockfile needs regeneration once Cargo is available.
+- Local tool availability as of this export: `cargo`, `rustc`,
+  `qemu-system-x86_64`, and `pwsh` are present on PATH; `nasm` and `ld.lld` are
+  not.
+- Main Rust dependencies: root build dependency `bootloader = "0.11.15"`;
+  kernel deps `bootloader_api = "0.11.15"` and `x86_64 = "0.14"`; UEFI loader
+  dep `uefi = "0.37.0"`.
+- `Cargo.lock` is now consistent with the manifests (lists `bootloader`,
+  `bootloader_api`, `x86_64`, and the `uefi-loader` workspace member); the
+  previously recorded stale-lock warning no longer applies.
 
 ## 4. Current Folder/File Structure
 
-Tracked files from `git ls-files` before creating this export:
+Tracked files from `git ls-files` (main branch):
 
 ```text
 .cargo/config.toml
 .gitignore
+AGENTS.md
 Cargo.lock
 Cargo.toml
+PROJECT_EXPORT.md
 README.md
 boot/stage1/stage1.asm
 boot/stage2/stage2_long.asm
 boot/stage2/stage2_pm.rs
 boot/stage2/stage2_real.asm
 build.rs
+docs/AI_PROGRESS_LOG.md
+docs/CURRENT_STATUS.md
+docs/KNOWN_LIMITATIONS.md
+docs/NEXT_STEPS.md
+docs/POST_VERIFICATION_SUMMARY.md
+docs/PROGRESS_AUDIT.md
+docs/RELEASE_v0.1.md
+docs/ROADMAP_AFTER_v0.1.md
+docs/ROADMAP_v0.2.md
+docs/ROADMAP_v0.3.md
+docs/USERSPACE_NEXT.md
+docs/VERIFICATION_MATRIX.md
+docs/apps.md
 docs/architecture.md
 docs/boot-flow.md
+docs/build-in-public-posts.md
+docs/chronofs-hardening.md
 docs/custom-bootloader.md
+docs/demo-script.md
 docs/dev-log.md
 docs/elf.md
+docs/hardware-testing.md
+docs/learning-paths.md
+docs/manual-testing.md
 docs/networking.md
+docs/portfolio-kit.md
+docs/release-checklist.md
+docs/resume-bullets.md
 docs/ring3.md
 docs/roadmap.md
+docs/safe-mode.md
+docs/screenshots.md
+docs/shell-commands.md
+docs/showcase.md
+docs/status-audit.md
 docs/storage.md
 docs/syscalls.md
 docs/uefi.md
+docs/userspace-model.md
+docs/windowing.md
 kernel/Cargo.toml
 kernel/src/apps/calc.rs
 kernel/src/apps/mod.rs
@@ -122,262 +186,335 @@ user/hello.c
 user/user.ld
 ```
 
-README's folder tree is stale. It does not list several current source files, including `kernel/src/boot.rs`, `kernel/src/mouse.rs`, `kernel/src/museum.rs`, `kernel/src/quest.rs`, `kernel/src/sched.rs`, and `kernel/src/wm.rs`.
+The docs tree has grown substantially since the original export (roughly a
+dozen new docs covering v0.1 release/checklist, v0.2/v0.3 roadmaps, the
+verification matrix/progress audit/post-verification summary, safe mode,
+learning paths, ChronoFS hardening, userspace staging, hardware/manual
+testing, and portfolio/showcase material). `docs/PROGRESS_AUDIT.md` §4-5
+tracks which docs are current vs. stale/duplicative; `docs/status-audit.md`,
+`docs/roadmap.md`, `docs/ROADMAP_AFTER_v0.1.md`, and `docs/dev-log.md` are
+historical/superseded rather than source-of-truth.
 
 ## 5. Important Files
 
-- `Cargo.toml`: root package/workspace and BIOS image build dependency setup.
-- `build.rs`: uses `bootloader` 0.11 BIOS image builder and emits `CHRONOSAPIEN_BIOS_IMAGE`.
-- `.cargo/config.toml`: default build target is `x86_64-unknown-none`; enables nightly `bindeps`.
-- `rust-toolchain.toml`: pins nightly components and bare-metal/UEFI targets.
-- `src/main.rs`: small host-side binary that prints the generated BIOS image path.
-- `kernel/src/main.rs`: kernel entrypoints and boot initialization sequence.
-- `kernel/src/boot.rs`: shared `BootContext`, bootloader crate handoff, custom/UEFI Chrono boot handoff v1/v2 parsing.
-- `kernel/src/framebuffer/mod.rs` and `font.rs`: pixel drawing, text console, top bar, taskbar, mouse cursor, era rendering effects, window drawing primitives.
-- `kernel/src/console.rs`: `print!` and `println!` macros over the framebuffer writer.
-- `kernel/src/serial.rs`: COM1 serial output guarded by a spinlock.
-- `kernel/src/gdt.rs`, `interrupts.rs`, `pic.rs`, `timer.rs`: descriptor tables, exception/IRQ handlers, PIC remap, PIT timer.
-- `kernel/src/memory.rs`: boot memory map handling, paging helpers, fixed user pages, reusable free-list heap allocator, user address-space support.
-- `kernel/src/keyboard.rs`: PS/2 keyboard decoder with IRQ1 buffering and polling fallback.
-- `kernel/src/mouse.rs`: interrupt-driven PS/2 mouse packet handling and event publication.
-- `kernel/src/shell.rs`: command loop and command dispatch.
-- `kernel/src/theme.rs`: era profiles for prompts, colors, boot text, sounds, windows, text frames, and sysinfo.
-- `kernel/src/wm.rs`: fixed-capacity framebuffer window manager for notes/sysinfo windows.
-- `kernel/src/sched.rs`: cooperative round-robin task scheduler with fixed stacks.
-- `kernel/src/smp.rs`: ACPI MADT parsing, AP startup trampoline, local APIC setup, per-core tracking.
-- `kernel/src/ata.rs`, `fs.rs`: ATA PIO sector I/O and ChronoFS filesystem facade with disk or heap fallback.
-- `kernel/src/pci.rs`, `net.rs`: PCI config scanning and RTL8139 ARP/UDP network stack.
-- `kernel/src/ring3.rs`, `syscall.rs`, `elf.rs`, `process.rs`: ring 3 demo, syscall ABI, ELF64 parser, and one foreground ELF process path.
-- `kernel/src/apps/`: built-in apps: `notes`, `calc`, and `sysinfo`.
-- `kernel/src/museum.rs`, `quest.rs`: educational shell surfaces and RPG-style capability tracker.
-- `boot/stage1/stage1.asm`: custom BIOS sector-0 boot stage.
-- `boot/stage2/stage2_real.asm`: active custom BIOS Stage 2 loader and long-mode transition.
-- `boot/stage2/stage2_long.asm`: reference long-mode handoff, not the active flat Stage 2 path.
-- `boot/stage2/stage2_pm.rs`: typed helper/layout documentation for Stage 2 manifest and boot info.
-- `uefi-loader/src/main.rs`: Rust UEFI application that loads `\CHRONO\KERNEL.ELF`, configures GOP, exits Boot Services, and jumps to the kernel.
-- `tools/chronofs_put.rs`: host tool to create/update the ChronoFS data image and inject files.
-- `tools/custom_image_builder.rs`: packages custom BIOS image and patches Stage 2 manifest.
-- `tools/uefi_image_builder.rs`: creates GPT/FAT32 ESP image containing `BOOTX64.EFI` and `KERNEL.ELF`.
-- `user/hello.c`, `user/user.ld`: freestanding user-space ELF demo for `exec hello.elf`.
+- `Cargo.toml` / `build.rs`: workspace setup and BIOS image build via the
+  `bootloader` 0.11 crate.
+- `kernel/src/shell.rs`: command loop/dispatch; the single largest surface for
+  product behavior (workspace, status, apps, files, museum/quest, userspace,
+  windows, networking, safe-mode commands all route through here). Cross-ref
+  `docs/shell-commands.md` for the current full command inventory.
+- `kernel/src/museum.rs`, `quest.rs`: educational shell surfaces and
+  RPG-style capability tracker (`learn`, `explain`, `museum`, `quest`).
+- `kernel/src/apps/`: built-in apps (`notes`, `calc`, `sysinfo`) plus the
+  static app-registry metadata consumed by `apps featured/category/...`.
+- `kernel/src/fs.rs`, `ata.rs`: ChronoFS facade (superblock, file table,
+  bitmap, contiguous extents, heap fallback) and ATA PIO disk I/O; the
+  `files` usability namespace (list/info/search/sample/demo/copy) wraps this.
+- `kernel/src/wm.rs`, `sched.rs`: fixed-capacity window manager and the
+  cooperative task scheduler behind `windows`/`tasks`/`kill`.
+- `kernel/src/ring3.rs`, `syscall.rs`, `elf.rs`, `process.rs`: Ring 3 demo,
+  SYSCALL/SYSRET ABI, ELF64 parser, and the one foreground ELF process path
+  behind the `userspace`/`ring3`/`syshello`/`exec` commands.
+- `kernel/src/net.rs`, `pci.rs`: RTL8139 ARP/UDP stack and PCI scanning behind
+  `net status/config/arp/send/log`.
+- `uefi-loader/src/main.rs`: Rust UEFI app; build is fixed and OVMF starts it,
+  but it currently fails with `Out of Resources` before kernel handoff — see
+  `docs/uefi.md` and the UEFI rows in `docs/VERIFICATION_MATRIX.md`.
+- `tools/chronofs_put.rs`, `custom_image_builder.rs`, `uefi_image_builder.rs`:
+  host-side image builders for ChronoFS data, custom BIOS, and UEFI ESP images.
+- `docs/POST_VERIFICATION_SUMMARY.md`: current product/engineering decision
+  point — read this first for "what's actually safe to build on."
+- `docs/VERIFICATION_MATRIX.md`: compact per-feature evidence lookup.
+- `docs/PROGRESS_AUDIT.md`: broader evidence audit plus the current command
+  inventory (§3) and doc-currency notes (§4-5).
+- `docs/ROADMAP_v0.3.md`: current release-planning source and track
+  evaluation table.
+- `docs/NEXT_STEPS.md`: active priority queue; points back at the four docs
+  above.
+- `docs/USERSPACE_NEXT.md`: staged design doc limiting next userspace work to
+  read-only foreground ELF metadata.
 
 ## 6. Features Already Implemented In Code
 
-These are code-present but not runtime-verified in this shell:
+Verified in QEMU (has recorded serial/screenshot evidence, per
+`docs/VERIFICATION_MATRIX.md`):
 
-- BIOS boot image path through root `build.rs` and `bootloader` crate.
-- Optional custom BIOS boot path with Stage 1, Stage 2, image builder, and `chrono_custom_entry`.
-- Optional UEFI path with a Rust `BOOTX64.EFI`, GOP framebuffer handoff, ACPI RSDP handoff, GPT/FAT32 image builder, and QEMU run script.
-- COM1 serial logging.
-- Framebuffer console with top bar, scrollable shell text region, bitmap font, RGB/BGR/U8 pixel handling, scanline/chunky/smooth/thin effects, and mouse cursor drawing.
-- Era profiles for 1984, 1995, 2007, and 2040.
-- PC speaker boot chimes and `beep <hz>`.
-- GDT/TSS setup with double-fault and ring 0 stacks.
-- IDT handlers for breakpoint, general protection fault, page fault, double fault, timer IRQ, keyboard IRQ, and mouse IRQ.
-- Legacy PIC remap and PIT 100 Hz tick counter.
-- PS/2 keyboard IRQ1 buffering with polling fallback and ASCII decoding.
-- PS/2 mouse initialization, IRQ12 packet decoding, click/move event publication.
-- Shell commands for help/about/clear/reboot/era/uptime/clock/mem/cores/beep/ring3/syshello/files/exec/windows/tasks/network/museum/quests/apps.
-- Built-in apps: one-line persistent notes, integer calculator, era-styled sysinfo.
-- Tiny framebuffer window manager for notes and sysinfo windows, including dragging, close button, bring-to-front, and era styling.
-- Cooperative scheduler with fixed task slots and task stacks; `tasks` and `kill <id>` shell commands.
-- SMP discovery and AP startup using ACPI MADT and INIT-SIPI-SIPI, with fallback to one core if discovery/setup fails.
-- Spinlock primitive for shared kernel state.
-- Reusable free-list heap allocator with 1 MiB heap at `0x200000`, block splitting, free reinsertion, and adjacent-block coalescing.
-- ATA PIO read/write of the primary slave IDE disk.
-- ChronoFS disk format with superblock, file table, bitmap, contiguous file sectors, and heap fallback if disk mount fails.
-- File shell commands: `ls`, `cat <name>`, `write <name> <content>`, `rm <name>`, `exec <name>`.
-- RTL8139 PCI network initialization, static IPv4 settings, ARP, UDP send, polling receive path, and serial RX logging.
-- Ring 3 privilege demo via `ring3`.
-- SYSCALL/SYSRET setup with `sys_write`, `sys_read`, `sys_exit`, and `sys_uptime`.
-- Static ELF64 parser and foreground ELF execution from ChronoFS.
-- `build-user.ps1` path to compile/install `hello.elf` into the data disk.
-- Museum and quest shell content using era profile text frames.
+- Single-core BIOS boot, serial logging, framebuffer shell (top bar, prompt,
+  scrollable text), and PNG screendump capture.
+- Onboarding: `start`, `guide quick`.
+- Safe/status: `mode status`, `safe on`, `doctor`.
+- App launcher: `apps`, `apps list`, notes home, `calc 6 - 7`, `open notes`,
+  `open sysinfo`.
+- ChronoFS on a disposable image: `fs status`, `fs info`, `ls`, `write`,
+  `cat`, `rm`, `fs check`, `fs journal`, `fsck`, `journal`, and delete
+  persistence across reboot.
+- Window lifecycle (narrow): `windows status`, `windows`/list alias, `windows
+  focus 1`, serial-backed `windows close 2`; one mouse click packet.
+- Userspace boundary: `userspace status`, `userspace syscalls` (read-only
+  table), and the fixed `ring3` demo (kernel entry, privilege transition,
+  expected GP-fault catch on a privileged instruction).
+- RTL8139 device init and MAC discovery.
+
+Implemented in code, not yet runtime-verified:
+
+- Shell workspace polish: `workspace`, `shortcuts`, `whereami`, `recent`,
+  `status`, `verify`, `theme`, `help search <term>`, typo suggestions.
+- App platform polish: `apps featured`, `apps recent`, `apps category`,
+  `apps help`, `apps demo`, `apps launch`, `apps verified`, `apps roadmap`,
+  richer manifest metadata, verification badges, risk labels.
+- ChronoFS usability layer: `files`, `files list/info/search/sample/demo`,
+  non-overwriting `files copy`, refusing `files rename`.
+- Learning progress map: `learn map/progress/beginner/advanced/next`,
+  `explain <term>`, `museum index`, `quest dependencies`, `quest badges`.
+- UEFI build path: `cargo build -p uefi-loader --target x86_64-unknown-uefi`
+  and `scripts/build-uefi.ps1` pass; OVMF starts the loader (see §7 for the
+  boot-time failure).
+- Reusable free-list heap allocator (split/free/reinsert/coalesce).
+- Cooperative scheduler task spawn/kill plumbing beyond the one observed
+  `sched: killed task 2` event.
+- Static ELF64 parser and foreground ELF execution path (blocked from running
+  end-to-end only by missing `ld.lld`/no installed test ELF, not by missing
+  code).
 
 ## 7. Features Partially Implemented Or Limited
 
-- Runtime behavior is not verified in this environment because Rust/QEMU/PowerShell tools are unavailable on `PATH`.
-- Keyboard input has code-present IRQ1 buffering plus a polling fallback, but runtime IRQ delivery and typing behavior are not verified.
-- Mouse input is interrupt-driven in code, but the README still says mouse support is not part of the milestone.
-- Heap allocation uses a code-present reusable free list, but allocation reuse and coalescing are not runtime-verified.
-- ChronoFS has no journal or repair tool. Interrupted writes/removes can corrupt metadata.
-- ChronoFS stores fixed-size metadata and contiguous file extents only. Current documented limits include 64 file slots, 32-byte filenames, no whitespace in filenames, one shell-line content via shell, and 64 KiB max file size.
-- Networking is ARP/UDP only, uses static IPv4, and has no DHCP, TCP, DNS, checksum-complete UDP stack, or real-hardware support.
-- UEFI real-hardware boot needs verification. Docs say Secure Boot must be disabled unless signing is added; USB HID/storage/serial are future work.
-- Custom BIOS handoff v1 is still supported but lacks `rsdp_addr`; SMP ACPI discovery can fall back to single core on that path.
-- Process support is early. There is one foreground static ELF path, no dynamic linker, no libc, no argv/env, no process scheduler integration, no general multi-process model.
-- `syshello` is an older fixed-page demo and is separate from the newer ELF exec path.
-- Scheduler is cooperative, not preemptive. Timer preemption, live migration, CPU hotplug, IOAPIC, and x2APIC are not implemented.
-- Several docs are behind source reality, especially README structure/current-state text.
+- **Window/input lifecycle** — the single biggest product-polish risk per
+  `docs/POST_VERIFICATION_SUMMARY.md`: visual close confirmation after
+  `windows close <id>`, `tasks`, `kill <observed-id>`, manual keyboard typing,
+  Backspace, Shift, visible mouse movement, drag, and mouse close all still
+  need clean proof. QEMU monitor key injection has repeatedly garbled longer
+  commands (`poster system`, `capsule current`, `windows list`, ChronoFS
+  command attempts).
+- **UEFI boot** — build/image path is fixed and OVMF starts the ChronoOS
+  loader, but it fails with `Out of Resources` before kernel framebuffer
+  handoff. Treated as a separate technical track, not a v0.3 blocker.
+- **Userspace/process model** — `userspace elf`, exact `syshello`, and
+  controlled `exec hello.elf` remain unverified/blocked because `ld.lld` is
+  not available and input garbling has prevented exact command capture. No
+  dynamic linker, libc, argv/env, or general multi-process model exists by
+  design (see `docs/USERSPACE_NEXT.md`).
+- **Custom BIOS boot** — blocked locally because `nasm` is not on PATH;
+  `scripts/build-custom.ps1`/`run-custom.ps1` have not been run.
+- **SMP/AP** — two-core smoke reaches BSP-online only; no AP-online or
+  two-core-ready evidence recorded. Treated as high-risk.
+- **Networking** — ARP/UDP over RTL8139 plus new `net status/config/log/demo`
+  observability commands exist in code; ARP/UDP runtime behavior is
+  unverified (input garbling, host UDP forwarding conflicts in the recorded
+  pass). No DHCP/DNS/TCP/sockets.
+- **ChronoFS repair/recovery** — `fsck repair`, controlled bitmap/stale-slot
+  repair, journal rollback/roll-forward, corrupt-journal refusal, and crash
+  recovery are implemented but unverified; independent write persistence
+  before deletion is also unverified (only delete-then-reboot persistence has
+  evidence).
+- Docs can lag source/evidence; always check `docs/VERIFICATION_MATRIX.md`
+  before trusting a status claim elsewhere.
 
 ## 8. Planned But Not Started
 
-Based on code/docs/quest data:
+Intentionally deferred for v0.3 (`docs/ROADMAP_v0.3.md`):
 
-- ChronoFS journaling, crash recovery, repair tooling, or reusable free-space policy improvements.
-- Richer graphics shell beyond the current tiny window manager.
-- Broader real-hardware support, especially USB HID, USB storage, USB serial, and non-QEMU networking.
-- More app-like shell programs after kernel basics stay stable.
+- TCP, DHCP, DNS, sockets, and broader networking.
+- USB HID, USB storage, USB serial, and broad real-hardware support.
+- Dynamic linker, package manager, dynamic app loading, app store behavior.
+- Full compositor, GUI toolkit, windowed file explorer, tiny paint canvas,
+  theme studio, crash lab, boot chime selector.
+- Preemptive scheduler, production process scheduling, and SMP/AP expansion.
+- Full userspace process model: fork/exec semantics, argv/env, libc, broad
+  file descriptors, permissions.
 
 ## 9. Current Build, Run, And Test Commands
-
-Commands documented or present in scripts:
 
 ```powershell
 cargo build -p kernel
 .\scripts\build.ps1
 .\scripts\run.ps1
 .\scripts\debug-serial.ps1
-.\scripts\build-custom.ps1
+.\scripts\build-custom.ps1   # blocked locally: nasm not on PATH
 .\scripts\run-custom.ps1
 .\scripts\build-uefi.ps1
 .\scripts\run-uefi.ps1
-.\scripts\build-user.ps1
+.\scripts\build-user.ps1     # blocked locally: ld.lld not on PATH
 ```
 
-Optional direct command from README:
+Direct build-check commands confirmed passing per `docs/NEXT_STEPS.md`:
 
-```powershell
-$hostTarget = ((rustc -vV | Select-String "^host:").ToString() -split " ")[1]
-cargo build -p chronosapien --target $hostTarget
-qemu-system-x86_64 -smp 2 -drive format=raw,file=target\x86_64-unknown-none\debug\chronosapien-bios.img,if=ide,index=0,media=disk -drive format=raw,file=target\x86_64-unknown-none\debug\chronofs-data.img,if=ide,index=1,media=disk -serial stdio
+```bash
+cargo check -p kernel --offline --locked
+cargo build -p uefi-loader --target x86_64-unknown-uefi --offline --locked
 ```
 
-Networking test documented in `docs/networking.md`:
+QEMU smoke pattern used for the recorded verification passes (single-core,
+serial-logged, screenshot-captured):
 
-```powershell
-ncat -ul 9000
+```bash
+qemu-system-x86_64 -smp 1 -drive format=raw,file=<bios-image>,if=ide,index=0,media=disk \
+  -drive format=raw,file=<chronofs-data-image>,if=ide,index=1,media=disk \
+  -serial file:<path>.serial.log
 ```
 
-Then boot and run:
-
-```text
-net arp
-net send
-```
-
-Storage smoke test documented in `docs/storage.md`:
-
-```text
-write hello.txt Hi there
-reboot
-cat hello.txt
-```
-
-There are no Rust unit tests found in the tracked source by search for `#[test]` or `mod tests`.
+There are no Rust unit tests in tracked source (`#[test]`/`mod tests`).
+Verification is QEMU/manual/screenshot-evidence based; see
+`docs/manual-testing.md` and `docs/release-checklist.md`.
 
 ## 10. Current Known Errors, Warnings, Or Broken Areas
 
-Verification attempted in this shell:
-
-- `git status --branch --short` before export: `## persistent-chronofs-storage...origin/persistent-chronofs-storage`.
-- The working tree had no modified or untracked files before creating `PROJECT_EXPORT.md`.
-- `git diff --check` passed with no output.
-- `cargo`, `rustc`, `qemu-system-x86_64`, and `pwsh` are not on `PATH`, so build/run/test verification could not be performed here.
-
-Observed command failures:
-
-```text
-cargo not found
-rustc not found
-qemu-system-x86_64 not found
-pwsh not found
-```
-
-Known repo issues:
-
-- `Cargo.lock` is stale/inconsistent with current manifests and workspace membership.
-- README's file tree and some milestone language are stale relative to current source files/features.
-- Runtime correctness of BIOS boot, custom BIOS boot, UEFI boot, SMP, storage persistence, networking, mouse/window interaction, syscalls, and ELF execution needs verification on a machine with Rust/QEMU/PowerShell tooling.
-- The code contains many expected `unsafe` blocks because this is kernel/device/boot code. This is not automatically a bug, but it raises review risk.
-- Some source comments still describe old assumptions, for example `keyboard.rs` says the early kernel is single-core/non-preemptive even though SMP and a cooperative scheduler now exist.
+- UEFI loader: `Out of Resources` failure before kernel framebuffer handoff
+  (build/image path itself is fixed).
+- Custom BIOS path: `nasm` not found on PATH locally, so this path is
+  untested in this environment.
+- `ld.lld` not found on PATH locally, so static ELF exec (`exec hello.elf`)
+  cannot be exercised end-to-end here.
+- QEMU monitor key injection garbles longer/typo-adjacent commands during
+  automated verification passes (e.g. `poster system` → `possteerr ssyysttem`,
+  `capsule current` → `ccapsule current`); manual GUI typing has not been
+  available in this environment to confirm Backspace/Shift/typing reliability.
+- `windows close 2` has only a serial-backed confirmation
+  (`sched: killed task 2`, `wm: close sysinfo`); the matching screenshot was an
+  inconclusive black/breakpoint-like framebuffer with no follow-up
+  `windows`/`tasks` capture.
+- No hardware boot, image write, or hardware serial log exists; all hardware
+  claims remain unverified by design.
+- `Cargo.lock` is now consistent with the manifests (previously recorded as
+  stale — that issue is resolved).
 
 ## 11. Important Architecture Decisions Already Made
 
-- Keep early boot approachable by using the `bootloader` crate as the normal BIOS boot image path.
-- Keep optional ownership paths in-repo: custom BIOS Stage 1/Stage 2 and a Rust UEFI loader.
-- Use a shared kernel-side `BootContext` abstraction for bootloader crate and custom/UEFI handoffs.
-- Use framebuffer-provided graphics rather than implementing a GPU/VESA driver in the kernel.
-- Use COM1 serial as the reliable debug path.
-- Keep device drivers small and explicit with direct port I/O helpers.
-- Use legacy PC-compatible devices in QEMU first: PS/2 keyboard/mouse, PIC, PIT, ATA PIO IDE, RTL8139.
-- Use identity mapping heavily in early memory work to keep physical/virtual addresses easy to inspect.
-- Start memory allocation with a fixed 1 MiB bump heap.
-- Keep ChronoFS intentionally simple: fixed metadata layout, 512-byte sectors, contiguous extents, no journal.
+- Keep early boot approachable via the `bootloader` crate as the default BIOS
+  image path; keep custom BIOS Stage 1/Stage 2 and the Rust UEFI loader as
+  optional, separately-tracked paths.
+- Use a shared kernel-side `BootContext` abstraction across bootloader-crate
+  and custom/UEFI handoffs.
+- Use framebuffer-provided graphics rather than a GPU/VESA driver.
+- Use COM1 serial as the reliable debug/evidence path; require exact `cmd:`
+  serial lines before counting a shell command as verified.
+- Keep legacy PC-compatible devices as the QEMU baseline: PS/2 keyboard/mouse,
+  PIC, PIT, ATA PIO IDE, RTL8139.
+- Keep ChronoFS intentionally simple: fixed metadata layout, 512-byte
+  sectors, contiguous extents, no journal beyond the current
+  clean/empty-state journal status.
 - Keep networking intentionally small: static IPv4, ARP, UDP, polling receive.
-- Use ring 3 demos and syscalls to teach privilege separation before building a full process model.
-- Use fixed-capacity arrays and simple limits throughout kernel UI/scheduler/filesystem paths.
-- Use era profiles as data that drives visual/sound/text presentation instead of scattering theme-specific branches.
+- Use Ring 3 demos and a fixed syscall ABI to teach privilege separation
+  before building any general process model; the next safe step is read-only
+  foreground ELF metadata, not a process table (`docs/USERSPACE_NEXT.md`).
+- Treat "implemented in code" and "verified" as distinct status labels
+  everywhere (`AGENTS.md`); never upgrade a status without recorded evidence.
+- v0.3 release sequencing: reliability/verification is the primary track,
+  window/input stabilization is secondary, userspace/process work is an
+  optional stretch track — no new subsystems until existing surfaces have
+  evidence (`docs/ROADMAP_v0.3.md`).
 
 ## 12. What Changed Recently
 
-Recent commits on `persistent-chronofs-storage`:
+Recent commits on `main`:
 
 ```text
-205dc9a Use era profile quest frames
-9ba691f Use era profile museum frames
-f733bc0 Format sysinfo from era profiles
-c66e057 Draw windows from era profiles
-c8fae10 Use era profile cursor timing
-72396f5 Drive boot sounds from era profiles
-09fbabf Render profile-driven framebuffer effects
-99005ce Expand era presentation profiles
-3f94410 Update README for UEFI support
-5b3a49e Document BIOS handoff compatibility
-12a54c0 Describe UEFI boot flow
-b2844a1 Document UEFI boot path
-016bf88 Add guarded UEFI USB writer
-afeae2f Add UEFI QEMU run script
-ca8acc5 Add UEFI image build script
-cc96103 Add UEFI ESP image builder
-d24f1d0 Extend custom boot handoff to v2
-51db57e Implement UEFI kernel loader
-8f803bd Add UEFI loader crate
-53f1a12 Add UEFI target to workspace
-c6febdb Update README for SMP
-e72a6ee Document SMP architecture
-13371df Run QEMU with two CPUs
-93c728a Add cores shell command
-5ab976b Wire SMP into boot
-3be64da Make scheduler SMP-aware
-a0d1f2f Add per-core descriptor tables
-b79231e Add SMP discovery and AP startup
-8ca706e Expose ACPI and SMP boot memory
-c17c650 Add SMP spinlock primitive
+13f2ab6 docs: record userspace and v0.3 planning
+61aecbf docs: update next steps for v0.3
+694ae7a docs: add v0.3 roadmap
+a5a6d79 docs: align userspace model with next steps
+ad316f0 docs: add userspace process next steps
+c592290 docs: refresh status trackers for product polish
+19ab266 docs: update demo and manual verification paths
+46040dd docs: document learning progress map
+bbbe0bf docs: document ChronoFS usability layer
+b551079 docs: document app platform polish
+44c280e docs: update shell command reference
+1a20f39 shell: add workspace app files and learning surfaces
+bba27c1 learn: add museum and quest progress views
+6af8709 apps: enrich static app manifests
+9ba16d1 fs: add ChronoFS inspection helpers
+a54c7ea record verification consolidation progress
+c966224 prioritize input window verification
+a985ee8 point next steps at verification summary
+9a83650 add post verification summary
+c402296 document UEFI loader boot result
 ```
 
-Branch-vs-main scope inspected earlier: this branch adds or modifies substantial OS feature work across storage, UEFI, user ELF loading, SMP, syscalls, networking docs/scripts/tools, frame rendering, themes, and shell/UI features. It is not a small documentation-only branch.
+This is documentation/planning-heavy: the underlying v0.1 verification pass
+(BIOS, ChronoFS, window/input, userspace, UEFI loader) already landed, and
+recent commits layer ChronoFS usability, app platform polish, learning
+progress map, and v0.3 roadmap/next-steps planning on top of it.
 
 ## 13. What Should Be Built Next
 
-Recommended next engineering sequence:
+Per `docs/ROADMAP_v0.3.md` and `docs/NEXT_STEPS.md`:
 
-1. Restore local build tooling and regenerate/validate `Cargo.lock`.
-2. Run compile checks for `kernel`, root BIOS image build, and `uefi-loader`.
-3. Fix compile errors only, if any, without refactoring unrelated code.
-4. Boot QEMU BIOS path and verify baseline shell, serial logs, framebuffer, keyboard, timer, filesystem mount/fallback, and clean shutdown/reboot behavior.
-5. Verify newer risky surfaces one at a time: SMP, mouse/window manager, scheduler tasks, ChronoFS persistence, RTL8139 ARP/UDP, `syshello`, and `exec hello.elf`.
-6. Update README/docs to match the current source tree and shell commands.
-7. Verify IRQ1 keyboard buffering, including shifted characters, Backspace, Enter, and the polling fallback.
-8. Verify reusable heap allocation with repeated open/close, file, app, and task workflows before adding more kernel behavior.
+1. **Primary**: v0.3 educational-workspace verification pass — run the
+   exact-next-prompt QEMU smoke test (see §14) covering `workspace`,
+   `shortcuts`, `whereami`, `status`, `verify`, `help search`, the app
+   platform polish commands, the learning progress map commands, and the
+   ChronoFS usability commands, on visible single-core BIOS QEMU.
+2. **Secondary**: window/input lifecycle stabilization — `windows close
+   <id>`, `tasks`, `kill <observed-id>`, manual typing, Backspace, Shift,
+   visible mouse movement, drag, and mouse close.
+3. **Stretch, optional**: userspace/process foundation limited to read-only
+   foreground ELF metadata per `docs/USERSPACE_NEXT.md` — do not build a
+   process table.
+4. Keep ChronoFS repair/recovery, userspace syscall/ELF execution, and the
+   UEFI `Out of Resources` investigation as separate narrow technical tracks,
+   not blockers for the primary/secondary v0.3 work.
+5. Do not start new feature tracks (networking expansion, USB, dynamic
+   linking, package management, full compositor, preemptive scheduling) until
+   the above are evidence-backed.
 
 ## 14. Recommended Next 5 Codex Prompts
 
-1. "Run the build checks for Chronosapian, fix only compile errors, and do not refactor unrelated code."
-2. "Update README/docs to match the current source tree and implemented shell commands."
-3. "Verify IRQ1 keyboard input in QEMU while preserving the existing polling fallback."
-4. "Exercise reusable heap allocation paths and document any allocator limits or failures."
-5. "Design and implement ChronoFS journaling or a repair tool for interrupted writes."
+From `docs/PROGRESS_AUDIT.md` §10 (current as of the 2026-06-13
+userspace-boundary pass):
+
+1. "Run a focused window lifecycle cleanup pass for `windows close <id>`,
+   `tasks`, and `kill <observed-task-id>` using a fresh disposable QEMU image
+   and real observed IDs. Do not run `kill 0`; do not claim success unless
+   serial and screenshots show removal."
+2. "Run a focused product-command input cleanup pass for `poster system` and
+   `capsule current` using manual typing or a better input harness. Do not
+   claim success unless the serial log shows exact command lines and
+   screenshots show the output."
+3. "Run a controlled ChronoFS repair/recovery QEMU pass on throwaway images
+   for independent write persistence, `fsck repair` on safe synthetic damage,
+   repair refusal cases, and journal rollback/roll-forward/corrupt-record
+   handling. Do not touch the repo data image."
+4. "Run a manual keyboard and mouse interaction pass for manual typing,
+   Backspace, Shift, visible cursor movement, title-bar drag, and mouse
+   close."
+5. "Run a userspace follow-up pass for exact `userspace elf`, exact
+   `syshello`, and controlled `exec hello.elf` only after `ld.lld` or an
+   equivalent safe linker path is available and the known test ELF is
+   installed into a disposable image."
+
+Exact next prompt from `docs/ROADMAP_v0.3.md` (the gating v0.3 smoke pass,
+takes priority over the list above per `docs/NEXT_STEPS.md`):
+
+```text
+Run a v0.3 educational workspace verification pass in visible single-core BIOS QEMU. Verify workspace, shortcuts, whereami, status, verify, help search, apps featured/category/info/demo, learn map/progress/beginner/advanced, museum index, quest badges/dependencies, files list/info/search/sample/demo, and capture serial logs plus screenshots. Do not add features or upgrade labels without evidence.
+```
 
 ## 15. Risks, Confusing Areas, And Cleanup Needs
 
-- Naming is inconsistent: `Chronosapian`, `chronosapien`, and `ChronoOS` all appear as project/OS identifiers.
-- `Cargo.lock` likely blocks reproducible builds until regenerated.
-- Docs are useful but cannot be trusted as complete truth. Source files show newer features than README describes.
-- Many major features are code-present but unverified in this shell. Avoid claiming runtime success until QEMU evidence exists.
-- SMP plus global `UnsafeCell` state needs careful review. Some comments still assume single-core behavior.
-- The cooperative scheduler, window manager, mouse IRQ path, framebuffer writer, and serial output all interact with interrupts and shared state; race/reentrancy review is important.
-- `ring3` intentionally enters a loop after handling the privileged instruction demo; this is expected demo behavior but can surprise users.
-- UEFI loader sets `physical_memory_offset` to `0` and builds identity maps; kernel memory code requires a physical memory offset and treats `Some(0)` as valid. This needs runtime verification on UEFI.
-- ATA path assumes QEMU primary slave IDE disk. UEFI and real hardware may not provide that, so ChronoFS may fall back to heap.
-- Networking assumes RTL8139 on PCI bus 0 and QEMU user-mode network defaults.
-- No automated tests are present. Current verification is script/manual/QEMU based.
+- Naming is inconsistent: `Chronosapian`, `chronosapien`, and `ChronoOS` all
+  appear as project/OS identifiers; intentionally left alone per `AGENTS.md`.
+- Docs outnumber verified evidence: roughly 40 docs exist, but the verified
+  core is narrow (single-core BIOS boot, a few shell commands, a basic
+  ChronoFS CRUD flow, narrow window open/list/focus, and the fixed `ring3`
+  demo). Always check `docs/VERIFICATION_MATRIX.md` before trusting a claim
+  elsewhere, including this file.
+- Several docs are explicitly historical/superseded:
+  `docs/status-audit.md`, `docs/roadmap.md`, `docs/ROADMAP_AFTER_v0.1.md`,
+  `docs/dev-log.md`, and older `docs/AI_PROGRESS_LOG.md` entries (these may
+  reference an earlier "Time Capsule OS" or pure-Chronosapian naming).
+- QEMU monitor key injection is an unreliable input harness for longer
+  commands; future verification passes need slower one-command-at-a-time
+  input or a better interactive path before claiming manual-input success.
+- The `windows close 2` evidence is mixed: serial confirms the close, but the
+  paired screenshot is inconclusive (black/breakpoint-like) with no
+  follow-up `windows`/`tasks` capture — do not treat visual close as proven.
+- SMP plus global `UnsafeCell` state needs careful review; only BSP-online
+  has been observed in the recorded two-core smoke test, not AP-online.
+- ChronoFS repair and journal recovery mutate metadata; any future repair
+  testing must use disposable/throwaway images only, never the repo data
+  image.
+- `nasm` and `ld.lld` are both missing from the local PATH, which blocks
+  custom BIOS build/run and static ELF exec verification until resolved.
+- No automated tests exist; all verification is QEMU/manual/screenshot based,
+  so evidence paths (serial logs, PNGs) are the actual source of truth, not
+  prose claims in docs.
