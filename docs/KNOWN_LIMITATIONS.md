@@ -65,6 +65,17 @@ hardware behavior.
 - `ring3`, `syshello`, and `exec <name>` should be run only during intentional
   verification until stronger evidence exists.
 
+## Verification Environment Limitations
+
+- QEMU monitor `sendkey` injection can duplicate or garble characters in
+  longer commands; it is not accepted as proof of manual keyboard behavior.
+- On macOS, automated GUI keystroke delivery (e.g. `osascript`) into the
+  visible QEMU window has been denied by Accessibility permissions in
+  recorded passes (`docs/AI_PROGRESS_LOG.md`, 2026-06-20). Until a host has
+  Accessibility access granted or another non-garbling input harness exists,
+  manual typing, Backspace, and Shift/capital/symbol input cannot be verified
+  from this kind of automated environment.
+
 ## GUI And Windowing Limitations
 
 - The framebuffer console, top bar, mouse path, and small windows exist in code.

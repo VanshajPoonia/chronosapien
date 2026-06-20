@@ -114,6 +114,14 @@ and should not block BIOS-based product polish.
 
 ## 7. Recommended Next Direction
 
+> **Superseded ordering notice:** the primary/secondary ordering below was
+> written before `docs/ROADMAP_v0.3.md`. ROADMAP_v0.3 and `docs/NEXT_STEPS.md`
+> reverse it: reliability/verification of the educational workspace is the
+> v0.3 primary track and window/input stabilization is the v0.3 secondary
+> track. Treat ROADMAP_v0.3/NEXT_STEPS as authoritative for sequencing; the
+> window/input command list below is still a valid and accurate verification
+> checklist, just not the first thing to run.
+
 Primary track: input/window lifecycle stabilization and verification.
 
 Run a fresh disposable-image BIOS QEMU pass for:

@@ -423,6 +423,11 @@ Recommended v0.3 direction:
 - Primary track: Reliability and verification.
 - Secondary track: ChronoFS hardening.
 
+> **Refined by ROADMAP_v0.3:** the primary track above still holds, but
+> `docs/ROADMAP_v0.3.md` refines the secondary track to window/input
+> stabilization and lists ChronoFS usability as a primary-support track
+> instead. Use ROADMAP_v0.3 for the current track breakdown.
+
 ChronoOS has more than enough code-present surface area. The best next product
 move is to convert existing systems into evidence-backed claims, then deepen one
 serious subsystem with controlled storage tests. Networking expansion, USB,
